@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Entry - Teknobyte</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .form-section {
+            display: none;
+        }
+        .form-section.active {
+            display: block;
+        }
+        #clientSearchResults {
+            position: absolute;
+            z-index: 1000;
+            width: calc(100% - 30px);
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .search-result-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        .search-result-item:hover {
+            background-color: #f5f5f5;
+        }
+        #invoicePreview {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .items-table {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .items-table th {
+            background-color: #4472C4;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        .items-table td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+        .items-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .total-row {
+            background-color: #70AD47 !important;
+            color: white;
+            font-weight: bold;
+        }
+        #addAnotherSection {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">New Sales Invoice</h1>
+            <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-secondary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+                </svg>
+                Back to Menu
+            </a>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <!-- Client Search Section -->
+                <div id="clientSearchSection" class="form-section active">
+                    <h4 class="mb-4">Step 1: Select Customer</h4>
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="clientName" class="form-label">Search Customer</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="clientName" list="clientNames" placeholder="Start typing customer name">
+                                <datalist id="clientNames">
+                                    {% for client in client_names %}
+                                        <option value="{{ client }}">
+                                    {% endfor %}
+                                </datalist>
+                                <button class="btn btn-primary" type="button" id="searchClientBtn">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+                                        <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                                    </svg>
+                                    Search
+                                </button>
+                            </div>
+                            <div id="clientSearchResults"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sales Form Section -->
+                <div id="salesFormSection" class="form-section">
+                    <h4 class="mb-4">Step 2: Enter Sale Details</h4>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="invoiceDate" class="form-label">Invoice Date</label>
+                            <input type="date" class="form-control" id="invoiceDate" value="{{ current_date }}">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="invoiceNumber" class="form-label">Invoice Number</label>
+                            <input type="text" class="form-control" id="invoiceNumber" readonly>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="customerNameDisplay" class="form-label">Customer Name</label>
+                            <input type="text" class="form-control" id="customerNameDisplay" readonly>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="product" class="form-label">Product</label>
+                            <select class="form-select" id="product">
+                                <option value="">Select a product</option>
+                                {% for product in product_names %}
+                                    <option value="{{ product }}">{{ product }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="quantity" class="form-label">Quantity</label>
+                            <input type="number" class="form-control" id="quantity" min="1" value="1">
+                        </div>
+
+                        <div class="col-md-3">
+                            <label for="price" class="form-label">Price (KSh)</label>
+                            <input type="number" class="form-control" id="price" step="0.01" min="0">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="category" class="form-label">Category</label>
+                            <select class="form-select" id="category">
+                                {% for category in categories %}
+                                    <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label for="account" class="form-label">Account Owner</label>
+                            <select class="form-select" id="account">
+                                {% for account in accounts %}
+                                    <option value="{{ account }}">{{ account }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Transaction Type</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="transactionType" id="sellRadio" value="sell" autocomplete="off" checked>
+                                <label class="btn btn-outline-primary" for="sellRadio">Sell</label>
+
+                                <input type="radio" class="btn-check" name="transactionType" id="takeBackRadio" value="take_back" autocomplete="off">
+                                <label class="btn btn-outline-primary" for="takeBackRadio">Take Back</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="notes" class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" rows="2"></textarea>
+                        </div>
+
+                        <div class="col-12 mt-4">
+                            <button type="button" class="btn btn-primary me-2" id="saveSaleBtn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-save" viewBox="0 0 16 16">
+                                    <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
+                                </svg>
+                                Save Sale
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="cancelSaleBtn">Cancel</button>
+                        </div>
+                    </div>
+
+                    <!-- Add Another Section -->
+                    <div id="addAnotherSection" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Add another item to this invoice?</h5>
+                            <div>
+                                <button type="button" class="btn btn-primary me-2" id="addAnotherYesBtn">Yes</button>
+                                <button type="button" class="btn btn-secondary" id="addAnotherNoBtn">No, Download Invoice</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Invoice Preview -->
+                    <div id="invoicePreview" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">Invoice Preview</h5>
+                            <a href="#" class="btn btn-success btn-sm" id="downloadInvoiceBtn" target="_blank">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-download" viewBox="0 0 16 16">
+                                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                                    <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+                                </svg>
+                                Download Invoice
+                            </a>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <p><strong>Invoice Number:</strong> <span id="previewInvoiceNumber"></span></p>
+                                <p><strong>Date:</strong> <span id="previewDate"></span></p>
+                                <p><strong>Customer:</strong> <span id="previewCustomer"></span></p>
+                            </div>
+                        </div>
+
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Quantity</th>
+                                    <th>Unit Price</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoiceItems">
+                                <!-- Items will be added here dynamically -->
+                            </tbody>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td colspan="3">TOTAL</td>
+                                    <td>KSh <span id="previewTotal">0.00</span></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Client search functionality
+            const clientNameInput = document.getElementById('clientName');
+            const searchClientBtn = document.getElementById('searchClientBtn');
+            const clientSearchResults = document.getElementById('clientSearchResults');
+            const salesFormSection = document.getElementById('salesFormSection');
+            const customerNameDisplay = document.getElementById('customerNameDisplay');
+            const invoiceNumber = document.getElementById('invoiceNumber');
+            const invoiceDate = document.getElementById('invoiceDate');
+            const invoiceItemsTable = document.getElementById('invoiceItems');
+            const addAnotherSection = document.getElementById('addAnotherSection');
+            const addAnotherYesBtn = document.getElementById('addAnotherYesBtn');
+            const addAnotherNoBtn = document.getElementById('addAnotherNoBtn');
+            const downloadInvoiceBtn = document.getElementById('downloadInvoiceBtn');
+            const saveSaleBtn = document.getElementById('saveSaleBtn');
+
+            let currentItems = [];
+            let currentInvoiceUrl = '';
+
+            // Search for client
+            searchClientBtn.addEventListener('click', function() {
+                const clientName = clientNameInput.value.trim();
+                if (!clientName) return;
+
+                fetch('/sales/entry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=search_client&client_name=${encodeURIComponent(clientName)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'not_found') {
+                        alert('Client not found. Please add the client first.');
+                    } else if (data.status === 'single_result') {
+                        selectClient(data.client_name);
+                    } else if (data.status === 'multiple_results') {
+                        showClientResults(data.clients);
+                    }
+                });
+            });
+
+            function showClientResults(clients) {
+                clientSearchResults.innerHTML = '';
+                clients.forEach(client => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-item';
+                    item.textContent = client;
+                    item.addEventListener('click', function() {
+                        selectClient(client);
+                    });
+                    clientSearchResults.appendChild(item);
+                });
+                clientSearchResults.style.display = 'block';
+            }
+
+            function selectClient(clientName) {
+                clientSearchResults.style.display = 'none';
+                customerNameDisplay.value = clientName;
+
+                // Get next invoice number and date
+                fetch('/sales/entry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=select_client&client_name=${encodeURIComponent(clientName)}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        invoiceNumber.value = data.invoice_number;
+                        invoiceDate.value = data.current_date;
+
+                        // Switch to sales form
+                        document.getElementById('clientSearchSection').classList.remove('active');
+                        salesFormSection.classList.add('active');
+                    }
+                });
+            }
+
+            // Save sale
+            saveSaleBtn.addEventListener('click', function() {
+                const formData = {
+                    invoice_date: invoiceDate.value,
+                    invoice_number: invoiceNumber.value,
+                    client_name: customerNameDisplay.value,
+                    product: document.getElementById('product').value,
+                    quantity: document.getElementById('quantity').value,
+                    price: document.getElementById('price').value,
+                    category: document.getElementById('category').value,
+                    account: document.getElementById('account').value,
+                    notes: document.getElementById('notes').value,
+                    transaction_type: document.querySelector('input[name="transactionType"]:checked').value,
+                    add_another: 'no' // We'll handle this in the UI
+                };
+
+                // Basic validation
+                if (!formData.product || !formData.price) {
+                    alert('Please fill in all required fields');
+                    return;
+                }
+
+                fetch('/sales/entry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=save_sale&${new URLSearchParams(formData).toString()}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success' || data.status === 'add_another') {
+                        // Add the new item to our current items array
+                        const newItem = {
+                            description: formData.product,
+                            quantity: formData.quantity,
+                            unitPrice: formData.price,
+                            total: (formData.quantity * formData.price).toFixed(2)
+                        };
+                        currentItems.push(newItem);
+                        currentInvoiceUrl = data.invoice_url;
+
+                        // Update invoice preview
+                        updateInvoicePreview(data.invoice_number, formData.invoice_date, formData.client_name, currentItems);
+
+                        // Show the "add another" section and hide the save button
+                        saveSaleBtn.style.display = 'none';
+                        addAnotherSection.style.display = 'block';
+                        document.getElementById('invoicePreview').style.display = 'block';
+                    } else {
+                        alert(data.message);
+                    }
+                });
+            });
+
+            // Add another item
+            addAnotherYesBtn.addEventListener('click', function() {
+                // Reset product fields but keep invoice details
+                document.getElementById('product').value = '';
+                document.getElementById('quantity').value = '1';
+                document.getElementById('price').value = '';
+                document.getElementById('category').value = 'Books';
+                document.getElementById('notes').value = '';
+
+                // Hide add another section and show save button
+                addAnotherSection.style.display = 'none';
+                saveSaleBtn.style.display = 'block';
+
+                // Focus on product field for next entry
+                document.getElementById('product').focus();
+            });
+
+            // Don't add another item - download invoice
+            addAnotherNoBtn.addEventListener('click', function() {
+                window.location.href = currentInvoiceUrl;
+            });
+
+            // Download invoice button
+            downloadInvoiceBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (currentInvoiceUrl) {
+                    window.location.href = currentInvoiceUrl;
+                }
+            });
+
+            function updateInvoicePreview(invoiceNumber, invoiceDate, customerName, items) {
+                document.getElementById('previewInvoiceNumber').textContent = invoiceNumber;
+                document.getElementById('previewDate').textContent = invoiceDate;
+                document.getElementById('previewCustomer').textContent = customerName;
+
+                // Clear existing items
+                invoiceItemsTable.innerHTML = '';
+
+                // Add all items
+                let totalAmount = 0;
+    items.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${item.description}</td>
+            <td>${item.quantity}</td>
+            <td>KSh ${parseFloat(item.unitPrice).toFixed(2)}</td>
+            <td>KSh ${parseFloat(item.total).toFixed(2)}</td>
+        `;
+        invoiceItemsTable.appendChild(row);
+        totalAmount += parseFloat(item.total);
+    });
+
+                // Update total
+                document.getElementById('previewTotal').textContent = totalAmount.toFixed(2);
+            }
+
+            // Cancel buttons
+            document.getElementById('cancelSaleBtn').addEventListener('click', function() {
+                salesFormSection.classList.remove('active');
+                document.getElementById('clientSearchSection').classList.add('active');
+                currentItems = [];
+                document.getElementById('invoicePreview').style.display = 'none';
+                saveSaleBtn.style.display = 'block';
+                addAnotherSection.style.display = 'none';
+            });
+        });
+    </script>
+</body>
+</html>

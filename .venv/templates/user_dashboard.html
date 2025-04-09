@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .navbar-custom {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .navbar-custom a {
+            margin-right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="navbar-custom d-flex justify-content-start align-items-center">
+            <h4 class="mr-4 mb-0">User Dashboard</h4>
+            <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-primary">Sales</a>
+            <a href="#" class="btn btn-outline-secondary">Bills</a>
+            <a href="#" class="btn btn-outline-success">Clients</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Logout</a>
+        </div>
+    </div>
+</body>
+</html>

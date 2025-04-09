@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice No {{ invoice[0] }} - Details</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .invoice-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .invoice-table {
+            width: 100%;
+        }
+        .invoice-table th {
+            width: 30%;
+            padding: 12px;
+            font-weight: 600;
+            color: #495057;
+            background-color: #f8f9fa;
+        }
+        .invoice-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .status-paid {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-pending {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .card {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            border: none;
+            border-radius: 0.5rem;
+        }
+        .card-header {
+            border-radius: 0.5rem 0.5rem 0 0 !important;
+        }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Invoice #{{ invoice[0] }}</h2>
+        <span class="badge badge-{% if invoice[18] == 'Paid' %}success{% else %}danger{% endif %} p-2">
+            {{ invoice[18] }}
+        </span>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header invoice-header">
+            <h5 class="mb-0">Invoice Details</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="invoice-table">
+                <tr>
+                    <th>Invoice Date</th>
+                    <td>{{ invoice[1].strftime('%d-%m-%Y') }}</td>
+                </tr>
+                <tr>
+                    <th>Invoice No</th>
+                    <td>{{ invoice[2] }}</td>
+                </tr>
+                <tr>
+                    <th>Customer Name</th>
+                    <td>{{ invoice[3] }}</td>
+                </tr>
+                <tr>
+                    <th>Product</th>
+                    <td>{{ invoice[6] }}</td>
+                </tr>
+                <tr>
+                    <th>Quantity</th>
+                    <td>{{ invoice[7] }}</td>
+                </tr>
+                <tr>
+                    <th>Amount (each)</th>
+                    <td>{{ "{:,.2f}".format(invoice[8]) }}</td>
+                </tr>
+                <tr>
+                    <th>Total Amount</th>
+                    <td><strong>{{ "{:,.2f}".format(invoice[9]) }}</strong></td>
+                </tr>
+                <tr>
+                    <th>Amount Paid</th>
+                    <td>{{ "{:,.2f}".format(invoice[10]) }}</td>
+                </tr>
+                <tr>
+                    <th>Balance Due</th>
+                    <td class="{% if invoice[11] > 0 %}status-pending{% else %}status-paid{% endif %}">
+                        {{ "{:,.2f}".format(invoice[11]) }}
+                    </td>
+                </tr>
+                <tr>
+                    <th>Payment Date</th>
+                    <td>{{ invoice[12].strftime('%d-%m-%Y') if invoice[12] else 'Not Paid currently' }}</td>
+                </tr>
+                <tr>
+                    <th>Category</th>
+                    <td>{{ invoice[13] }}</td>
+                </tr>
+                <tr>
+                    <th>Account Owner</th>
+                    <td>{{ invoice[14] }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between">
+        <a href="{{ url_for('search_invoices') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Invoices
+        </a>
+    </div>
+</div>
+
+<!-- Font Awesome for icons -->
+<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+<!-- Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
