@@ -28,9 +28,7 @@ app.secret_key = 'your_secret_key'
 # Create invoice folder to store downloaded invoices
 app.config['UPLOAD_FOLDER'] = 'invoices'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
-app.config['SQLALCHEMY_DATABASE_URI'] = (
-    "postgresql+psycopg2://<DB_USER>:<DB_PASSWORD>@localhost:5432/<DB_NAME>"
-)
+
 
 
 # Database configuration
