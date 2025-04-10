@@ -2,6 +2,7 @@
 from flask import Flask,flash, session, render_template, request, redirect, url_for, send_from_directory, jsonify, make_response
 import os
 import io
+from io import BytesIO
 from datetime import datetime, timedelta
 import re
 import shutil
@@ -157,51 +158,100 @@ def validate_password(password):
         return "Password must contain at least one special symbol (!@#$%^&*)."
 
 # Generate Receipt function
-def generate_receipt(sales_id, customer_name, invoice_no, amount_paid,
-                   previous_bal, new_bal, payment_date, is_full_payment):
+def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, previous_bal, new_bal, payment_date, items):
+    receipt_buffer = BytesIO()
 
-        buffer = io.BytesIO()
-        p = canvas.Canvas(buffer, pagesize=letter)
+    c = canvas.Canvas(receipt_buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    style_normal = styles["Normal"]
 
-        # Receipt Header
-        p.setFont("Helvetica-Bold", 16)
-        p.drawString(100, 750, "PAYMENT RECEIPT")
-        p.line(100, 745, 500, 745)
+    # Company information
+    address = "Brightwoods Apartment, Chania Ave"
+    city_state_zip = "PO. Box 74080-00200, Nairobi, KENYA"
+    phone = "Phone: +254-705917383"
+    email = "Email: info@teknobyte.ltd"
+    kra_pin = "PIN: P051155522R"
 
+    c.setFont("Helvetica", 8)
+    c.drawString(430, 740, "")
+    c.drawString(430, 730, address)
+    c.drawString(430, 720, city_state_zip)
+    c.drawString(430, 710, phone)
+    c.drawString(430, 700, email)
+    c.drawString(430, 690, kra_pin)
+    c.drawString(430, 660, "")
 
-        # Receipt Details
-        p.setFont("Helvetica", 12)
-        y_position = 700
-        details = [
-            f"Receipt No: RCPT-{sales_id:05d}",
-            f"Invoice No: {invoice_no}",
-            f"Customer: {customer_name}",
-            f"Payment Date: {payment_date.strftime('%Y-%m-%d')}",
-            "",
-            f"Amount Paid: ${amount_paid:.2f}",
-            f"Previous Balance: ${previous_bal:.2f}",
-            f"New Balance: ${new_bal:.2f}",
-            "",
-            f"Payment Status: {'FULL PAYMENT' if is_full_payment else 'PARTIAL PAYMENT'}"
-        ]
+    # Receipt title and payment details
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(250, 640, "Payment Receipt")
 
-        for line in details:
-            p.drawString(100, y_position, line)
-            y_position -= 30
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 600, f"Date: {payment_date}")
+    c.drawString(50, 580, f"Invoice No: {invoice_no}")
 
-        # Payment summary box
-        p.rect(100, y_position - 50, 400, 80)
-        p.setFont("Helvetica-Bold", 14)
-        p.drawString(120, y_position - 20, "PAYMENT SUMMARY")
-        p.setFont("Helvetica", 12)
-        p.drawString(120, y_position - 50, f"Total Paid: ${amount_paid:.2f}")
-        p.drawString(120, y_position - 80, f"Remaining Balance: ${new_bal:.2f}")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 560, f"Client: {customer_name}")
 
-        p.showPage()
-        p.save()
+    # Items table
+    data = [
+        ['Description', 'Qty', 'Unit Price', 'Amount']
+    ]
+    for item in items:
+        data.append([
+            item['description'],
+            str(item['quantity']),
+            f"KSh {item['unit_price']:,.1f}",
+            f"KSh {item['total']:,.1f}"
+        ])
 
-        buffer.seek(0)
-        return buffer
+    table = Table(data, colWidths=[3 * inch, 1 * inch, 1.5 * inch, 1.5 * inch])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+
+    table_height = len(data) * 20
+    table.wrapOn(c, 0, 0)
+    table.drawOn(c, 50, 500 - table_height)
+
+    # Add total amount
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(400, 480 - table_height, f"Total Amount: KSh {sum(item['total'] for item in items):,.1f}")
+
+    # Payment details
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 460 - table_height, f"Amount Paid: KSh {amount_paid:,.1f}")
+    c.drawString(50, 440 - table_height, f"Previous Balance: KSh {previous_bal:,.1f}")
+    c.drawString(50, 420 - table_height, f"New Balance: KSh {new_bal:,.1f}")
+
+    # Payment status (Paid or Balance remaining)
+    c.setFont("Helvetica-Bold", 12)
+    if new_bal == 0:
+        c.drawString(50, 400 - table_height, "Payment Status: Paid in Full")
+    else:
+        c.drawString(50, 400 - table_height, f"Balance Remaining: KSh {new_bal:,.1f}")
+
+    # Notes section if any balance remains
+    if new_bal > 0:
+        c.setFont("Helvetica", 10)
+        c.drawString(50, 380 - table_height, "Please settle the remaining balance at your earliest convenience.")
+
+    # Accountant details
+    c.setFont("Helvetica", 12)
+    c.drawString(50, 200, "John Kungu")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 180, "ACCOUNTANT")
+
+    c.save()
+    receipt_buffer.seek(0)
+
+    return receipt_buffer
+
 # Login Page
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -621,7 +671,12 @@ def update_payment(sales_id):
                 previous_bal = float(invoice[11]),
                 new_bal = balance,
                 payment_date = datetime.now().date(),
-                is_full_payment=(balance==0)
+                items=[{
+                    'description': product,
+                    'quantity': int(quantity),
+                    'unit_price': float(amount),
+                    'total': int(quantity) * float(amount)
+                }]
             )
 
             flash("Payment updated successfully!", "success")
@@ -630,9 +685,12 @@ def update_payment(sales_id):
             response.headers['Content-Type'] = 'application/pdf'
             response.headers['Content-Disposition'] = f'attachment; filename=receipt_{invoice_no}.pdf'
 
-            return response
+            def after_response():
+                return redirect(url_for('view_sales', sales_id=sales_id))
 
-            return redirect(url_for('view_sales', sales_id = sales_id))
+            response.call_on_close(after_response)
+
+            return response
         except Exception as e:
             conn.rollback()
             flash(f"Error: {str(e)}", "danger")
