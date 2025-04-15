@@ -67,6 +67,27 @@
             border-radius: 5px;
             border: 1px solid #dee2e6;
         }
+        .transaction-type-badge {
+            font-size: 0.8em;
+            padding: 3px 6px;
+            border-radius: 3px;
+        }
+        .badge-sell {
+            background-color: #28a745;
+            color: white;
+        }
+        .badge-take-back {
+            background-color: #dc3545;
+            color: white;
+        }
+        #transactionTypeSection {
+            text-align: left;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
     </style>
 </head>
 <body>
@@ -108,9 +129,34 @@
                     </div>
                 </div>
 
+                <!-- Transaction Type Selection Section -->
+                <div id="transactionTypeSection" class="form-section">
+                    <h4 class="mb-4">Step 2: Select Transaction Type</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="btn-group w-100">
+                                <button type="button" class="btn btn-primary" id="sellBtn">
+                                    Sell Products
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" id="takeBackBtn">
+                                    Take Back Products
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-left">
+                        <button type="button" class="btn btn-outline-secondary" id="backToClientSearchBtn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+                            </svg>
+                            Back to Customer Selection
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Sales Form Section -->
                 <div id="salesFormSection" class="form-section">
-                    <h4 class="mb-4">Step 2: Enter Sale Details</h4>
+                    <h4 class="mb-4">Step 3: Enter <span id="transactionTypeHeading">Sale</span> Details</h4>
 
                     <div class="row g-3">
                         <div class="col-md-4">
@@ -168,13 +214,7 @@
 
                         <div class="col-md-4">
                             <label class="form-label">Transaction Type</label>
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="transactionType" id="sellRadio" value="sell" autocomplete="off" checked>
-                                <label class="btn btn-outline-primary" for="sellRadio">Sell</label>
-
-                                <input type="radio" class="btn-check" name="transactionType" id="takeBackRadio" value="take_back" autocomplete="off">
-                                <label class="btn btn-outline-primary" for="takeBackRadio">Take Back</label>
-                            </div>
+                            <input type="text" class="form-control" id="transactionTypeDisplay" readonly>
                         </div>
 
                         <div class="col-12">
@@ -187,9 +227,14 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-save" viewBox="0 0 16 16">
                                     <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1H2z"/>
                                 </svg>
-                                Save Sale
+                                Save Transaction
                             </button>
-                            <button type="button" class="btn btn-outline-secondary" id="cancelSaleBtn">Cancel</button>
+                            <button type="button" class="btn btn-outline-secondary" id="backToTransactionTypeBtn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+                                </svg>
+                                Back
+                            </button>
                         </div>
                     </div>
 
@@ -221,6 +266,7 @@
                                 <p><strong>Invoice Number:</strong> <span id="previewInvoiceNumber"></span></p>
                                 <p><strong>Date:</strong> <span id="previewDate"></span></p>
                                 <p><strong>Customer:</strong> <span id="previewCustomer"></span></p>
+                                <p><strong>Transaction Type:</strong> <span id="previewTransactionType"></span></p>
                             </div>
                         </div>
 
@@ -256,6 +302,8 @@
             const clientNameInput = document.getElementById('clientName');
             const searchClientBtn = document.getElementById('searchClientBtn');
             const clientSearchResults = document.getElementById('clientSearchResults');
+            const clientSearchSection = document.getElementById('clientSearchSection');
+            const transactionTypeSection = document.getElementById('transactionTypeSection');
             const salesFormSection = document.getElementById('salesFormSection');
             const customerNameDisplay = document.getElementById('customerNameDisplay');
             const invoiceNumber = document.getElementById('invoiceNumber');
@@ -266,9 +314,16 @@
             const addAnotherNoBtn = document.getElementById('addAnotherNoBtn');
             const downloadInvoiceBtn = document.getElementById('downloadInvoiceBtn');
             const saveSaleBtn = document.getElementById('saveSaleBtn');
+            const sellBtn = document.getElementById('sellBtn');
+            const takeBackBtn = document.getElementById('takeBackBtn');
+            const transactionTypeDisplay = document.getElementById('transactionTypeDisplay');
+            const transactionTypeHeading = document.getElementById('transactionTypeHeading');
+            const backToClientSearchBtn = document.getElementById('backToClientSearchBtn');
+            const backToTransactionTypeBtn = document.getElementById('backToTransactionTypeBtn');
 
             let currentItems = [];
             let currentInvoiceUrl = '';
+            let currentTransactionType = 'sell';
 
             // Search for client
             searchClientBtn.addEventListener('click', function() {
@@ -326,12 +381,43 @@
                         invoiceNumber.value = data.invoice_number;
                         invoiceDate.value = data.current_date;
 
-                        // Switch to sales form
-                        document.getElementById('clientSearchSection').classList.remove('active');
-                        salesFormSection.classList.add('active');
+                        // Switch to transaction type selection
+                        clientSearchSection.classList.remove('active');
+                        transactionTypeSection.classList.add('active');
                     }
                 });
             }
+
+            // Transaction type selection
+            sellBtn.addEventListener('click', function() {
+                currentTransactionType = 'sell';
+                transactionTypeDisplay.value = 'Sell';
+                transactionTypeHeading.textContent = 'Sale';
+                proceedToSalesForm();
+            });
+
+            takeBackBtn.addEventListener('click', function() {
+                currentTransactionType = 'take_back';
+                transactionTypeDisplay.value = 'Take Back';
+                transactionTypeHeading.textContent = 'Take Back';
+                proceedToSalesForm();
+            });
+
+            function proceedToSalesForm() {
+                transactionTypeSection.classList.remove('active');
+                salesFormSection.classList.add('active');
+            }
+
+            // Navigation buttons
+            backToClientSearchBtn.addEventListener('click', function() {
+                transactionTypeSection.classList.remove('active');
+                clientSearchSection.classList.add('active');
+            });
+
+            backToTransactionTypeBtn.addEventListener('click', function() {
+                salesFormSection.classList.remove('active');
+                transactionTypeSection.classList.add('active');
+            });
 
             // Save sale
             saveSaleBtn.addEventListener('click', function() {
@@ -345,7 +431,7 @@
                     category: document.getElementById('category').value,
                     account: document.getElementById('account').value,
                     notes: document.getElementById('notes').value,
-                    transaction_type: document.querySelector('input[name="transactionType"]:checked').value,
+                    transaction_type: currentTransactionType,
                     add_another: 'no' // We'll handle this in the UI
                 };
 
@@ -366,17 +452,27 @@
                 .then(data => {
                     if (data.status === 'success' || data.status === 'add_another') {
                         // Add the new item to our current items array
+                        const quantity = currentTransactionType === 'take_back' ?
+                            -Math.abs(formData.quantity) : formData.quantity;
+
                         const newItem = {
                             description: formData.product,
-                            quantity: formData.quantity,
+                            quantity: quantity,
                             unitPrice: formData.price,
-                            total: (formData.quantity * formData.price).toFixed(2)
+                            total: (quantity * formData.price).toFixed(2),
+                            type: currentTransactionType
                         };
                         currentItems.push(newItem);
                         currentInvoiceUrl = data.invoice_url;
 
                         // Update invoice preview
-                        updateInvoicePreview(data.invoice_number, formData.invoice_date, formData.client_name, currentItems);
+                        updateInvoicePreview(
+                            data.invoice_number,
+                            formData.invoice_date,
+                            formData.client_name,
+                            currentTransactionType,
+                            currentItems
+                        );
 
                         // Show the "add another" section and hide the save button
                         saveSaleBtn.style.display = 'none';
@@ -394,7 +490,7 @@
                 document.getElementById('product').value = '';
                 document.getElementById('quantity').value = '1';
                 document.getElementById('price').value = '';
-                document.getElementById('category').value = 'Books';
+                document.getElementById('category').value = document.getElementById('category').options[0].value;
                 document.getElementById('notes').value = '';
 
                 // Hide add another section and show save button
@@ -418,41 +514,33 @@
                 }
             });
 
-            function updateInvoicePreview(invoiceNumber, invoiceDate, customerName, items) {
+            function updateInvoicePreview(invoiceNumber, invoiceDate, customerName, transactionType, items) {
                 document.getElementById('previewInvoiceNumber').textContent = invoiceNumber;
                 document.getElementById('previewDate').textContent = invoiceDate;
                 document.getElementById('previewCustomer').textContent = customerName;
+                document.getElementById('previewTransactionType').textContent =
+                    transactionType === 'sell' ? 'Sale' : 'Take Back';
 
                 // Clear existing items
                 invoiceItemsTable.innerHTML = '';
 
                 // Add all items
                 let totalAmount = 0;
-    items.forEach(item => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            <td>${item.description}</td>
-            <td>${item.quantity}</td>
-            <td>KSh ${parseFloat(item.unitPrice).toFixed(2)}</td>
-            <td>KSh ${parseFloat(item.total).toFixed(2)}</td>
-        `;
-        invoiceItemsTable.appendChild(row);
-        totalAmount += parseFloat(item.total);
-    });
+                items.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.description}</td>
+                        <td>${Math.abs(item.quantity)}</td>
+                        <td>KSh ${parseFloat(item.unitPrice).toFixed(2)}</td>
+                        <td>KSh ${parseFloat(item.total).toFixed(2)}</td>
+                    `;
+                    invoiceItemsTable.appendChild(row);
+                    totalAmount += parseFloat(item.total);
+                });
 
                 // Update total
                 document.getElementById('previewTotal').textContent = totalAmount.toFixed(2);
             }
-
-            // Cancel buttons
-            document.getElementById('cancelSaleBtn').addEventListener('click', function() {
-                salesFormSection.classList.remove('active');
-                document.getElementById('clientSearchSection').classList.add('active');
-                currentItems = [];
-                document.getElementById('invoicePreview').style.display = 'none';
-                saveSaleBtn.style.display = 'block';
-                addAnotherSection.style.display = 'none';
-            });
         });
     </script>
 </body>

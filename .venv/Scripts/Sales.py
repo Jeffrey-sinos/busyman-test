@@ -158,7 +158,7 @@ def validate_password(password):
         return "Password must contain at least one special symbol (!@#$%^&*)."
 
 # Generate Receipt function
-def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, previous_bal, new_bal, payment_date, items):
+def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, new_bal, payment_date, items):
     receipt_buffer = BytesIO()
 
     c = canvas.Canvas(receipt_buffer, pagesize=letter)
@@ -183,10 +183,10 @@ def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, previous_
 
     # Receipt title and payment details
     c.setFont("Helvetica-Bold", 20)
-    c.drawString(250, 640, "Payment Receipt")
+    c.drawString(250, 640, "Receipt")
 
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, 600, f"Date: {payment_date}")
+    c.drawString(50, 600, f"Date: {payment_date.strftime('%d-%m-%Y')}")
     c.drawString(50, 580, f"Invoice No: {invoice_no}")
 
     c.setFont("Helvetica-Bold", 12)
@@ -200,8 +200,8 @@ def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, previous_
         data.append([
             item['description'],
             str(item['quantity']),
-            f"KSh {item['unit_price']:,.1f}",
-            f"KSh {item['total']:,.1f}"
+            f"Ksh {item['unit_price']:,.1f}",
+            f"Ksh {item['total']:,.1f}"
         ])
 
     table = Table(data, colWidths=[3 * inch, 1 * inch, 1.5 * inch, 1.5 * inch])
@@ -219,27 +219,14 @@ def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, previous_
     table.wrapOn(c, 0, 0)
     table.drawOn(c, 50, 500 - table_height)
 
-    # Add total amount
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(400, 480 - table_height, f"Total Amount: KSh {sum(item['total'] for item in items):,.1f}")
-
     # Payment details
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, 460 - table_height, f"Amount Paid: KSh {amount_paid:,.1f}")
-    c.drawString(50, 440 - table_height, f"Previous Balance: KSh {previous_bal:,.1f}")
-    c.drawString(50, 420 - table_height, f"New Balance: KSh {new_bal:,.1f}")
+    c.drawString(400, 480 - table_height, f"Paid: Ksh {amount_paid:,.1f}")
 
     # Payment status (Paid or Balance remaining)
     c.setFont("Helvetica-Bold", 12)
-    if new_bal == 0:
-        c.drawString(50, 400 - table_height, "Payment Status: Paid in Full")
-    else:
-        c.drawString(50, 400 - table_height, f"Balance Remaining: KSh {new_bal:,.1f}")
+    c.drawString(400, 460 - table_height, f"Balance: Ksh {new_bal:,.1f}")
 
-    # Notes section if any balance remains
-    if new_bal > 0:
-        c.setFont("Helvetica", 10)
-        c.drawString(50, 380 - table_height, "Please settle the remaining balance at your earliest convenience.")
 
     # Accountant details
     c.setFont("Helvetica", 12)
@@ -351,7 +338,7 @@ def sales_entry():
         elif action == 'save_sale':
             try:
                 # Get form data
-                invoice_date = request.form.get('invoice_date')
+                invoice_date = datetime.strptime(request.form.get('invoice_date'), '%Y-%m-%d')
                 invoice_number = request.form.get('invoice_number')
                 customer_name = request.form.get('client_name')
                 product = request.form.get('product')
@@ -360,8 +347,12 @@ def sales_entry():
                 category = request.form.get('category')
                 account_owner = request.form.get('account')
                 notes = request.form.get('notes', '')
-                transaction_type = request.form.get('transaction_type')
+                transaction_type = request.form.get('transaction_type')  # 'sell' or 'take_back'
                 add_another = request.form.get('add_another', 'no') == 'yes'
+
+                # Adjust quantity based on transaction type
+                if transaction_type == 'take_back':
+                    quantity = -abs(quantity)  # Ensure quantity is negative for take back
 
                 # Calculation of Values
                 total = round(quantity * price, 2)
@@ -370,10 +361,6 @@ def sales_entry():
                 paid_date = None
                 acc_status = 'Active'
                 payment_status = 'Not Paid'
-
-                if quantity < 0:
-                    total = abs(total)
-                    payment_status = 'Refund'
 
                 current_datetime = get_current_datetime()
 
@@ -386,7 +373,7 @@ def sales_entry():
                         invoice_date, invoice_no, customer_name, product, qty, 
                         amt, total, paid, bal, paid_date, category, 
                         account_owner, acc_status, payment_status
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING sales_id;
                 """, (
                     invoice_date, invoice_number, customer_name, product, quantity,
@@ -398,12 +385,12 @@ def sales_entry():
                 conn.commit()
 
                 cursor.execute("""
-                                   SELECT product as description, qty as quantity, 
-                                          amt as unit_price, total as total
-                                   FROM sales 
-                                   WHERE invoice_no = %s
-                                   ORDER BY sales_id
-                               """, (invoice_number,))
+                    SELECT product as description, qty as quantity, 
+                           amt as unit_price, total as total
+                    FROM sales 
+                    WHERE invoice_no = %s
+                    ORDER BY sales_id
+                """, (invoice_number,))
 
                 columns = [desc[0] for desc in cursor.description]
                 all_items = []
@@ -414,13 +401,13 @@ def sales_entry():
                 invoice_data = {
                     'customer_name': customer_name,
                     'invoice_number': invoice_number,
-                    'invoice_date': invoice_date,
+                    'invoice_date': invoice_date.strftime('%d-%m-%Y'),
                     'items': [{
                         'description': item['description'],
                         'quantity': item['quantity'],
                         'unit_price': item['unit_price'],
-                        'total': item['total']
-                    }for item in all_items],
+                        'total': item['total'],
+                    } for item in all_items],
                     'total_amount': sum(item['total'] for item in all_items),
                     'notes': notes,
                     'payment_status': payment_status
@@ -495,6 +482,55 @@ def download_invoice(filename):
         filename,
         as_attachment=True
     )
+
+# Download receipt route
+@app.route('/download_receipt/<int:sales_id>')
+def download_receipt(sales_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM sales WHERE sales_id = %s", (sales_id,))
+    invoice = cur.fetchone()
+
+    if not invoice:
+        flash("Invoice not found", "danger")
+        return redirect(url_for('search_invoices'))
+
+    # Extract fields from the invoice row (assuming a column order)
+    customer_name = invoice[3]
+    invoice_no = invoice[2]
+    product = invoice[6]
+    quantity = invoice[7]
+    amount = invoice[8]
+    paid = invoice[10]
+    balance = invoice[11]
+
+    receipt_buffer = generate_receipt(
+        sales_id = sales_id,
+        customer_name = customer_name,
+        invoice_no = invoice_no,
+        amount_paid = paid,
+        new_bal = balance,
+        payment_date = datetime.now().date(),
+        items=[{
+            'description': product,
+            'quantity': int(quantity),
+            'unit_price': float(amount),
+            'total': int(quantity) * float(amount)
+        }]
+    )
+
+    cur.close()
+    conn.close()
+
+    response = make_response(receipt_buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=receipt_{invoice_no}.pdf'
+    return response
+
 
 # Search invoices route
 @app.route('/search_invoices', methods=['GET', 'POST'])
@@ -662,35 +698,8 @@ def update_payment(sales_id):
                 sales_id
             ))
             conn.commit()
+            return redirect(url_for('view_sales', sales_id=sales_id))
 
-            receipt_buffer = generate_receipt(
-                sales_id = sales_id,
-                customer_name=customer_name,
-                invoice_no = invoice_no,
-                amount_paid = paid,
-                previous_bal = float(invoice[11]),
-                new_bal = balance,
-                payment_date = datetime.now().date(),
-                items=[{
-                    'description': product,
-                    'quantity': int(quantity),
-                    'unit_price': float(amount),
-                    'total': int(quantity) * float(amount)
-                }]
-            )
-
-            flash("Payment updated successfully!", "success")
-
-            response = make_response(receipt_buffer.getvalue())
-            response.headers['Content-Type'] = 'application/pdf'
-            response.headers['Content-Disposition'] = f'attachment; filename=receipt_{invoice_no}.pdf'
-
-            def after_response():
-                return redirect(url_for('view_sales', sales_id=sales_id))
-
-            response.call_on_close(after_response)
-
-            return response
         except Exception as e:
             conn.rollback()
             flash(f"Error: {str(e)}", "danger")
@@ -848,8 +857,8 @@ def create_invoice(invoice_data, filename):
         data.append([
             item['description'],
             str(item['quantity']),
-            f"KSh {item['unit_price']:,.1f}",
-            f"KSh {item['total']:,.1f}"
+            f"Ksh {item['unit_price']:,.1f}",
+            f"Ksh {item['total']:,.1f}"
         ])
 
     table = Table(data, colWidths=[3 * inch, 1 * inch, 1.5 * inch, 1.5 * inch])
