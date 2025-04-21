@@ -77,7 +77,7 @@ def get_next_invoice_number():
         cursor.close()
         conn.close()
 
-# display products function
+# Display products function
 def read_product_names():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -91,7 +91,7 @@ def read_product_names():
         cursor.close()
         conn.close()
 
-# display categories function
+# Display categories function
 def read_categories():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -106,7 +106,7 @@ def read_categories():
         cursor.close
         conn.close
 
-# display account owners function
+# Display account owners function
 def read_account_owners():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -121,7 +121,7 @@ def read_account_owners():
         cursor.close
         conn.close
 
-# display clients function
+# Display clients function
 def read_client_names():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -352,7 +352,7 @@ def sales_entry():
 
                 # Adjust quantity based on transaction type
                 if transaction_type == 'take_back':
-                    quantity = -abs(quantity)  # Ensure quantity is negative for take back
+                    quantity = -abs(quantity)  # quantity is negative for take back
 
                 # Calculation of Values
                 total = round(quantity * price, 2)
@@ -499,7 +499,7 @@ def download_receipt(sales_id):
         flash("Invoice not found", "danger")
         return redirect(url_for('search_invoices'))
 
-    # Extract fields from the invoice row (assuming a column order)
+    # Extract fields from the invoice row
     customer_name = invoice[3]
     invoice_no = invoice[2]
     product = invoice[6]
@@ -530,7 +530,6 @@ def download_receipt(sales_id):
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = f'attachment; filename=receipt_{invoice_no}.pdf'
     return response
-
 
 # Search invoices route
 @app.route('/search_invoices', methods=['GET', 'POST'])
@@ -635,7 +634,7 @@ def update_payment(sales_id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Verify permissions and fetch invoice
+    # Verify if it is super user and fetch invoice
     if session.get('role') != 1:  # If not superuser
         cur.close()
         conn.close()
@@ -730,20 +729,233 @@ def view_sales(sales_id):
 
     return render_template('view_sales.html', invoice=invoice)
 
-# View users route
-@app.route('/view_users')
-def view_users():
-    if 'user_id' not in session or session.get('role') != 1:
+
+# Manage users route
+@app.route('/manage_users')
+def manage_users():
+    if 'user_id' not in session or session.get('role') not in [1,2]:
         return redirect(url_for('login'))
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT user_id, username, role FROM users ORDER BY user_id ASC")
+    cur.execute("""
+        SELECT u.user_id, u.username, r.role_name, u.status 
+        FROM users u 
+        JOIN roles r ON u.role = r.role_id
+        ORDER BY u.user_id ASC
+    """)
     users = cur.fetchall()
     cur.close()
     conn.close()
 
-    return render_template('view_users.html', users=users)
+    return render_template('manage_users.html', users=users)
+
+
+# Add users route
+@app.route('/add_user', methods=['GET', 'POST'])
+def add_user():
+    if 'user_id' not in session or session.get('role') not in [1, 2]:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if request.method == 'POST':
+        username = request.form['username']
+        role_id = request.form['role']
+        password = request.form['password']
+        confirm_password = request.form['confirm_password']
+
+        error = validate_password(password)
+        if error:
+            flash(error, "danger")
+            return redirect(url_for('add_user'))
+
+        if password != confirm_password:
+            flash("Passwords do not match!", "danger")
+            return redirect(url_for('add_user'))
+
+        hashed_password = generate_password_hash(password)
+
+        try:
+            cur.execute("""
+                INSERT INTO users (username, role, password) 
+                VALUES (%s, %s, %s)
+            """, (username, role_id, hashed_password))
+            conn.commit()
+            flash('User added successfully!', 'success')
+
+            # Redirect based on current user's role
+            if session.get('role') == 2:
+                return redirect(url_for('admin_dashboard'))
+            else:
+                return redirect(url_for('superuser_dashboard'))
+
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error: {str(e)}', 'danger')
+
+        finally:
+            cur.close()
+            conn.close()
+    else:
+        # GET: fetch roles for dropdown
+        cur.execute("SELECT role_id, role_name FROM roles")
+        roles = cur.fetchall()
+        cur.close()
+        conn.close()
+        return render_template('add_users.html', roles=roles)
+
+# Change Password Route
+@app.route('/change_password/<int:user_id>', methods=['GET', 'POST'])
+def change_password(user_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    if session['user_id'] != user_id:
+        flash("You can only change your own password.", "danger")
+        return redirect(url_for('manage_users'))
+
+    if request.method == 'POST':
+        user_id = session['user_id']
+        old_password = request.form['old_password']
+        new_password = request.form['new_password']
+        confirm_password = request.form['confirm_password']
+
+        error = validate_password(new_password)
+        if error:
+            flash(error, "danger")
+            return redirect(url_for('change_password'))
+        if new_password != confirm_password:
+            flash("Passwords do not match!", "danger")
+            return redirect(url_for('change_password', user_id=user_id))
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute("SELECT password FROM users WHERE user_id = %s", (user_id,))
+        user = cur.fetchone()
+
+        if user and check_password_hash(user[0], old_password):
+            hashed_password = generate_password_hash(new_password)
+            cur.execute("UPDATE users SET password = %s WHERE user_id = %s", (hashed_password, user_id))
+            conn.commit()
+            flash('Password changed successfully!', 'success')
+        else:
+            flash('Old password is incorrect!', 'danger')
+
+        cur.close()
+        conn.close()
+
+        return redirect(url_for('change_password'))
+
+    return render_template('change_password.html')
+
+# User details route
+@app.route('/user_details/<int:user_id>')
+def user_details(user_id):
+    if 'user_id' not in session:
+        flash("Please log in first.", "warning")
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        if session.get('role') == 1 or session.get('role') == 2:
+            cur.execute("""
+            SELECT u.user_id, u.username, r.role_name FROM users u
+            JOIN roles r
+            ON u.role = r.role_id
+            WHERE u.user_id = %s
+            """, (user_id,))
+        else:
+            cur.execute("""
+            SELECT u.user_id, u.username, r.role_name FROM users u
+            JOIN roles r
+            ON u.role = r.role_id
+            WHERE u.user_id = %s
+            AND u.user_id = %s
+            """, (user_id, session['user_id']))
+
+        user = cur.fetchone()
+
+        if not user:
+            flash("User not found or access denied.", "danger")
+            return redirect(url_for('manage_users'))
+
+        return render_template('user_details.html', user=user)
+    
+    except Exception as e:
+        flash(f"Error: {str(e)}", "danger")
+        return redirect(url_for('manage_users'))
+    finally:
+        cur.close()
+        conn.close()
+
+# Edit User information route
+@app.route('/edit_users/<int:user_id>', methods=['GET', 'POST'])
+def edit_users(user_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if session.get('role') not in [1, 2]:
+        flash('Access denied', 'danger')
+        return redirect(url_for('manage_users'))
+
+    if request.method == 'POST':
+        # Get data from form
+        username = request.form.get('username')
+        role_id = request.form.get('role')
+        status = request.form.get('status')
+
+        try:
+            # Update user in the database
+            cur.execute("""
+                UPDATE users
+                SET username = %s, role = %s, status = %s
+                WHERE user_id = %s
+            """, (username, role_id, status, user_id))
+            conn.commit()
+            flash("User updated successfully", "success")
+            return redirect(url_for('manage_users'))
+        except Exception as e:
+            conn.rollback()
+            flash(f"Failed to update user: {e}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+    else:
+        try:
+            # Fetch user details
+            cur.execute(""" 
+                SELECT u.user_id, u.username, r.role_id, r.role_name, u.status 
+                FROM users u 
+                JOIN roles r ON u.role = r.role_id
+                WHERE u.user_id = %s
+            """, (user_id,))
+            user = cur.fetchone()
+
+            # Fetch all roles for the dropdown
+            cur.execute("SELECT role_id, role_name FROM roles")
+            roles = cur.fetchall()
+
+            if not user:
+                flash("User not found or access denied", "danger")
+                return redirect(url_for('manage_users'))
+
+            return render_template('edit_users.html', user=user, roles=roles)
+
+        except Exception as e:
+            flash(f"Error fetching user: {e}", "danger")
+            return redirect(url_for('manage_users'))
+        finally:
+            cur.close()
+            conn.close()
+
 
 # View invoice preview route
 @app.route('/sales/view/<invoice_number>')

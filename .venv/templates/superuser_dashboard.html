@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard</title>
+    <title>Superuser Dashboard</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .navbar-custom {
@@ -22,7 +22,7 @@
             <h4 class="mr-4 mb-0">Superuser Dashboard</h4>
             <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-primary">Sales</a>
             <a href="#" class="btn btn-outline-secondary">Bills</a>
-            <a href="#" class="btn btn-outline-info">Users</a>
+            <a href="{{ url_for('manage_users') }}" class="btn btn-outline-info">Manage Users</a>
             <a href="#" class="btn btn-outline-success">Clients</a>
             <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Logout</a>
         </div>
