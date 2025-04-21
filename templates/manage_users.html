@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Users</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h2 class="mt-5">Manage Users</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Add new user -->
+        <div class="d-flex justify-content-end mb-3">
+            <a href="{{ url_for('add_user') }}" class="btn btn-primary">+ Add New User</a>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr onclick="window.location='{{ url_for('edit_users', user_id=user[0]) }}'" style="cursor: pointer;">
+                    <td>{{ user[1] }}</td>
+                    <td>{{ user[2] }}</td>
+                    <td>{{ user[3] }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_users', user_id=user[0])}}" class="btn btn-sm btn-warning">Edit user</a>
+                    </td>
+                    <td>
+                        <!-- Show change password button only for the current user -->
+                        {% if session['user_id'] == user[0] %}
+                        <a href="{{ url_for('change_password', user_id=user[0]) }}" class="btn btn-danger btn-sm">Change Password</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="{{ url_for('admin_dashboard') if session.get('role') == 2 else url_for('superuser_dashboard') }}" class="btn btn-secondary mt-3">Back to Dashboard</a>
+    </div>
+</body>
+</html>

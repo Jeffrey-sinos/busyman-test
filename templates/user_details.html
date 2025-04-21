@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User #{{ user[0] }}</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>User Details</h2>
+        <div class="card">
+            <div class="card-body">
+                <p><strong>User ID:</strong> {{ user[0] }}</p>
+                <p><strong>Username:</strong> {{ user[1] }}</p>
+                <p><strong>Role:</strong> {{ user[2] }}</p>
+                <a href="{{ url_for('view_users') }}" class="btn btn-secondary">Back to Users</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

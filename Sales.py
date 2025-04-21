@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Direct flask to templates folder
-app = Flask(__name__, template_folder='../templates')
+app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
 # Create invoice folder to store downloaded invoices

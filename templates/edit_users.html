@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <title>Edit User</title>
+</head>
+<body>
+<div class="container mt-5">
+    <h2>Edit User</h2>
+    <form method="POST">
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" class="form-control" name="username" value="{{ user[1] }}" required>
+        </div>
+        <div class="form-group">
+            <label>Role</label>
+            <select name="role" class="form-control" required>
+                {% for role in roles %}
+                <option value="{{ role[0] }}" {% if role[0] == user[2] %}selected{% endif %}>
+                    {{ role[1] }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Status</label>
+            <select name="status" class="form-control" required>
+                <option value="Active" {% if user[4] == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Inactive" {% if user[4] == 'Inactive' %}selected{% endif %}>Inactive</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Update</button>
+        <a href="{{ url_for('manage_users') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+</body>
+</html>
