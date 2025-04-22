@@ -859,7 +859,7 @@ def change_password(user_id):
         cur.close()
         conn.close()
 
-        return redirect(url_for('change_password'))
+        return redirect(url_for('change_password', user_id=user_id))
 
     return render_template('change_password.html')
 
