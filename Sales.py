@@ -249,23 +249,28 @@ def login():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        cur.execute("SELECT user_id, role, username, password FROM users WHERE username = %s", (username,))
+        cur.execute("SELECT user_id, role, username, password, status FROM users WHERE username = %s", (username,))
         user = cur.fetchone()
 
         cur.close()
         conn.close()
 
-        if user and check_password_hash(user[3], password):
-            session['user_id'] = user[0]
-            session['role'] = user[1]
-            session['username'] = user[2]
+        if user:
+            if user[4] == 'Inactive':
+                flash('Your account is inactive you cannot login', 'danger')
+                return render_template('login.html')
 
-            if user[1] == 1:
-                return redirect(url_for('superuser_dashboard'))
-            elif user[1] == 2:
-                return redirect(url_for('admin_dashboard'))
-            elif user[1] == 3:
-                return redirect(url_for('user_dashboard'))
+            if user and check_password_hash(user[3], password):
+                session['user_id'] = user[0]
+                session['role'] = user[1]
+                session['username'] = user[2]
+
+                if user[1] == 1:
+                    return redirect(url_for('superuser_dashboard'))
+                elif user[1] == 2:
+                    return redirect(url_for('admin_dashboard'))
+                elif user[1] == 3:
+                    return redirect(url_for('user_dashboard'))
 
         flash("Invalid credentials!", "danger")
     return render_template('login.html')
@@ -634,7 +639,7 @@ def update_payment(sales_id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Verify if it is super user and fetch invoice
+    # Verify if it is superuser and fetch invoice
     if session.get('role') != 1:  # If not superuser
         cur.close()
         conn.close()
@@ -760,6 +765,9 @@ def add_user():
     conn = get_db_connection()
     cur = conn.cursor()
 
+    cur.execute("SELECT role_id, role_name FROM roles")
+    roles = cur.fetchall()
+
     if request.method == 'POST':
         username = request.form['username']
         role_id = request.form['role']
@@ -769,11 +777,13 @@ def add_user():
         error = validate_password(password)
         if error:
             flash(error, "danger")
-            return redirect(url_for('add_user'))
+            selected_role = int(role_id)
+            return render_template('add_users.html', roles=roles, username=username, selected_role=selected_role)
 
         if password != confirm_password:
             flash("Passwords do not match!", "danger")
-            return redirect(url_for('add_user'))
+            selected_role = int(role_id)
+            return render_template('add_users.html', roles=roles, username=username, selected_role=selected_role)
 
         hashed_password = generate_password_hash(password)
 
@@ -785,15 +795,17 @@ def add_user():
             conn.commit()
             flash('User added successfully!', 'success')
 
-            # Redirect based on current user's role
-            if session.get('role') == 2:
-                return redirect(url_for('admin_dashboard'))
-            else:
-                return redirect(url_for('superuser_dashboard'))
+            # Redirect to manage users page
+
+            return redirect(url_for('manage_users'))
+
 
         except Exception as e:
             conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
+            return render_template('add_users.html', roles=roles, username=username, selected_role=role_id)
+
+
 
         finally:
             cur.close()
@@ -955,6 +967,62 @@ def edit_users(user_id):
         finally:
             cur.close()
             conn.close()
+
+# Manage Clients
+@app.route('/manage_clients')
+def manage_clients():
+    if 'user_id' not in session or session.get('role') not in [1,2]:
+        return redirect(url_for('login'))
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM clients")
+    clients = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return render_template('manage_clients.html', clients=clients)
+
+# Add new client route
+@app.route('/add_client', methods=['GET', 'POST'])
+def add_client():
+    if 'user_id' not in session or session.get('role') not in [1, 2]:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if request.method == 'POST':
+        customer_name = request.form['customer_name']
+        institution = request.form['institution']
+        phone_no = request.form['phone_no']
+        phone_no_2 = request.form['phone_no_2']
+        email = request.form['email']
+        position = request.form['position']
+        id_no = request.form['id_no']
+        date_created = datetime.today().strftime('%d/%m/%Y')
+
+
+        try:
+            cur.execute("""
+                INSERT INTO clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
+            conn.commit()
+            flash('Client added successfully!', 'success')
+
+
+            return redirect(url_for('manage_clients'))
+
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error: {str(e)}', 'danger')
+
+        finally:
+            cur.close()
+            conn.close()
+    else:
+        return render_template('add_clients.html')
+
 
 
 # View invoice preview route
