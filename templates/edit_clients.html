@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Client</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .form-container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-top: 50px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group label {
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-container">
+            <h2>Edit Client</h2>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form method="POST">
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="customer_name">Client Name</label>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name" value="{{ client[1] }}" required>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="institution">Institution</label>
+                        <input type="text" class="form-control" id="institution" name="institution" value="{{ client[2] }}" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="phone_no">Phone Number 1</label>
+                        <input type="text" class="form-control" id="phone_no" name="phone_no" value="{{client[3] }}" required>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="phone_no_2">Phone Number 2</label>
+                        <input type="text" class="form-control" id="phone_no_2" name="phone_no_2" value="{{ client[4] }}" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="email">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" value="{{ client[5] }}" required>
+                    </div>
+                    <div class="form-group col-md-6">
+                        <label for="position">Position</label>
+                        <input type="text" class="form-control" id="position" name="position" value="{{ client[6] }}" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        <label for="id_no">ID Number</label>
+                        <input type="text" class="form-control" id="id_no" name="id_no" value="{{ client[7] }}" required>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ url_for('manage_clients') }}" class="btn btn-secondary">Back</a>
+                    <button type="submit" class="btn btn-primary">Update Client</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS for dismissible alert -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

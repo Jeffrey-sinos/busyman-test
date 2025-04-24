@@ -1,0 +1,87 @@
+.form-section {
+            display: none;
+        }
+.form-section.active {
+            display: block;
+        }
+#clientSearchResults {
+            position: absolute;
+            z-index: 1000;
+            width: calc(100% - 30px);
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            display: none;
+        }
+.search-result-item {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+.search-result-item:hover {
+            background-color: #f5f5f5;
+        }
+#invoicePreview {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: #f8f9fa;
+        }
+.items-table {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+.items-table th {
+            background-color: #4472C4;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+.items-table td {
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+.items-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+.total-row {
+            background-color: #70AD47 !important;
+            color: white;
+            font-weight: bold;
+        }
+#addAnotherSection {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+.transaction-type-badge {
+            font-size: 0.8em;
+            padding: 3px 6px;
+            border-radius: 3px;
+        }
+.badge-sell {
+            background-color: #28a745;
+            color: white;
+        }
+.badge-take-back {
+            background-color: #dc3545;
+            color: white;
+        }
+#transactionTypeSection {
+            text-align: left;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+#downloadSuccessToast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1100;
+        }

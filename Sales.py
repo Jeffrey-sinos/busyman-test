@@ -126,7 +126,7 @@ def read_client_names():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT DISTINCT customer_name FROM sales ORDER BY customer_name;")
+        cursor.execute("SELECT DISTINCT customer_name FROM clients ORDER BY customer_name;")
         return [row[0] for row in cursor.fetchall()]
     except Exception as e:
         print(f"Error reading client names: {e}")
@@ -469,6 +469,7 @@ def sales_entry():
     # Initialize customer name and invoice number from query parameters if they exist
     customer_name = request.args.get('customer_name', '')
     invoice_number = request.args.get('invoice_number', next_invoice_number)
+    date_created = datetime.today().strftime('%d-%m-%Y')
 
     return render_template('sales_entry.html',
                            product_names=product_names,
@@ -477,7 +478,8 @@ def sales_entry():
                            categories=categories,
                            accounts=accounts,
                            client_names=client_names,
-                           current_date=get_current_date())
+                           current_date=get_current_date(),
+                           date_created=date_created)
 
 # Download invoice route
 @app.route('/invoices/<filename>')
@@ -999,7 +1001,7 @@ def add_client():
         email = request.form['email']
         position = request.form['position']
         id_no = request.form['id_no']
-        date_created = datetime.today().strftime('%d/%m/%Y')
+        date_created = request.form['date_created']
 
 
         try:
@@ -1011,7 +1013,7 @@ def add_client():
             flash('Client added successfully!', 'success')
 
 
-            return redirect(url_for('manage_clients'))
+            return render_template('add_clients.html')
 
         except Exception as e:
             conn.rollback()
@@ -1021,8 +1023,96 @@ def add_client():
             cur.close()
             conn.close()
     else:
-        return render_template('add_clients.html')
+        date_created = datetime.today().strftime('%d-%m-%Y')
+        return render_template('add_clients.html', date_created=date_created)
 
+# Add client via modal AJAX route
+@app.route('/add_client_ajax', methods=['POST'])
+def add_client_ajax():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'Unauthorized'})
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        customer_name = request.form['customer_name']
+        institution = request.form['institution']
+        phone_no = request.form['phone_no']
+        phone_no_2 = request.form['phone_no_2']
+        email = request.form['email']
+        position = request.form['position']
+        id_no = request.form['id_no']
+        date_created = request.form['date_created']
+
+        cur.execute("""
+            INSERT INTO clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
+        conn.commit()
+
+        return jsonify({'success': True, 'customer_name': customer_name})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+    finally:
+        cur.close()
+        conn.close()
+
+# Edit client info route
+@app.route('/edit_clients/<int:customer_id>', methods=['GET', 'POST'])
+def edit_clients(customer_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if session.get('role') not in [1, 2]:
+        flash('Access denied', 'danger')
+        return redirect(url_for('manage_clients'))
+
+    if request.method == 'POST':
+        # Get data from form
+        customer_name = request.form.get('customer_name')
+        institution = request.form.get('institution')
+        phone_no = request.form.get('phone_no')
+        phone_no_2 = request.form.get('phone_no_2')
+        email = request.form.get('email')
+        position = request.form.get('position')
+        id_no = request.form.get('id_no')
+
+
+        try:
+            # Update user in the database
+            cur.execute("""
+                UPDATE clients
+                SET customer_name = %s, institution = %s, phone_no = %s, phone_no_2 = %s,
+                email = %s, position = %s, id_no = %s
+                WHERE customer_id = %s
+            """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, customer_id))
+            conn.commit()
+            flash("Client updated successfully", "success")
+            return redirect(url_for('manage_clients'))
+        except Exception as e:
+            conn.rollback()
+            flash(f"Failed to update client: {e}", "danger")
+        finally:
+            cur.close()
+            conn.close()
+    else:
+        cur.execute("SELECT * FROM clients WHERE customer_id = %s", (customer_id,))
+        client = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if client:
+            return render_template('edit_clients.html', client=client)
+        else:
+            flash("Client not found", "danger")
+            return redirect(url_for('manage_clients'))
 
 
 # View invoice preview route

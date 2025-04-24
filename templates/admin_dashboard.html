@@ -3,29 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard</title>
+    <title>Main Menu - Busyman Pro</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .navbar-custom {
+        body {
             background-color: #f8f9fa;
-            padding: 1rem;
-            border-bottom: 1px solid #dee2e6;
         }
-        .navbar-custom a {
-            margin-right: 20px;
+        .menu-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 2rem;
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+        .menu-container .btn {
+            margin: 10px 0;
+            width: 100%;
+        }
+        .superuser-text {
+            font-size: 1rem;
+            color: #6c757d;
+            margin-bottom: 1.5rem;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <div class="navbar-custom d-flex justify-content-start align-items-center">
-            <h4 class="mr-4 mb-0">Admin Dashboard</h4>
-            <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-primary">Sales</a>
-            <a href="{{ url_for('manage_users') }}" class="btn btn-outline-info">Users</a>
-            <a href="#" class="btn btn-outline-secondary">Bills</a>
-            <a href="#" class="btn btn-outline-success">Clients</a>
-            <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Logout</a>
+    <div class="menu-container">
+        <div class="text-center mb-5">
+            <h1 class="display-4">BusyMan Pro</h1>
+            <p class="lead">Manage your sales and invoices</p>
         </div>
+        <div class="superuser-text">Logged in as Admin</div>
+        <a href="{{ url_for('sales_menu') }}" class="btn btn-primary">Sales</a>
+        <a href="#" class="btn btn-secondary">Bills</a>
+        <a href="{{ url_for('manage_users') }}" class="btn btn-info">Manage Users</a>
+        <a href="{{ url_for('manage_clients') }}" class="btn btn-success">Manage Clients</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
     </div>
 </body>
 </html>

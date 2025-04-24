@@ -3,98 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sales Entry - Teknobyte</title>
+    <title>Sales Entry - Busyman Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .form-section {
-            display: none;
-        }
-        .form-section.active {
-            display: block;
-        }
-        #clientSearchResults {
-            position: absolute;
-            z-index: 1000;
-            width: calc(100% - 30px);
-            max-height: 200px;
-            overflow-y: auto;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 0 0 4px 4px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            display: none;
-        }
-        .search-result-item {
-            padding: 8px 12px;
-            cursor: pointer;
-        }
-        .search-result-item:hover {
-            background-color: #f5f5f5;
-        }
-        #invoicePreview {
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            padding: 20px;
-            margin-top: 20px;
-            background-color: #f8f9fa;
-        }
-        .items-table {
-            width: 100%;
-            margin-bottom: 20px;
-        }
-        .items-table th {
-            background-color: #4472C4;
-            color: white;
-            padding: 8px;
-            text-align: left;
-        }
-        .items-table td {
-            padding: 8px;
-            border-bottom: 1px solid #ddd;
-        }
-        .items-table tr:nth-child(even) {
-            background-color: #f2f2f2;
-        }
-        .total-row {
-            background-color: #70AD47 !important;
-            color: white;
-            font-weight: bold;
-        }
-        #addAnotherSection {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #dee2e6;
-        }
-        .transaction-type-badge {
-            font-size: 0.8em;
-            padding: 3px 6px;
-            border-radius: 3px;
-        }
-        .badge-sell {
-            background-color: #28a745;
-            color: white;
-        }
-        .badge-take-back {
-            background-color: #dc3545;
-            color: white;
-        }
-        #transactionTypeSection {
-            text-align: left;
-            padding: 20px;
-            margin: 20px 0;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-            background-color: #f8f9fa;
-        }
-        #downloadSuccessToast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1100;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/sales_entry.css') }}">
+
 </head>
 <body>
     <div class="container py-4">
@@ -104,7 +16,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
                 </svg>
-                Back to Menu
+                Back to Sales Menu
             </a>
         </div>
 
@@ -122,18 +34,18 @@
             <div class="card-body">
                 <!-- Client Search Section -->
                 <div id="clientSearchSection" class="form-section active">
-                    <h4 class="mb-4">Step 1: Select Customer</h4>
+                    <h4 class="mb-4">Step 1: Select Client</h4>
                     <div class="row mb-3">
                         <div class="col-md-8">
-                            <label for="clientName" class="form-label">Search Customer</label>
+                            <label for="clientName" class="form-label">Search Client</label>
                             <div class="input-group">
-                                <input type="text" class="form-control" id="clientName" list="clientNames" placeholder="Start typing customer name">
+                                <input type="text" class="form-control" id="clientName" list="clientNames" placeholder="Start typing client name">
                                 <datalist id="clientNames">
                                     {% for client in client_names %}
                                         <option value="{{ client }}">
                                     {% endfor %}
                                 </datalist>
-                                <button class="btn btn-primary" type="button" id="searchClientBtn">
+                                <button class="btn btn-primary d-flex align-items-center gap-1" type="button" id="searchClientBtn">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
                                         <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
                                     </svg>
@@ -143,6 +55,10 @@
                             <div id="clientSearchResults"></div>
                         </div>
                     </div>
+                    <p>Can't find the client? Add a new client below</p>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                        Add New Client
+                    </button>
                 </div>
 
                 <!-- Transaction Type Selection Section -->
@@ -165,7 +81,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
                                 <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
                             </svg>
-                            Back to Customer Selection
+                            Back to Client Selection
                         </button>
                     </div>
                 </div>
@@ -311,278 +227,53 @@
             </div>
         </div>
     </div>
+    <div class="modal fade" id="addClientModal" tabindex="-1" aria-labelledby="addClientModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form id="addClientForm">
+                     <div class="modal-header">
+                        <h5 class="modal-title" id="addClientModalLabel">Add New Client</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+            <div class="modal-body row g-3">
+                <div class="col-md-6">
+                    <label for="customer_name" class="form-label">Customer Name</label>
+                    <input type="text" class="form-control" name="customer_name" id="customer_name" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="institution" class="form-label">Institution</label>
+                    <input type="text" class="form-control" name="institution" id="institution" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="phone_no" class="form-label">Phone No</label>
+                    <input type="text" class="form-control" name="phone_no" id="phone_no" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="phone_no_2" class="form-label">Second Phone No</label>
+                    <input type="text" class="form-control" name="phone_no_2" id="phone_no_2" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" name="email" id="email" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="position" class="form-label">Position</label>
+                    <input type="text" class="form-control" name="position" id="position" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="id_no" class="form-label">ID No</label>
+                    <input type="text" class="form-control" name="id_no" id="id_no" required>
+                </div>
+            </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Add Client</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize toast
-            const downloadSuccessToast = new bootstrap.Toast(document.getElementById('downloadSuccessToast'), {autohide: true, delay: 3000});
-
-            // Client search functionality
-            const clientNameInput = document.getElementById('clientName');
-            const searchClientBtn = document.getElementById('searchClientBtn');
-            const clientSearchResults = document.getElementById('clientSearchResults');
-            const clientSearchSection = document.getElementById('clientSearchSection');
-            const transactionTypeSection = document.getElementById('transactionTypeSection');
-            const salesFormSection = document.getElementById('salesFormSection');
-            const customerNameDisplay = document.getElementById('customerNameDisplay');
-            const invoiceNumber = document.getElementById('invoiceNumber');
-            const invoiceDate = document.getElementById('invoiceDate');
-            const invoiceItemsTable = document.getElementById('invoiceItems');
-            const addAnotherSection = document.getElementById('addAnotherSection');
-            const addAnotherYesBtn = document.getElementById('addAnotherYesBtn');
-            const addAnotherNoBtn = document.getElementById('addAnotherNoBtn');
-            const downloadInvoiceBtn = document.getElementById('downloadInvoiceBtn');
-            const saveSaleBtn = document.getElementById('saveSaleBtn');
-            const sellBtn = document.getElementById('sellBtn');
-            const takeBackBtn = document.getElementById('takeBackBtn');
-            const transactionTypeDisplay = document.getElementById('transactionTypeDisplay');
-            const transactionTypeHeading = document.getElementById('transactionTypeHeading');
-            const backToClientSearchBtn = document.getElementById('backToClientSearchBtn');
-            const backToTransactionTypeBtn = document.getElementById('backToTransactionTypeBtn');
-
-            let currentItems = [];
-            let currentInvoiceUrl = '';
-            let currentTransactionType = 'sell';
-
-            // Search for client
-            searchClientBtn.addEventListener('click', function() {
-                const clientName = clientNameInput.value.trim();
-                if (!clientName) return;
-
-                fetch('/sales/entry', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=search_client&client_name=${encodeURIComponent(clientName)}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'not_found') {
-                        alert('Client not found. Please add the client first.');
-                    } else if (data.status === 'single_result') {
-                        selectClient(data.client_name);
-                    } else if (data.status === 'multiple_results') {
-                        showClientResults(data.clients);
-                    }
-                });
-            });
-
-            function showClientResults(clients) {
-                clientSearchResults.innerHTML = '';
-                clients.forEach(client => {
-                    const item = document.createElement('div');
-                    item.className = 'search-result-item';
-                    item.textContent = client;
-                    item.addEventListener('click', function() {
-                        selectClient(client);
-                    });
-                    clientSearchResults.appendChild(item);
-                });
-                clientSearchResults.style.display = 'block';
-            }
-
-            function selectClient(clientName) {
-                clientSearchResults.style.display = 'none';
-                customerNameDisplay.value = clientName;
-
-                // Get next invoice number and date
-                fetch('/sales/entry', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=select_client&client_name=${encodeURIComponent(clientName)}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        invoiceNumber.value = data.invoice_number;
-                        invoiceDate.value = data.current_date;
-
-                        // Switch to transaction type selection
-                        clientSearchSection.classList.remove('active');
-                        transactionTypeSection.classList.add('active');
-                    }
-                });
-            }
-
-            // Transaction type selection
-            sellBtn.addEventListener('click', function() {
-                currentTransactionType = 'sell';
-                transactionTypeDisplay.value = 'Sell';
-                transactionTypeHeading.textContent = 'Sale';
-                proceedToSalesForm();
-            });
-
-            takeBackBtn.addEventListener('click', function() {
-                currentTransactionType = 'take_back';
-                transactionTypeDisplay.value = 'Take Back';
-                transactionTypeHeading.textContent = 'Take Back';
-                proceedToSalesForm();
-            });
-
-            function proceedToSalesForm() {
-                transactionTypeSection.classList.remove('active');
-                salesFormSection.classList.add('active');
-            }
-
-            // Navigation buttons
-            backToClientSearchBtn.addEventListener('click', function() {
-                transactionTypeSection.classList.remove('active');
-                clientSearchSection.classList.add('active');
-            });
-
-            backToTransactionTypeBtn.addEventListener('click', function() {
-                salesFormSection.classList.remove('active');
-                transactionTypeSection.classList.add('active');
-            });
-
-            // Save sale
-            saveSaleBtn.addEventListener('click', function() {
-                const formData = {
-                    invoice_date: invoiceDate.value,
-                    invoice_number: invoiceNumber.value,
-                    client_name: customerNameDisplay.value,
-                    product: document.getElementById('product').value,
-                    quantity: document.getElementById('quantity').value,
-                    price: document.getElementById('price').value,
-                    category: document.getElementById('category').value,
-                    account: document.getElementById('account').value,
-                    notes: document.getElementById('notes').value,
-                    transaction_type: currentTransactionType,
-                    add_another: 'no' // We'll handle this in the UI
-                };
-
-                // Basic validation
-                if (!formData.product || !formData.price) {
-                    alert('Please fill in all required fields');
-                    return;
-                }
-
-                fetch('/sales/entry', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=save_sale&${new URLSearchParams(formData).toString()}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success' || data.status === 'add_another') {
-                        // Add the new item to our current items array
-                        const quantity = currentTransactionType === 'take_back' ?
-                            -Math.abs(formData.quantity) : formData.quantity;
-
-                        const newItem = {
-                            description: formData.product,
-                            quantity: quantity,
-                            unitPrice: formData.price,
-                            total: (quantity * formData.price).toFixed(2),
-                            type: currentTransactionType
-                        };
-                        currentItems.push(newItem);
-                        currentInvoiceUrl = data.invoice_url;
-
-                        // Update invoice preview
-                        updateInvoicePreview(
-                            data.invoice_number,
-                            formData.invoice_date,
-                            formData.client_name,
-                            currentTransactionType,
-                            currentItems
-                        );
-
-                        // Show the "add another" section and hide the save button
-                        saveSaleBtn.style.display = 'none';
-                        addAnotherSection.style.display = 'block';
-                        document.getElementById('invoicePreview').style.display = 'block';
-                    } else {
-                        alert(data.message);
-                    }
-                });
-            });
-
-            // Add another item
-            addAnotherYesBtn.addEventListener('click', function() {
-                // Reset product fields but keep invoice details
-                document.getElementById('product').value = '';
-                document.getElementById('quantity').value = '1';
-                document.getElementById('price').value = '';
-                document.getElementById('category').value = document.getElementById('category').options[0].value;
-                document.getElementById('notes').value = '';
-
-                // Hide add another section and show save button
-                addAnotherSection.style.display = 'none';
-                saveSaleBtn.style.display = 'block';
-
-                // Focus on product field for next entry
-                document.getElementById('product').focus();
-            });
-
-            // Don't add another item - download invoice
-            addAnotherNoBtn.addEventListener('click', function() {
-                if (currentInvoiceUrl) {
-                    // Create a hidden iframe to trigger the download
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    iframe.src = currentInvoiceUrl;
-                    document.body.appendChild(iframe);
-
-                    // Show success message
-                    downloadSuccessToast.show();
-
-                    // Redirect after download
-                    setTimeout(function() {
-                        window.location.href = '/sales';
-                    }, 2000);
-                }
-            });
-
-            // Download invoice button
-            downloadInvoiceBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (currentInvoiceUrl) {
-                    // Create a hidden iframe to trigger the download
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    iframe.src = currentInvoiceUrl;
-                    document.body.appendChild(iframe);
-
-                    // Show success message
-                    downloadSuccessToast.show();
-                }
-            });
-
-            function updateInvoicePreview(invoiceNumber, invoiceDate, customerName, transactionType, items) {
-                document.getElementById('previewInvoiceNumber').textContent = invoiceNumber;
-                document.getElementById('previewDate').textContent = invoiceDate;
-                document.getElementById('previewCustomer').textContent = customerName;
-                document.getElementById('previewTransactionType').textContent =
-                    transactionType === 'sell' ? 'Sale' : 'Take Back';
-
-                // Clear existing items
-                invoiceItemsTable.innerHTML = '';
-
-                // Add all items
-                let totalAmount = 0;
-                items.forEach(item => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${item.description}</td>
-                        <td>${Math.abs(item.quantity)}</td>
-                        <td>KSh ${parseFloat(item.unitPrice).toFixed(2)}</td>
-                        <td>KSh ${parseFloat(item.total).toFixed(2)}</td>
-                    `;
-                    invoiceItemsTable.appendChild(row);
-                    totalAmount += parseFloat(item.total);
-                });
-
-                // Update total
-                document.getElementById('previewTotal').textContent = totalAmount.toFixed(2);
-            }
-        });
-    </script>
+    <script src="{{ url_for('static', filename='js/sales_entry.js') }}"></script>
 </body>
 </html>
