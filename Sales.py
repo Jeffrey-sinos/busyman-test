@@ -1300,6 +1300,166 @@ def payments_menu():
     return render_template('payments_menu.html')
 
 
+@app.route('/add-billing-account', methods=['GET', 'POST'])
+def search_billing_account():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Get reference data for dropdowns
+    categories = ['Payroll', 'Utilities', 'Purchases', 'Rates', 'Subscriptions', 'Taxes', 'Licenses', 'Insurance']
+
+    cur.execute("SELECT account_owner FROM Account_Owner ORDER BY account_owner")
+    account_types = [row[0] for row in cur.fetchall()]
+
+    cur.execute("SELECT bank_name FROM banks ORDER BY bank_name")
+    bank_accounts = [row[0] for row in cur.fetchall()]
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'search':
+            search_term = request.form.get('search_account').strip()
+
+            try:
+                # Search by account number or account name
+                query = sql.SQL("""
+                    SELECT ba.id, ba.invoice_no, sp.name as provider, 
+                           ba.account_name, ba.account_no, ba.paybill_no, 
+                           ba.ussd_no, ba.bill_amount, ba.billing_date,
+                           c.name as category, acc-type.name as account_type,
+                           bk.name as bank_account, ba.freq
+                    FROM billing-account ba
+                    JOIN account_owner at ON ba.account_type_id = at.id
+                    JOIN banks bk ON ba.bank_account_id = bk.id
+                    WHERE ba.account_no = %s OR ba.account_name ILIKE %s
+                    LIMIT 1
+                """)
+                cur.execute(query, (search_term, f'%{search_term}%'))
+                result = cur.fetchone()
+
+                if result:
+                    # Map result to dictionary
+                    fields = ['id', 'invoice_no', 'provider', 'account_name',
+                              'account_no', 'paybill_no', 'ussd_no', 'bill_amount',
+                              'billing_date', 'category', 'account_type',
+                              'bank_account', 'frequency']
+                    account_data = dict(zip(fields, result))
+
+                    return render_template('add_billing_account.html',
+                                           categories=categories,
+                                           account_types=account_types,
+                                           bank_accounts=bank_accounts,
+                                           **account_data)
+                else:
+                    flash('No account found with that search term', 'warning')
+                    return redirect(url_for('search_billing_account'))
+
+            except Exception as e:
+                conn.rollback()
+                flash(f'Error searching for account: {str(e)}', 'danger')
+                return redirect(url_for('search_billing_account'))
+
+        # elif action == 'save':
+        #     try:
+        #         # Get all form data
+        #         account_data = {
+        #             'invoice_no': request.form.get('invoice'),
+        #             'provider': request.form.get('provider'),
+        #             'account_name': request.form.get('account_name'),
+        #             'account_no': request.form.get('account_no'),
+        #             'category': request.form.get('category'),
+        #             'account_type': request.form.get('account_type'),
+        #             'bank_account': request.form.get('bank_account'),
+        #             'paybill_no': request.form.get('paybill_no'),
+        #             'ussd_no': request.form.get('ussd_no'),
+        #             'frequency': request.form.get('frequency'),
+        #             'billing_date': request.form.get('billing_date'),
+        #             'bill_amount': request.form.get('bill_amount')
+        #         }
+        #
+        #         # First get foreign key IDs
+        #         cur.execute("SELECT id FROM service_providers WHERE name = %s",
+        #                     (account_data['provider'],))
+        #         provider_id = cur.fetchone()[0]
+        #
+        #         cur.execute("SELECT id FROM categories WHERE name = %s",
+        #                     (account_data['category'],))
+        #         category_id = cur.fetchone()[0]
+        #
+        #         # Similar for other foreign keys...
+        #
+        #         # Insert or update the billing account
+        #         if request.form.get('account_id'):  # Update existing
+        #             update_query = sql.SQL("""
+        #                 UPDATE billing_accounts
+        #                 SET invoice_no = %s, provider_id = %s, account_name = %s,
+        #                     account_no = %s, category_id = %s, account_type_id = %s,
+        #                     bank_account_id = %s, paybill_no = %s, ussd_no = %s,
+        #                     frequency_id = %s, billing_date = %s, bill_amount = %s,
+        #                     updated_at = NOW()
+        #                 WHERE id = %s
+        #             """)
+        #             cur.execute(update_query, (
+        #                 account_data['invoice_no'], provider_id, account_data['account_name'],
+        #                 account_data['account_no'], category_id, account_type_id,
+        #                 bank_account_id, account_data['paybill_no'], account_data['ussd_no'],
+        #                 frequency_id, account_data['billing_date'], account_data['bill_amount'],
+        #                 request.form.get('account_id')
+        #             ))
+        #             flash('Billing account updated successfully', 'success')
+        #         else:  # Insert new
+        #             insert_query = sql.SQL("""
+        #                 INSERT INTO billing_accounts (
+        #                     invoice_no, provider_id, account_name, account_no,
+        #                     category_id, account_type_id, bank_account_id,
+        #                     paybill_no, ussd_no, frequency_id, billing_date,
+        #                     bill_amount, created_at
+        #                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        #             """)
+        #             cur.execute(insert_query, (
+        #                 account_data['invoice_no'], provider_id, account_data['account_name'],
+        #                 account_data['account_no'], category_id, account_type_id,
+        #                 bank_account_id, account_data['paybill_no'], account_data['ussd_no'],
+        #                 frequency_id, account_data['billing_date'], account_data['bill_amount']
+        #             ))
+        #             flash('New billing account created successfully', 'success')
+        #
+        #         conn.commit()
+        #         return redirect(url_for('search_billing_account'))
+        #
+        #     except Exception as e:
+        #         conn.rollback()
+        #         flash(f'Error saving billing account: {str(e)}', 'danger')
+        #         return redirect(url_for('search_billing_account'))
+
+        elif action == 'delete':
+            try:
+                account_id = request.form.get('account_id')
+                if account_id:
+                    cur.execute("DELETE FROM billing_accounts WHERE id = %s", (account_id,))
+                    conn.commit()
+                    flash('Billing account deleted successfully', 'success')
+                return redirect(url_for('search_billing_account'))
+            except Exception as e:
+                conn.rollback()
+                flash(f'Error deleting billing account: {str(e)}', 'danger')
+                return redirect(url_for('search_billing_account'))
+
+    # GET request - show empty form with new invoice number
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    invoice_number = 'INV-' + datetime.now().strftime('%Y%m%d%H%M%S')
+
+    cur.close()
+    conn.close()
+
+    return render_template('add_billing_account.html',
+                           categories=categories,
+                           account_types=account_types,
+                           bank_accounts=bank_accounts,
+                           current_date=current_date,
+                           invoice_no=invoice_number)
+
+
 # Allow external hosting
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
