@@ -22,12 +22,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Direct flask to templates folder
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
 # Create invoice folder to store downloaded invoices
 app.config['UPLOAD_FOLDER'] = 'invoices'
+# Create receipt folder to store downloaded receipts
+app.config['RECEIPT_FOLDER']= 'receipts'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
 
 
@@ -159,9 +160,13 @@ def validate_password(password):
 
 # Generate Receipt function
 def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, new_bal, payment_date, items):
-    receipt_buffer = BytesIO()
 
-    c = canvas.Canvas(receipt_buffer, pagesize=letter)
+    os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
+    sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', invoice_no)
+    filename = f"receipt_{sanitized_invoice_no}.pdf"
+    filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
+
+    c = canvas.Canvas(filepath, pagesize=letter)
     styles = getSampleStyleSheet()
     style_normal = styles["Normal"]
 
@@ -235,9 +240,11 @@ def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, new_bal, 
     c.drawString(50, 180, "ACCOUNTANT")
 
     c.save()
+    with open(filepath, 'rb') as f:
+        receipt_buffer = BytesIO(f.read())
     receipt_buffer.seek(0)
-
     return receipt_buffer
+
 
 # Login Page
 @app.route('/', methods=['GET', 'POST'])
@@ -515,27 +522,37 @@ def download_receipt(sales_id):
     paid = invoice[10]
     balance = invoice[11]
 
-    receipt_buffer = generate_receipt(
-        sales_id = sales_id,
-        customer_name = customer_name,
-        invoice_no = invoice_no,
-        amount_paid = paid,
-        new_bal = balance,
-        payment_date = datetime.now().date(),
-        items=[{
-            'description': product,
-            'quantity': int(quantity),
-            'unit_price': float(amount),
-            'total': int(quantity) * float(amount)
-        }]
-    )
+    sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', invoice_no)
+    filename = f"receipt_{sanitized_invoice_no}.pdf"
+    filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
 
-    cur.close()
-    conn.close()
+    if not os.path.exists(filepath):
+        # Generate receipt if missing
+        receipt_buffer = generate_receipt(
+            sales_id=sales_id,
+            customer_name=customer_name,
+            invoice_no=invoice_no,
+            amount_paid=paid,
+            new_bal=balance,
+            payment_date=datetime.now().date(),
+            items=[{
+                'description': product,
+                'quantity': quantity,
+                'unit_price': amount,
+                'total': quantity * amount
+            }]
+        )
+        flash("Receipt generated for download", "info")
+    else:
+        # Read existing receipt
+        with open(filepath, 'rb') as f:
+            receipt_buffer = BytesIO(f.read())
+        receipt_buffer.seek(0)
 
+    # Prepare download
     response = make_response(receipt_buffer.getvalue())
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=receipt_{invoice_no}.pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
     return response
 
 # Search invoices route
@@ -704,6 +721,22 @@ def update_payment(sales_id):
                 sales_id
             ))
             conn.commit()
+            if paid > 0:
+                generate_receipt(
+                    sales_id=sales_id,
+                    customer_name=customer_name,
+                    invoice_no=invoice_no,
+                    amount_paid=paid,
+                    new_bal=balance,
+                    payment_date=datetime.now().date(),
+                    items=[{
+                        'description': product,
+                        'quantity': quantity,
+                        'unit_price': amount,
+                        'total': total
+                    }]
+                )
+
             return redirect(url_for('view_sales', sales_id=sales_id))
 
         except Exception as e:
@@ -977,7 +1010,7 @@ def manage_clients():
         return redirect(url_for('login'))
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM clients")
+    cur.execute("SELECT * FROM clients ORDER BY customer_name")
     clients = cur.fetchall()
     cur.close()
     conn.close()
@@ -987,7 +1020,7 @@ def manage_clients():
 # Add new client route
 @app.route('/add_client', methods=['GET', 'POST'])
 def add_client():
-    if 'user_id' not in session or session.get('role') not in [1, 2]:
+    if 'user_id' not in session:
         return redirect(url_for('login'))
 
     conn = get_db_connection()
@@ -1001,16 +1034,23 @@ def add_client():
         email = request.form['email']
         position = request.form['position']
         id_no = request.form['id_no']
-        date_created = request.form['date_created']
+        date_created = datetime.today() # today's date is used by default
 
 
         try:
-            cur.execute("""
-                INSERT INTO clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
-            conn.commit()
-            flash('Client added successfully!', 'success')
+            # Check if the client already exists
+            cur.execute("SELECT * FROM clients WHERE phone_no = %s",(phone_no,))
+            existing_client = cur.fetchone()
+
+            if existing_client:
+                flash('Client with this phone number already exists.', 'warning')
+            else:
+                cur.execute("""
+                    INSERT INTO clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
+                conn.commit()
+                flash('Client added successfully!', 'success')
 
 
             return render_template('add_clients.html')
@@ -1023,8 +1063,7 @@ def add_client():
             cur.close()
             conn.close()
     else:
-        date_created = datetime.today().strftime('%d-%m-%Y')
-        return render_template('add_clients.html', date_created=date_created)
+        return render_template('add_clients.html')
 
 # Add client via modal AJAX route
 @app.route('/add_client_ajax', methods=['POST'])
@@ -1043,15 +1082,22 @@ def add_client_ajax():
         email = request.form['email']
         position = request.form['position']
         id_no = request.form['id_no']
-        date_created = request.form['date_created']
+        date_created = datetime.today() # Use today's date by default
 
-        cur.execute("""
+        # Check if client already exists
+        cur.execute("SELECT * FROM clients WHERE phone_no = %s", (phone_no,))
+        existing_client = cur.fetchone()
+
+        if existing_client:
+            return jsonify({'success': False, 'error': 'Client with this phone number already exists.'})
+        else:
+            cur.execute("""
             INSERT INTO clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
-        conn.commit()
+            conn.commit()
 
-        return jsonify({'success': True, 'customer_name': customer_name})
+            return jsonify({'success': True, 'customer_name': customer_name})
 
     except Exception as e:
         conn.rollback()
@@ -1279,4 +1325,5 @@ def logout():
 # Allow external hosting
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
     app.run(host='0.0.0.0', port=5000, debug=True)
