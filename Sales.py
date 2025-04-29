@@ -22,15 +22,13 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Direct flask to templates folder
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
 # Create invoice folder to store downloaded invoices
 app.config['UPLOAD_FOLDER'] = 'invoices'
-# Create receipt folder to store downloaded receipts
-app.config['RECEIPT_FOLDER']= 'receipts'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
-
 
 
 # Database configuration
@@ -43,13 +41,16 @@ def get_db_connection():
         port=os.getenv('DB_PORT')
     )
 
+
 # Current date function
 def get_current_date():
     return datetime.now().strftime('%Y-%m-%d')
 
+
 # Current time function
 def get_current_datetime():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
 
 # Create the next invoice number
 def get_next_invoice_number():
@@ -78,6 +79,7 @@ def get_next_invoice_number():
         cursor.close()
         conn.close()
 
+
 # Display products function
 def read_product_names():
     conn = get_db_connection()
@@ -91,6 +93,7 @@ def read_product_names():
     finally:
         cursor.close()
         conn.close()
+
 
 # Display categories function
 def read_categories():
@@ -107,6 +110,7 @@ def read_categories():
         cursor.close
         conn.close
 
+
 # Display account owners function
 def read_account_owners():
     conn = get_db_connection()
@@ -122,6 +126,7 @@ def read_account_owners():
         cursor.close
         conn.close
 
+
 # Display clients function
 def read_client_names():
     conn = get_db_connection()
@@ -135,6 +140,7 @@ def read_client_names():
     finally:
         cursor.close()
         conn.close()
+
 
 # Password validation page
 def validate_password(password):
@@ -158,15 +164,12 @@ def validate_password(password):
     if not re.search(r"[!@#$%^&*()?\":{}|<>]", password):
         return "Password must contain at least one special symbol (!@#$%^&*)."
 
+
 # Generate Receipt function
 def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, new_bal, payment_date, items):
+    receipt_buffer = BytesIO()
 
-    os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
-    sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', invoice_no)
-    filename = f"receipt_{sanitized_invoice_no}.pdf"
-    filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
-
-    c = canvas.Canvas(filepath, pagesize=letter)
+    c = canvas.Canvas(receipt_buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     style_normal = styles["Normal"]
 
@@ -232,7 +235,6 @@ def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, new_bal, 
     c.setFont("Helvetica-Bold", 12)
     c.drawString(400, 460 - table_height, f"Balance: Ksh {new_bal:,.1f}")
 
-
     # Accountant details
     c.setFont("Helvetica", 12)
     c.drawString(50, 200, "John Kungu")
@@ -240,9 +242,8 @@ def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, new_bal, 
     c.drawString(50, 180, "ACCOUNTANT")
 
     c.save()
-    with open(filepath, 'rb') as f:
-        receipt_buffer = BytesIO(f.read())
     receipt_buffer.seek(0)
+
     return receipt_buffer
 
 
@@ -282,6 +283,7 @@ def login():
         flash("Invalid credentials!", "danger")
     return render_template('login.html')
 
+
 # User dashboard route
 @app.route('/user_dashboard')
 def user_dashboard():
@@ -289,6 +291,7 @@ def user_dashboard():
         return redirect(url_for('login'))
 
     return render_template('user_dashboard.html')
+
 
 # Admin dashboard route
 @app.route('/admin_dashboard')
@@ -298,6 +301,7 @@ def admin_dashboard():
 
     return render_template('admin_dashboard.html')
 
+
 # Superuser dashboard route
 @app.route('/superuser_dashboard')
 def superuser_dashboard():
@@ -305,15 +309,18 @@ def superuser_dashboard():
         return redirect(url_for('login'))
     return render_template('superuser_dashboard.html')
 
-#Sales Menu route
+
+# Sales Menu route
 @app.route('/sales')
 def sales_menu():
     return render_template('sales_menu.html')
+
 
 # Sales reports menu route
 @app.route('/sales/reports')
 def sales_reports_menu():
     return render_template('sales_reports_menu.html')
+
 
 # Sales entry route
 @app.route('/sales/entry', methods=['GET', 'POST'])
@@ -488,6 +495,7 @@ def sales_entry():
                            current_date=get_current_date(),
                            date_created=date_created)
 
+
 # Download invoice route
 @app.route('/invoices/<filename>')
 def download_invoice(filename):
@@ -496,6 +504,7 @@ def download_invoice(filename):
         filename,
         as_attachment=True
     )
+
 
 # Download receipt route
 @app.route('/download_receipt/<int:sales_id>')
@@ -522,38 +531,29 @@ def download_receipt(sales_id):
     paid = invoice[10]
     balance = invoice[11]
 
-    sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', invoice_no)
-    filename = f"receipt_{sanitized_invoice_no}.pdf"
-    filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
+    receipt_buffer = generate_receipt(
+        sales_id = sales_id,
+        customer_name = customer_name,
+        invoice_no = invoice_no,
+        amount_paid = paid,
+        new_bal = balance,
+        payment_date = datetime.now().date(),
+        items=[{
+            'description': product,
+            'quantity': int(quantity),
+            'unit_price': float(amount),
+            'total': int(quantity) * float(amount)
+        }]
+    )
 
-    if not os.path.exists(filepath):
-        # Generate receipt if missing
-        receipt_buffer = generate_receipt(
-            sales_id=sales_id,
-            customer_name=customer_name,
-            invoice_no=invoice_no,
-            amount_paid=paid,
-            new_bal=balance,
-            payment_date=datetime.now().date(),
-            items=[{
-                'description': product,
-                'quantity': quantity,
-                'unit_price': amount,
-                'total': quantity * amount
-            }]
-        )
-        flash("Receipt generated for download", "info")
-    else:
-        # Read existing receipt
-        with open(filepath, 'rb') as f:
-            receipt_buffer = BytesIO(f.read())
-        receipt_buffer.seek(0)
+    cur.close()
+    conn.close()
 
-    # Prepare download
     response = make_response(receipt_buffer.getvalue())
     response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+    response.headers['Content-Disposition'] = f'attachment; filename=receipt_{invoice_no}.pdf'
     return response
+
 
 # Search invoices route
 @app.route('/search_invoices', methods=['GET', 'POST'])
@@ -630,7 +630,6 @@ def search_invoices():
         cur.close()
         conn.close()
 
-
     except Exception as e:
         return render_template('search_invoices.html',
                                error=f"Database error: {str(e)}",
@@ -648,6 +647,7 @@ def search_invoices():
                            products=products,
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
+
 
 # Update payment
 @app.route('/update_payment/<int:sales_id>', methods=['GET', 'POST'])
@@ -721,22 +721,6 @@ def update_payment(sales_id):
                 sales_id
             ))
             conn.commit()
-            if paid > 0:
-                generate_receipt(
-                    sales_id=sales_id,
-                    customer_name=customer_name,
-                    invoice_no=invoice_no,
-                    amount_paid=paid,
-                    new_bal=balance,
-                    payment_date=datetime.now().date(),
-                    items=[{
-                        'description': product,
-                        'quantity': quantity,
-                        'unit_price': amount,
-                        'total': total
-                    }]
-                )
-
             return redirect(url_for('view_sales', sales_id=sales_id))
 
         except Exception as e:
@@ -747,8 +731,8 @@ def update_payment(sales_id):
             conn.close()
         return redirect(url_for('search_invoices'))
 
-
     return render_template('update_payment.html', invoice=invoice)
+
 
 # View sales route
 @app.route('/invoice/<int:sales_id>')
@@ -834,13 +818,10 @@ def add_user():
 
             return redirect(url_for('manage_users'))
 
-
         except Exception as e:
             conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
             return render_template('add_users.html', roles=roles, username=username, selected_role=role_id)
-
-
 
         finally:
             cur.close()
@@ -852,6 +833,7 @@ def add_user():
         cur.close()
         conn.close()
         return render_template('add_users.html', roles=roles)
+
 
 # Change Password Route
 @app.route('/change_password/<int:user_id>', methods=['GET', 'POST'])
@@ -898,6 +880,7 @@ def change_password(user_id):
 
     return render_template('change_password.html')
 
+
 # User details route
 @app.route('/user_details/<int:user_id>')
 def user_details(user_id):
@@ -939,6 +922,7 @@ def user_details(user_id):
     finally:
         cur.close()
         conn.close()
+
 
 # Edit User information route
 @app.route('/edit_users/<int:user_id>', methods=['GET', 'POST'])
@@ -1003,6 +987,7 @@ def edit_users(user_id):
             cur.close()
             conn.close()
 
+
 # Manage Clients
 @app.route('/manage_clients')
 def manage_clients():
@@ -1010,17 +995,18 @@ def manage_clients():
         return redirect(url_for('login'))
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM clients ORDER BY customer_name")
+    cur.execute("SELECT * FROM clients")
     clients = cur.fetchall()
     cur.close()
     conn.close()
 
     return render_template('manage_clients.html', clients=clients)
 
+
 # Add new client route
 @app.route('/add_client', methods=['GET', 'POST'])
 def add_client():
-    if 'user_id' not in session:
+    if 'user_id' not in session or session.get('role') not in [1, 2]:
         return redirect(url_for('login'))
 
     conn = get_db_connection()
@@ -1034,24 +1020,16 @@ def add_client():
         email = request.form['email']
         position = request.form['position']
         id_no = request.form['id_no']
-        date_created = datetime.today() # today's date is used by default
+        date_created = request.form['date_created']
 
 
         try:
-            # Check if the client already exists
-            cur.execute("SELECT * FROM clients WHERE phone_no = %s",(phone_no,))
-            existing_client = cur.fetchone()
-
-            if existing_client:
-                flash('Client with this phone number already exists.', 'warning')
-            else:
-                cur.execute("""
-                    INSERT INTO clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
-                conn.commit()
-                flash('Client added successfully!', 'success')
-
+            cur.execute("""
+                INSERT INTO clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
+            conn.commit()
+            flash('Client added successfully!', 'success')
 
             return redirect(url_for('manage_clients'))
 
@@ -1063,7 +1041,9 @@ def add_client():
             cur.close()
             conn.close()
     else:
-        return render_template('add_clients.html')
+        date_created = datetime.today().strftime('%d-%m-%Y')
+        return render_template('add_clients.html', date_created=date_created)
+
 
 # Add client via modal AJAX route
 @app.route('/add_client_ajax', methods=['POST'])
@@ -1082,22 +1062,15 @@ def add_client_ajax():
         email = request.form['email']
         position = request.form['position']
         id_no = request.form['id_no']
-        date_created = datetime.today() # Use today's date by default
+        date_created = request.form['date_created']
 
-        # Check if client already exists
-        cur.execute("SELECT * FROM clients WHERE phone_no = %s", (phone_no,))
-        existing_client = cur.fetchone()
-
-        if existing_client:
-            return jsonify({'success': False, 'error': 'Client with this phone number already exists.'})
-        else:
-            cur.execute("""
+        cur.execute("""
             INSERT INTO clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
-            conn.commit()
+        conn.commit()
 
-            return jsonify({'success': True, 'customer_name': customer_name})
+        return jsonify({'success': True, 'customer_name': customer_name})
 
     except Exception as e:
         conn.rollback()
@@ -1106,6 +1079,7 @@ def add_client_ajax():
     finally:
         cur.close()
         conn.close()
+
 
 # Edit client info route
 @app.route('/edit_clients/<int:customer_id>', methods=['GET', 'POST'])
@@ -1129,7 +1103,6 @@ def edit_clients(customer_id):
         email = request.form.get('email')
         position = request.form.get('position')
         id_no = request.form.get('id_no')
-
 
         try:
             # Update user in the database
@@ -1212,10 +1185,10 @@ def view_invoice(invoice_number):
         cursor.close()
         conn.close()
 
+
 # Generate invoice route
 def create_invoice(invoice_data, filename):
-
-    #Create canvas
+    # Create canvas
     c = canvas.Canvas(filename, pagesize=letter)
     
     # Create style
@@ -1311,9 +1284,8 @@ def create_invoice(invoice_data, filename):
     c.drawString(50, 200, "John Kungu")
     c.setFont("Helvetica-Bold", 12)
     c.drawString(50, 180, "ACCOUNTANT")
-
-
     c.save()
+
 
 # Logout Route
 @app.route('/logout')
@@ -1322,8 +1294,13 @@ def logout():
     flash("Logged out successfully.", "info")
     return redirect(url_for('login'))
 
+
+@app.route('/payments')
+def payments_menu():
+    return render_template('payments_menu.html')
+
+
 # Allow external hosting
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
     app.run(host='0.0.0.0', port=5000, debug=True)
