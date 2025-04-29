@@ -4,7 +4,10 @@
 .form-section.active {
             display: block;
         }
-#clientSearchResults {
+.client-search-container {
+            position: relative;
+        }
+#clientSearchResults, #clientSuggestions {
             position: absolute;
             z-index: 1000;
             width: calc(100% - 30px);
@@ -16,12 +19,17 @@
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             display: none;
         }
-.search-result-item {
+.search-result-item, .suggestion-item {
             padding: 8px 12px;
             cursor: pointer;
         }
-.search-result-item:hover {
+.search-result-item:hover, .suggestion-item:hover{
             background-color: #f5f5f5;
+        }
+#clientName.suggesting {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            border-bottom: none;
         }
 #invoicePreview {
             border: 1px solid #dee2e6;

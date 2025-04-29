@@ -1031,7 +1031,7 @@ def add_client():
             conn.commit()
             flash('Client added successfully!', 'success')
 
-            return render_template('add_clients.html')
+            return redirect(url_for('manage_clients'))
 
         except Exception as e:
             conn.rollback()
