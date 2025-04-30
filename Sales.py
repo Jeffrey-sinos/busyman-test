@@ -1300,6 +1300,11 @@ def payments_menu():
     return render_template('payments_menu.html')
 
 
+@app.route('/search_billing_account')
+def search_billing_account():
+    return render_template('search_billing_account.html')
+
+
 # Allow external hosting
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
