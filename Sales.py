@@ -1342,6 +1342,7 @@ def search_billing_account():
                     'value': row[1],  # account_name
                     'data': {
                         'service_provider': row[0],
+                        'account_name': row[1],
                         'account_number': row[2],
                         'category': row[3],
                         'paybill_number': row[4],
