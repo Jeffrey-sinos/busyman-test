@@ -1300,8 +1300,72 @@ def payments_menu():
     return render_template('payments_menu.html')
 
 
-@app.route('/search_billing_account')
+@app.route('/search_billing_account', methods=['GET', 'POST'])
 def search_billing_account():
+    """Handle both page rendering and search requests"""
+    if request.method == 'GET' and request.args.get('term'):
+        search_term = request.args.get('term', '').strip()
+        print(f"Search term received: {search_term}")
+
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            query = sql.SQL("""
+                SELECT service_provider, account_name, account_number, category, paybill_number, ussd_number,
+                       frequency, billing_date, bill_amount, account_owner, created_date, invoice_number,
+                       status, bank_account
+                FROM billing_account
+                WHERE account_name ILIKE %s
+                ORDER BY account_name
+                LIMIT 10
+            """)
+
+            cur.execute(query, (f'%{search_term}%',))
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            results = []
+            for idx, row in enumerate(rows):
+                print(f"Row {idx}: {row}")
+                # Safely handle billing_date formatting
+                billing_date = ''
+                try:
+                    billing_date = row[7].strftime('%Y-%m-%d') if hasattr(row[7], 'strftime') else str(row[7])
+                except Exception as e:
+                    print(f"Date formatting error: {e}")
+                    billing_date = str(row[7])
+
+                results.append({
+                    'label': f"{row[1]} ({row[0]})",  # account_name (account_number)
+                    'value': row[1],  # account_name
+                    'data': {
+                        'service_provider': row[0],
+                        'account_number': row[2],
+                        'category': row[3],
+                        'paybill_number': row[4],
+                        'ussd_number': row[5],
+                        'frequency': row[6],
+                        'billing_date': billing_date,
+                        'bill_amount': row[8],
+                        'account_owner': row[9],
+                        'created_date': row[10],
+                        'invoice_number': row[11],
+                        'status': row[12],
+                        'bank_account': row[13]
+                    }
+                })
+            return jsonify(results)
+
+        except Exception as e:
+            print(f"Database error: {e}")
+            return jsonify([])
+
+    elif request.method == 'POST':
+        # Optional: handle full form submission if needed
+        return redirect(url_for('search_billing_account'))
+
     return render_template('search_billing_account.html')
 
 

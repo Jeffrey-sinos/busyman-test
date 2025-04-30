@@ -5,52 +5,199 @@
     <title>Search Billing Account</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
     <style>
-        body {
+        .body {
             background-color: #f8f9fa;
             padding-top: 20px;
         }
         .form-container {
             background-color: white;
-            padding: 1.5rem;  /* Reduced from 2rem */
-            border-radius: 8px;  /* Slightly smaller radius */
-            margin-top: 15px;  /* Reduced from 30px */
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);  /* Softer shadow */
-            max-width: 600px;  /* Constrain width */
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            max-width: 600px;
             margin-left: auto;
             margin-right: auto;
         }
         h2 {
             text-align: center;
-            margin-bottom: 20px;  /* Reduced from 30px */
-            font-size: 1.5rem;  /* Slightly smaller heading */
+            margin-bottom: 20px;
+            font-size: 1.5rem;
         }
-        .input-group {
-            margin-bottom: 0;  /* Remove default margin */
+        .ui-autocomplete {
+            z-index: 9999;
+            background-color: white;
+            border: 1px solid #ccc;
+            max-height: 200px;
+            overflow-y: auto;
+            position: absolute;
+        }
+        .ui-menu-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .ui-menu-item:hover {
+            background-color: #f5f5f5;
+            cursor: pointer;
+        }
+        .account-details {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 3px;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .form-group {
+            flex: 1;
+            margin-right: 10px;
+            margin-bottom: 0;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="form-container">
-        <h2>Search Billing Account</h2>
-
-        <form method="POST">
-            <div class="form-group">
-                <label for="search_account">Search Account</label>
-                <div class="input-group">
-                    <input type="text" class="form-control" id="search_account" name="search_account" placeholder="Enter account to search">
-                    <div class="input-group-append">
-                        <button class="btn btn-primary" type="submit" name="action" value="search">Search</button>
-                        <a href="menu.html" class="btn btn-secondary">Back to Menu</a>
+<div class="container mt-4">
+    <div class="card form-container"> <!-- Added form-container class here -->
+        <div class="card-body">
+            <h2 class="card-title">Search Billing Account</h2>
+            <form method="POST" id="searchForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="search_account" class="sr-only">Account Search</label>
+                        <input type="text" class="form-control" id="search_account"
+                               name="search_account" placeholder="Type account name..." autocomplete="off">
+                        <!-- Hidden fields for all data -->
+                        <input type="hidden" id="service_provider" name="service_provider">
+                        <input type="hidden" id="account_number" name="account_number">
+                        <input type="hidden" id="category" name="category">
+                        <input type="hidden" id="paybill_number" name="paybill_number">
+                        <input type="hidden" id="ussd_number" name="ussd_number">
+                        <input type="hidden" id="frequency" name="frequency">
+                        <input type="hidden" id="billing_date" name="billing_date">
+                        <input type="hidden" id="bill_amount" name="bill_amount">
+                        <input type="hidden" id="account_owner" name="account_owner">
+                        <input type="hidden" id="invoice_number" name="invoice_number">
+                        <input type="hidden" id="bank_account" name="bank_account">
+                    </div>
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">Search</button>
+                        <a href="{{ url_for('payments_menu') }}" class="btn btn-secondary">Back</a>
                     </div>
                 </div>
+            </form>
+
+            <!-- Results display area -->
+            <div id="accountDetails" class="mt-4" style="display:none;">
+                <h4>Account Details</h4>
+                <table class="table table-bordered">
+                    <tbody>
+                        <tr><th>Service Provider</th><td id="detail-service_provider"></td></tr>
+                        <tr><th>Account Name</th><td id="detail-account_name"></td></tr>
+                        <tr><th>Account Number</th><td id="detail-account_number"></td></tr>
+                        <tr><th>Category</th><td id="detail-category"></td></tr>
+                        <tr><th>Paybill Number</th><td id="detail-paybill_number"></td></tr>
+                        <tr><th>USSD Number</th><td id="detail-ussd_number"></td></tr>
+                        <tr><th>Frequency</th><td id="detail-frequency"></td></tr>
+                        <tr><th>Billing Date</th><td id="detail-billing_date"></td></tr>
+                        <tr><th>Bill Amount</th><td id="detail-bill_amount"></td></tr>
+                        <tr><th>Account Owner</th><td id="detail-account_owner"></td></tr>
+                        <tr><th>Invoice Number</th><td id="detail-invoice_number"></td></tr>
+                        <tr><th>Bank Account</th><td id="detail-bank_account"></td></tr>
+                    </tbody>
+                </table>
             </div>
-        </form>
+        </div>
     </div>
 </div>
 
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+<script>
+$(function() {
+    let typingTimer;                // Timer identifier
+    const doneTypingInterval = 500;  // Time to wait after user stops typing (in ms)
+
+    $("#search_account").on("keyup", function() {
+        clearTimeout(typingTimer);  // Clear the previous timer
+        typingTimer = setTimeout(function() {
+            searchAccount($("#search_account").val());
+        }, doneTypingInterval);
+    });
+
+    function searchAccount(term) {
+        console.log("Sending request for:", term);
+        $.ajax({
+            url: "{{ url_for('search_billing_account') }}",
+            dataType: "json",
+            data: { term: term },
+            success: function(data) {
+                console.log("Received data:", data);
+                $("#search_account").autocomplete("option", "source", data); // Update autocomplete source
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX error:", error);
+            }
+        });
+    }
+
+    $("#search_account").autocomplete({
+        minLength: 1,
+        select: function(event, ui) {
+            console.log("Selected:", ui.item);
+            // Update all hidden fields
+            $("#service_provider").val(ui.item.data.service_provider);
+            $("#account_number").val(ui.item.data.account_number);
+            $("#category").val(ui.item.data.category);
+            $("#paybill_number").val(ui.item.data.paybill_number);
+            $("#ussd_number").val(ui.item.data.ussd_number);
+            $("#frequency").val(ui.item.data.frequency);
+            $("#billing_date").val(ui.item.data.billing_date);
+            $("#bill_amount").val(ui.item.data.bill_amount);
+            $("#account_owner").val(ui.item.data.account_owner);
+            $("#invoice_number").val(ui.item.data.invoice_number);
+            $("#bank_account").val(ui.item.data.bank_account);
+
+            // Display details
+            displayAccountDetails(ui.item.data);
+            return false;
+        }
+    }).autocomplete("instance")._renderItem = function(ul, item) {
+        return $("<li>")
+            .append(`
+                <div>
+                    <strong>${item.label}</strong>
+                    <div class="account-details">
+                        ${item.data.service_provider} | ${item.data.category} | ${item.data.account_owner}
+                    </div>
+                </div>
+            `)
+            .appendTo(ul);
+    };
+
+    function displayAccountDetails(data) {
+        $("#accountDetails").show();
+        $("#detail-service_provider").text(data.service_provider);
+        $("#detail-account_name").text($("#search_account").val());
+        $("#detail-account_number").text(data.account_number);
+        $("#detail-category").text(data.category);
+        $("#detail-paybill_number").text(data.paybill_number);
+        $("#detail-ussd_number").text(data.ussd_number);
+        $("#detail-frequency").text(data.frequency);
+        $("#detail-billing_date").text(data.billing_date);
+        $("#detail-bill_amount").text(data.bill_amount);
+        $("#detail-account_owner").text(data.account_owner);
+        $("#detail-invoice_number").text(data.invoice_number);
+        $("#detail-bank_account").text(data.bank_account);
+    }
+});
+</script>
 </body>
 </html>
