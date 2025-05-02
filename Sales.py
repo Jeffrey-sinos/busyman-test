@@ -1378,25 +1378,127 @@ def search_billing_account():
             return jsonify([])
 
     elif request.method == 'POST':
-        # Handle form submission
-        if request.form.get('form_type') == 'edit':
-            # Handle edit form submission
+        form_type = request.form.get('form_type')
+        if form_type == 'edit':
+            try:
+                # Get all form data
+                invoice_number = request.form['invoice_number']
+                service_provider = request.form['service_provider']
+                account_name = request.form['account_name']
+                account_number = request.form['account_number']
+                category = request.form['category']
+                paybill_number = request.form['paybill_number']
+                ussd_number = request.form['ussd_number']
+                frequency = request.form['frequency']
+                billing_date = request.form['billing_date']
+                bill_amount = request.form['bill_amount']
+                account_owner = request.form['account_owner']
+                status = request.form.get('status', 'Active')  # Default to Active if not provided
+                bank_account = request.form['bank_account']
+                conn = get_db_connection()
+                cur = conn.cursor()
+
+                # Update query
+
+                update_query = sql.SQL("""
+
+                        UPDATE billing_account
+                        SET 
+                            service_provider = %s,
+                            account_name = %s,
+                            account_number = %s,
+                            category = %s,
+                            paybill_number = %s,
+                            ussd_number = %s,
+                            frequency = %s,
+                            billing_date = %s,
+                            bill_amount = %s,
+                            account_owner = %s,
+                            status = %s,
+                            bank_account = %s
+                        WHERE invoice_number = %s
+                        RETURNING *
+                    """)
+
+                cur.execute(update_query, (
+                    service_provider,
+                    account_name,
+                    account_number,
+                    category,
+                    paybill_number,
+                    ussd_number,
+                    frequency,
+                    billing_date,
+                    bill_amount,
+                    account_owner,
+                    status,
+                    bank_account,
+                    invoice_number
+                ))
+
+                # Get the updated record
+                updated_record = cur.fetchone()
+                conn.commit()
+                # Format the updated record for response
+
+                billing_date = ''
+                try:
+                    billing_date = updated_record[7].strftime('%Y-%m-%d') if hasattr(updated_record[7],
+                                                                          'strftime') else str(
+                        updated_record[7])
+                except Exception as e:
+                    print(f"Date formatting error: {e}")
+                    billing_date = str(updated_record[7])
+
+                updated_data = {
+
+                    'service_provider': updated_record[0],
+                    'account_name': updated_record[1],
+                    'account_number': updated_record[2],
+                    'category': updated_record[3],
+                    'paybill_number': updated_record[4],
+                    'ussd_number': updated_record[5],
+                    'frequency': updated_record[6],
+                    'billing_date': billing_date,
+                    'bill_amount': updated_record[8],
+                    'account_owner': updated_record[9],
+                    'created_date': updated_record[10],
+                    'invoice_number': updated_record[11],
+                    'status': updated_record[12],
+                    'bank_account': updated_record[13]
+                }
+
+                return jsonify({
+
+                    'success': True,
+                    'message': 'Billing account updated successfully',
+                    'updated_data': updated_data
+                })
+            except Exception as e:
+                print(f"Error updating billing account: {e}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to update billing account: {str(e)}'
+                }), 400
+            finally:
+                cur.close()
+                conn.close()
+
+        elif form_type == 'add':
+            # Handle add form submission (if needed)
             pass
-        elif request.form.get('form_type') == 'add':
-            # Handle add form submission
-            pass
-        return redirect(url_for('search_billing_account'))
+        return jsonify({'success': False, 'message': 'Invalid form type'}), 400
 
     return render_template('billing-accounts/search-billing-account.html')
 
 
 @app.route('/edit_billing_account')
-def get_edit_form():
+def edit_billing_account():
     return render_template('billing-accounts/edit-billing-account.html')
 
 
 @app.route('/add_billing_account')
-def get_add_form():
+def add_billing_account():
     return render_template('billing-accounts/add-billing-account.html')
 
 

@@ -12,7 +12,7 @@
                         <div class="form-group">
                             <label for="search_account" class="sr-only">Account Search</label>
                             <input type="text" class="form-control" id="search_account"
-                                   name="search_account" placeholder="Type account name..." autocomplete="off">
+                                   name="search_account" placeholder="Search billing account..." autocomplete="off">
                             <!-- Hidden fields for all data -->
                             <input type="hidden" id="service_provider" name="service_provider">
                             <input type="hidden" id="account_name" name="account_name">
@@ -97,9 +97,12 @@
                     </table>
                     <div class="text-right mt-3">
                         <button type="button" id="editAccountBtn" class="btn btn-primary">Edit Account</button>
+                        <button type="button" id="deleteAccountBtn" class="btn btn-primary">Delete Account</button>
+<!--                        <button type="button" id="addBillingAcc" class="btn btn-primary">Add New Account</button>-->
                     </div>
                 </div>
                 {% include "billing-accounts/edit-billing-account.html" %}
+<!--                {% include "billing-accounts/add-billing-account.html" %}-->
             </div>
         </div>
     </div>
@@ -113,6 +116,8 @@
 <script>
 $(function() {
     let typingTimer;
+    let isAddMode = false;
+
     const doneTypingInterval = 500;
 
     // Changed from keyup to keydown to prevent form submission on enter
@@ -322,59 +327,101 @@ $(function() {
 
     // Form submission handler remains the same
     $("#editAccountForm").on("submit", function(e) {
-        e.preventDefault();
-        saveAccountChanges();
+    e.preventDefault();
+
+    // Show loading indicator
+    const submitBtn = $(this).find('button[type="submit"]');
+    const originalBtnText = submitBtn.html();
+    submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
+
+    // Collect form data
+    const formData = $(this).serialize();
+
+    $.ajax({
+        url: $(this).attr('action'),
+        type: 'POST',
+        data: formData,
+        success: function(response) {
+            // Show success message
+            submitBtn.html('<i class="fas fa-check"></i> Saved!').removeClass('btn-primary').addClass('btn-success');
+
+            // Create a temporary success message
+            const successAlert = $(`
+                <div class="alert alert-success alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+                    <strong>Success!</strong> Changes saved successfully.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            `);
+
+            // Add to body and auto-dismiss after 3 seconds
+            $('body').append(successAlert);
+            setTimeout(() => {
+                successAlert.alert('close');
+            }, 3000);
+
+            // Update the view with new data
+            const updatedData = {
+                service_provider: $("#edit-service_provider").val(),
+                account_name: $("#edit-account_name").val(),
+                account_number: $("#edit-account_number").val(),
+                category: $("#edit-category").val(),
+                paybill_number: $("#edit-paybill_number").val(),
+                ussd_number: $("#edit-ussd_number").val(),
+                frequency: $("#edit-frequency").val(),
+                billing_date: $("#edit-billing_date").val(),
+                bill_amount: $("#edit-bill_amount").val(),
+                account_owner: $("#edit-account_owner").val(),
+                invoice_number: $("#edit-invoice_number").val(),
+                bank_account: $("#edit-bank_account").val()
+            };
+
+            showAccountDetails(updatedData);
+
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                submitBtn.html(originalBtnText).removeClass('btn-success').addClass('btn-primary').prop('disabled', false);
+                $("#viewAccountDetails").show();
+                $("#editAccountForm").hide();
+            }, 2000);
+        },
+        error: function(xhr) {
+            // Handle error
+            submitBtn.html(originalBtnText).removeClass('btn-success').addClass('btn-primary').prop('disabled', false);
+
+            const errorAlert = $(`
+                <div class="alert alert-danger alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+                    <strong>Error!</strong> Failed to save changes.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            `);
+
+            $('body').append(errorAlert);
+            setTimeout(() => {
+                errorAlert.alert('close');
+            }, 3000);
+        }
     });
+});
 
     function showSearchSection() {
+        // Hide account details
         $("#accountDetails").addClass("hidden");
+
+        // Show search section
         $("#searchSection").removeClass("hidden");
+
+        // Clear search field
+        $("#search_account").val('');
     }
 
-    function saveAccountChanges() {
-        // Collect data from the editable form
-        const formData = {
-            service_provider: $("#edit-service_provider").val(),
-            account_name: $("#edit-account_name").val(),
-            account_number: $("#edit-account_number").val(),
-            category: $("#edit-category").val(),
-            paybill_number: $("#edit-paybill_number").val(),
-            ussd_number: $("#edit-ussd_number").val(),
-            frequency: $("#edit-frequency").val(),
-            billing_date: $("#edit-billing_date").val(),
-            bill_amount: $("#edit-bill_amount").val(),
-            account_owner: $("#edit-account_owner").val(),
-            invoice_number: $("#edit-invoice_number").val(),
-            bank_account: $("#edit-bank_account").val()
-        };
-
-        // Here you would typically send the data to your server
-        console.log("Saving changes:", formData);
-
-        // Update the hidden fields with the new values
-        updateFormFields(formData);
-
-        alert("Changes saved successfully!");
-    }
-
-    // Add New button handler
-    $("#addBillingAcc").on("click", function() {
-        $.get("{{ url_for('get_add_form') }}", function(html) {
-            $("#accountDetails").html(html).removeClass("hidden");
-            $("#searchResultsPopup, #searchOverlay").hide();
-            $("#add-account_name").focus();
-
-            // Set up form submission handler
-            $("#addAccountForm").on("submit", function(e) {
-                e.preventDefault();
-                saveNewAccount();
-            });
-        });
-    });
 
     // When a result is clicked
     function loadEditForm(accountData) {
-        $.post("{{ url_for('get_edit_form') }}", accountData, function(html) {
+        $.post("{{ url_for('edit_billing_account') }}", accountData, function(html) {
             $("#accountDetails").html(html).removeClass("hidden");
             $("#searchResultsPopup, #searchOverlay").hide();
 
@@ -383,17 +430,6 @@ $(function() {
         });
     }
 
-    function saveNewAccount() {
-        const formData = $("#addAccountForm").serializeArray().reduce(function(obj, item) {
-            obj[item.name] = item.value;
-            return obj;
-        }, {});
-
-        $.post("{{ url_for('search_billing_account') }}", formData, function(response) {
-            alert("Account added successfully!");
-            // Refresh or redirect as needed
-        });
-    }
 
     // Initialize autocomplete
     $("#search_account").autocomplete({

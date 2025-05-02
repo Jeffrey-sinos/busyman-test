@@ -1,10 +1,15 @@
-<button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search">
-    &larr; Back to Search
-</button>
-<h4>Add New Account</h4>
+<div id="accountDetails2" class="mt-4">
+    <button type="button" id="backToSearchFromAdd" class="btn btn-outline-secondary back-to-search mb-3">
+        &larr; Back to Search
+    </button>
+
 <form id="addAccountForm" class="editable-form">
     <table class="table table-bordered">
                         <tbody>
+                            <tr>
+                                <th>Invoice Number</th>
+                                <td><input type="text" class="form-control" id="add-invoice_number" name="invoice_number"></td>
+                            </tr>
                             <tr>
                                 <th>Service Provider</th>
                                 <td><input type="text" class="form-control" id="add-service_provider" name="service_provider"></td>
@@ -14,7 +19,7 @@
                                 <td><input type="text" class="form-control" id="add-account_name" name="account_name"></td>
                             </tr>
                             <tr>
-                                <th>Account Number</th>
+                                <th>Account No</th>
                                 <td><input type="text" class="form-control" id="add-account_number" name="account_number"></td>
                             </tr>
                             <tr>
@@ -33,6 +38,14 @@
                                 </td>
                             </tr>
                             <tr>
+                                <th>Account Owner</th>
+                                <td><input type="text" class="form-control" id="add-account_owner" name="account_owner"></td>
+                            </tr>
+                            <tr>
+                                <th>Bank Account</th>
+                                <td><input type="text" class="form-control" id="add-bank_account" name="bank_account"></td>
+                            </tr>
+                            <tr>
                                 <th>Paybill Number</th>
                                 <td><input type="text" class="form-control" id="add-paybill_number" name="paybill_number"></td>
                             </tr>
@@ -47,7 +60,7 @@
                                         <option value="Monthly">Monthly</option>
                                         <option value="Quarterly">Quarterly</option>
                                         <option value="Annual">Annual</option>
-                                        <option value="One-time">Occasional</option>
+                                        <option value="Occasional">Occasional</option>
                                     </select>
                                 </td>
                             </tr>
@@ -59,22 +72,12 @@
                                 <th>Bill Amount</th>
                                 <td><input type="number" step="0.01" class="form-control" id="add-bill_amount" name="bill_amount"></td>
                             </tr>
-                            <tr>
-                                <th>Account Owner</th>
-                                <td><input type="text" class="form-control" id="add-account_owner" name="account_owner"></td>
-                            </tr>
-                            <tr>
-                                <th>Invoice Number</th>
-                                <td><input type="text" class="form-control" id="add-invoice_number" name="invoice_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Bank Account</th>
-                                <td><input type="text" class="form-control" id="add-bank_account" name="bank_account"></td>
-                            </tr>
+
                         </tbody>
                     </table>
-    <div class="text-right mt-3">
-        <button type="button" id="cancelAdd" class="btn btn-secondary mr-2">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Account</button>
+                    <div class="text-right mt-3">
+                        <button type="button" id="cancelAdd" class="btn btn-secondary mr-2">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
     </div>
-</form>

@@ -1,9 +1,10 @@
-<form id="editAccountForm" class="editable-form" style="display: none;">
+<form id="editAccountForm" class="editable-form" method="POST" action="{{ url_for('search_billing_account') }}" style="display: none;">
+    <input type="hidden" name="form_type" value="edit">
                     <table class="table table-bordered">
                         <tbody>
                             <tr>
                                 <th>Invoice Number</th>
-                                <td><input type="text" class="form-control" id="edit-invoice_number" name="invoice_number" disabled></td>
+                                <td><input type="text" class="form-control" id="edit-invoice_number" name="invoice_number" readonly></td>
                             </tr>
                             <tr>
                                 <th>Service Provider</th>
