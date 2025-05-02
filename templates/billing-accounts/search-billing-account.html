@@ -1,0 +1,457 @@
+{% extends "billing-accounts/main-template.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card form-container">
+        <div class="card-body">
+            <!-- Search Section -->
+            <div id="searchSection" class="search-section">
+                <h2 class="card-title">Search Billing Account</h2>
+                <form method="POST" id="searchForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="search_account" class="sr-only">Account Search</label>
+                            <input type="text" class="form-control" id="search_account"
+                                   name="search_account" placeholder="Search billing account..." autocomplete="off">
+                            <!-- Hidden fields for all data -->
+                            <input type="hidden" id="service_provider" name="service_provider">
+                            <input type="hidden" id="account_name" name="account_name">
+                            <input type="hidden" id="account_number" name="account_number">
+                            <input type="hidden" id="category" name="category">
+                            <input type="hidden" id="paybill_number" name="paybill_number">
+                            <input type="hidden" id="ussd_number" name="ussd_number">
+                            <input type="hidden" id="frequency" name="frequency">
+                            <input type="hidden" id="billing_date" name="billing_date">
+                            <input type="hidden" id="bill_amount" name="bill_amount">
+                            <input type="hidden" id="account_owner" name="account_owner">
+                            <input type="hidden" id="invoice_number" name="invoice_number">
+                            <input type="hidden" id="bank_account" name="bank_account">
+                        </div>
+                        <div class="button-group">
+                            <button type="button" id="searchButton" class="btn btn-primary">Search</button>
+                            <a href="{{ url_for('payments_menu') }}" class="btn btn-secondary">Back</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Results display area - will be populated dynamically -->
+            <div id="accountDetails" class="mt-4 hidden">
+                <button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search">
+                    &larr; Back to Search
+                </button>
+                <h4 id="accountDetailsTitle">Account Details</h4>
+                <div id="viewAccountDetails" class="editable-form">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th>Invoice Number</th>
+                                <td id="view-invoice_number"></td>
+                            </tr>
+                            <tr>
+                                <th>Service Provider</th>
+                                <td id="view-service_provider"></td>
+                            </tr>
+                            <tr>
+                                <th>Account Name</th>
+                                <td id="view-account_name"></td>
+                            </tr>
+                            <tr>
+                                <th>Account No</th>
+                                <td id="view-account_number"></td>
+                            </tr>
+                            <tr>
+                                <th>Category</th>
+                                <td id="view-category"></td>
+                            </tr>
+                            <tr>
+                                <th>Account Owner</th>
+                                <td id="view-account_owner"></td>
+                            </tr>
+                            <tr>
+                                <th>Bank Account</th>
+                                <td id="view-bank_account"></td>
+                            </tr>
+                            <tr>
+                                <th>Paybill Number</th>
+                                <td id="view-paybill_number"></td>
+                            </tr>
+                            <tr>
+                                <th>USSD Number</th>
+                                <td id="view-ussd_number"></td>
+                            </tr>
+                            <tr>
+                                <th>Frequency</th>
+                                <td id="view-frequency"></td>
+                            </tr>
+                            <tr>
+                                <th>Billing Date</th>
+                                <td id="view-billing_date"></td>
+                            </tr>
+                            <tr>
+                                <th>Bill Amount</th>
+                                <td id="view-bill_amount"></td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                    <div class="text-right mt-3">
+                        <button type="button" id="editAccountBtn" class="btn btn-primary">Edit Account</button>
+                        <button type="button" id="deleteAccountBtn" class="btn btn-primary">Delete Account</button>
+<!--                        <button type="button" id="addBillingAcc" class="btn btn-primary">Add New Account</button>-->
+                    </div>
+                </div>
+                {% include "billing-accounts/edit-billing-account.html" %}
+<!--                {% include "billing-accounts/add-billing-account.html" %}-->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include results popup -->
+{% include "billing-accounts/results-popup.html" %}
+
+
+{% block extra_js %}
+<script>
+$(function() {
+    let typingTimer;
+    let isAddMode = false;
+
+    const doneTypingInterval = 500;
+
+    // Changed from keyup to keydown to prevent form submission on enter
+    $("#search_account").on("keydown", function(e) {
+        if (e.keyCode === 13) { // Enter key
+            e.preventDefault();
+            performSearch();
+            return;
+        }
+
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(function() {
+            searchAccount($("#search_account").val());
+        }, doneTypingInterval);
+    });
+
+    // Search button click handler
+    $("#searchButton").on("click", function(e) {
+        e.preventDefault();
+        performSearch();
+    });
+
+    // Close popup handlers
+    $(".close-popup, #searchOverlay").on("click", function() {
+        $("#searchResultsPopup, #searchOverlay").hide();
+    });
+
+    // Back to search button handler
+    $("#backToSearch").on("click", function() {
+        showSearchSection();
+    });
+
+    function performSearch() {
+    const searchTerm = $("#search_account").val().trim();
+
+    // Show loading indicator immediately
+    $("#searchResultsContainer").html('<div class="text-center p-3"><div class="spinner-border text-primary"></div></div>');
+    $("#searchResultsPopup, #searchOverlay").show();
+
+    // Cache-busting with timestamp
+    const timestamp = new Date().getTime();
+
+    $.ajax({
+        url: "{{ url_for('search_billing_account') }}?term=" + encodeURIComponent(searchTerm) +
+             "&all=" + (searchTerm === "") + "&_=" + timestamp,
+        dataType: "json",
+        cache: false, // Prevent browser caching
+        beforeSend: function() {
+            // Show popup immediately while loading
+            $("#searchResultsPopup").css('opacity', '0.8');
+        },
+        success: function(data) {
+            if (!data || data.length === 0) {
+                showSearchResults([]);
+                return;
+            }
+            showSearchResults(data);
+        },
+        complete: function() {
+            $("#searchResultsPopup").css('opacity', '1');
+        }
+    });
+}
+
+    function showSearchResults(results) {
+        const container = $("#searchResultsContainer");
+        container.empty();
+
+        if (results.length === 0) {
+            container.append("<p>No results found</p>");
+        } else {
+            results.forEach(function(item) {
+                container.append(`
+                    <div class="result-item" data-account='${JSON.stringify(item.data).replace(/'/g, "&apos;")}'>
+                        <strong>${item.label}</strong>
+                        <div class="account-details">
+                            ${item.data.service_provider} | ${item.data.category} | ${item.data.account_owner}
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
+        // Add click handler for result items
+        $(".result-item").on("click", function() {
+            const accountData = JSON.parse($(this).attr("data-account").replace(/&apos;/g, "'"));
+            updateFormFields(accountData);
+            showAccountDetails(accountData); // Pass the data here
+            $("#searchResultsPopup, #searchOverlay").hide();
+        });
+
+        $("#searchResultsPopup, #searchOverlay").show();
+    }
+
+    function searchAccount(term) {
+        if (term.trim() === "") return;
+
+        $.ajax({
+            url: "{{ url_for('search_billing_account') }}",
+            dataType: "json",
+            data: { term: term },
+            success: function(data) {
+                $("#search_account").autocomplete("option", "source", data);
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX error:", error);
+            }
+        });
+    }
+
+    function updateFormFields(data) {
+        // Update hidden fields
+        $("#service_provider").val(data.service_provider);
+        $("#account_name").val(data.account_name);
+        $("#account_number").val(data.account_number);
+        $("#category").val(data.category);
+        $("#paybill_number").val(data.paybill_number);
+        $("#ussd_number").val(data.ussd_number);
+        $("#frequency").val(data.frequency);
+        $("#billing_date").val(data.billing_date);
+        $("#bill_amount").val(data.bill_amount);
+        $("#account_owner").val(data.account_owner);
+        $("#invoice_number").val(data.invoice_number);
+        $("#bank_account").val(data.bank_account);
+
+        // Update editable form fields
+        $("#edit-service_provider").val(data.service_provider);
+        $("#edit-account_name").val(data.account_name);
+        $("#edit-account_number").val(data.account_number);
+        $("#edit-category").val(data.category);
+        $("#edit-paybill_number").val(data.paybill_number);
+        $("#edit-ussd_number").val(data.ussd_number);
+        $("#edit-frequency").val(data.frequency);
+        $("#edit-billing_date").val(data.billing_date);
+        $("#edit-bill_amount").val(data.bill_amount);
+        $("#edit-account_owner").val(data.account_owner);
+        $("#edit-invoice_number").val($("#invoice_number").val());
+        $("#edit-bank_account").val(data.bank_account);
+    }
+
+    function showAccountDetails(data) {
+        $("#searchSection").addClass("hidden");
+        $("#accountDetails").removeClass("hidden");
+
+        $("#view-service_provider").text(data.service_provider);
+        $("#view-account_name").text(data.account_name);
+        $("#view-account_number").text(data.account_number);
+        $("#view-category").text(data.category);
+        $("#view-paybill_number").text(data.paybill_number);
+        $("#view-ussd_number").text(data.ussd_number);
+        $("#view-frequency").text(data.frequency);
+        $("#view-billing_date").text(data.billing_date);
+        $("#view-bill_amount").text(data.bill_amount);
+        $("#view-account_owner").text(data.account_owner);
+        $("#view-invoice_number").text(data.invoice_number);
+        $("#view-bank_account").text(data.bank_account);
+
+        $("#viewAccountDetails").show();
+        $("#editAccountForm").hide();
+
+        $("#service_provider").val(data.service_provider);
+        $("#account_name").val(data.account_name);
+        $("#account_number").val(data.account_number);
+        $("#category").val(data.category);
+        $("#paybill_number").val(data.paybill_number);
+        $("#ussd_number").val(data.ussd_number);
+        $("#frequency").val(data.frequency);
+        $("#billing_date").val(data.billing_date);
+        $("#bill_amount").val(data.bill_amount);
+        $("#account_owner").val(data.account_owner);
+        $("#invoice_number").val(data.invoice_number);
+        $("#bank_account").val(data.bank_account);
+    }
+
+    // Edit button handler
+    $("#editAccountBtn").on("click", function() {
+        // Hide read-only view, show edit form
+        $("#viewAccountDetails").hide();
+        $("#editAccountForm").show();
+
+        // Add editable class to all inputs except invoice number
+        $("#editAccountForm input:not(#edit-invoice_number)").addClass("editable-field");
+        $("#accountDetailsTitle").text("Edit Account Details");
+
+        // Populate editable fields from hidden fields
+        $("#edit-service_provider").val($("#service_provider").val());
+        $("#edit-account_name").val($("#account_name").val());
+        $("#edit-account_number").val($("#account_number").val());
+        $("#edit-category").val($("#category").val());
+        $("#edit-paybill_number").val($("#paybill_number").val());
+        $("#edit-ussd_number").val($("#ussd_number").val());
+        $("#edit-frequency").val($("#frequency").val());
+        $("#edit-billing_date").val($("#billing_date").val());
+        $("#edit-bill_amount").val($("#bill_amount").val());
+        $("#edit-account_owner").val($("#account_owner").val());
+        $("#edit-invoice_number").val($("#invoice_number").val());
+        $("#edit-bank_account").val($("#bank_account").val());
+    });
+
+    // Cancel edit handler
+    $("#cancelEdit").on("click", function() {
+        // Show read-only view, hide edit form
+        $("#viewAccountDetails").show();
+        $("#editAccountForm").hide();
+        $("#accountDetailsTitle").text("Account Details");
+    });
+
+    // Form submission handler remains the same
+    $("#editAccountForm").on("submit", function(e) {
+    e.preventDefault();
+
+    // Show loading indicator
+    const submitBtn = $(this).find('button[type="submit"]');
+    const originalBtnText = submitBtn.html();
+    submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
+
+    // Collect form data
+    const formData = $(this).serialize();
+
+    $.ajax({
+        url: $(this).attr('action'),
+        type: 'POST',
+        data: formData,
+        success: function(response) {
+            // Show success message
+            submitBtn.html('<i class="fas fa-check"></i> Saved!').removeClass('btn-primary').addClass('btn-success');
+
+            // Create a temporary success message
+            const successAlert = $(`
+                <div class="alert alert-success alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+                    <strong>Success!</strong> Changes saved successfully.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            `);
+
+            // Add to body and auto-dismiss after 3 seconds
+            $('body').append(successAlert);
+            setTimeout(() => {
+                successAlert.alert('close');
+            }, 3000);
+
+            // Update the view with new data
+            const updatedData = {
+                service_provider: $("#edit-service_provider").val(),
+                account_name: $("#edit-account_name").val(),
+                account_number: $("#edit-account_number").val(),
+                category: $("#edit-category").val(),
+                paybill_number: $("#edit-paybill_number").val(),
+                ussd_number: $("#edit-ussd_number").val(),
+                frequency: $("#edit-frequency").val(),
+                billing_date: $("#edit-billing_date").val(),
+                bill_amount: $("#edit-bill_amount").val(),
+                account_owner: $("#edit-account_owner").val(),
+                invoice_number: $("#edit-invoice_number").val(),
+                bank_account: $("#edit-bank_account").val()
+            };
+
+            showAccountDetails(updatedData);
+
+            // Reset button after 2 seconds
+            setTimeout(() => {
+                submitBtn.html(originalBtnText).removeClass('btn-success').addClass('btn-primary').prop('disabled', false);
+                $("#viewAccountDetails").show();
+                $("#editAccountForm").hide();
+            }, 2000);
+        },
+        error: function(xhr) {
+            // Handle error
+            submitBtn.html(originalBtnText).removeClass('btn-success').addClass('btn-primary').prop('disabled', false);
+
+            const errorAlert = $(`
+                <div class="alert alert-danger alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
+                    <strong>Error!</strong> Failed to save changes.
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+            `);
+
+            $('body').append(errorAlert);
+            setTimeout(() => {
+                errorAlert.alert('close');
+            }, 3000);
+        }
+    });
+});
+
+    function showSearchSection() {
+        // Hide account details
+        $("#accountDetails").addClass("hidden");
+
+        // Show search section
+        $("#searchSection").removeClass("hidden");
+
+        // Clear search field
+        $("#search_account").val('');
+    }
+
+
+    // When a result is clicked
+    function loadEditForm(accountData) {
+        $.post("{{ url_for('edit_billing_account') }}", accountData, function(html) {
+            $("#accountDetails").html(html).removeClass("hidden");
+            $("#searchResultsPopup, #searchOverlay").hide();
+
+            // Update form fields with the data
+            updateFormFields(accountData);
+        });
+    }
+
+
+    // Initialize autocomplete
+    $("#search_account").autocomplete({
+        minLength: 0, // Show suggestions even when empty
+        select: function(event, ui) {
+            updateFormFields(ui.item.data);
+            showAccountDetails();
+            return false;
+        }
+    }).autocomplete("instance")._renderItem = function(ul, item) {
+        return $("<li>")
+            .append(`
+                <div>
+                    <strong>${item.label}</strong>
+                    <div class="account-details">
+                        ${item.data.service_provider} | ${item.data.category} | ${item.data.account_owner}
+                    </div>
+                </div>
+            `)
+            .appendTo(ul);
+    };
+});
+</script>
+{% endblock %}
+{% endblock %}
