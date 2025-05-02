@@ -134,7 +134,7 @@ def read_client_names():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT DISTINCT customer_name FROM clients ORDER BY customer_name;")
+        cursor.execute("SELECT customer_name FROM clients ORDER BY customer_name;")
         return [row[0] for row in cursor.fetchall()]
     except Exception as e:
         print(f"Error reading client names: {e}")
