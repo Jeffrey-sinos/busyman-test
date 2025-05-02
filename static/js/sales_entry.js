@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize download success toast
+    // Initialize elements
     const downloadSuccessToast = new bootstrap.Toast(document.getElementById('downloadSuccessToast'), {autohide: true, delay: 3000});
-
-    // Client search functionality
     const clientNameInput = document.getElementById('clientName');
     const searchClientBtn = document.getElementById('searchClientBtn');
     const clientSearchResults = document.getElementById('clientSearchResults');
@@ -25,18 +23,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const transactionTypeHeading = document.getElementById('transactionTypeHeading');
     const backToClientSearchBtn = document.getElementById('backToClientSearchBtn');
     const backToTransactionTypeBtn = document.getElementById('backToTransactionTypeBtn');
+    const selectedClientDisplay = document.getElementById('selectedClientDisplay');
 
+    // State variables
     let currentItems = [];
     let currentInvoiceUrl = '';
     let currentTransactionType = 'sell';
-
-    // Client names from database
     const clientNames = window.clientNames || [];
+    selectedClientDisplay.textContent = 'No client selected';
 
-    // Show suggestions when typing
+    // Client search functionality
     clientNameInput.addEventListener('input', function() {
         const searchTerm = this.value.toLowerCase();
-        // One character typed
         if (searchTerm.length < 1) {
             clientSuggestions.style.display = 'none';
             clientNameInput.classList.remove('suggesting');
@@ -44,8 +42,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const filteredClients = clientNames.filter(client =>
-            client.toLowerCase().includes(searchTerm))
-            .slice(0, 30); // Show max 10 suggestions
+            client.toLowerCase().includes(searchTerm)).slice(0, 30);
 
         if (filteredClients.length > 0) {
             clientSuggestions.innerHTML = '';
@@ -68,7 +65,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Hide suggestions when clicking elsewhere
     document.addEventListener('click', function(e) {
         if (e.target !== clientNameInput && !clientSuggestions.contains(e.target)) {
             clientSuggestions.style.display = 'none';
@@ -76,10 +72,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Search for client
+    // Search button with empty input shows all clients in modal
     searchClientBtn.addEventListener('click', function() {
         const clientName = clientNameInput.value.trim();
-        if (!clientName) return;
+
+        if (!clientName) {
+            showAllClientsModal();
+            return;
+        }
 
         fetch('/sales/entry', {
             method: 'POST',
@@ -100,6 +100,56 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Scrollable modal for all clients
+    function showAllClientsModal() {
+        const allClientsList = document.getElementById('allClientsList');
+        allClientsList.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+
+        const modal = new bootstrap.Modal(document.getElementById('allClientsModal'));
+        modal.show();
+
+        if (clientNames && clientNames.length > 0) {
+            populateClientList(clientNames);
+        } else {
+            fetch('/sales/entry', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=get_all_clients'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && data.clients.length > 0) {
+                    populateClientList(data.clients);
+                } else {
+                    allClientsList.innerHTML = '<div class="list-group-item text-muted">No clients found</div>';
+                }
+            })
+            .catch(error => {
+                allClientsList.innerHTML = '<div class="list-group-item text-danger">Error loading clients</div>';
+                console.error('Error fetching clients:', error);
+            });
+        }
+
+        function populateClientList(clients) {
+            allClientsList.innerHTML = '';
+            clients.sort((a, b) => a.localeCompare(b));
+
+            clients.forEach(client => {
+                const clientItem = document.createElement('button');
+                clientItem.type = 'button';
+                clientItem.className = 'list-group-item list-group-item-action';
+                clientItem.textContent = client;
+                clientItem.addEventListener('click', function() {
+                    selectClient(client);
+                    modal.hide();
+                });
+                allClientsList.appendChild(clientItem);
+            });
+        }
+    }
+
     function showClientResults(clients) {
         clientSearchResults.innerHTML = '';
         clientSuggestions.style.display = 'none';
@@ -110,11 +160,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Group clients into chunks of 5
         const chunkSize = 5;
         for (let i = 0; i < clients.length; i += chunkSize) {
             const chunk = clients.slice(i, i + chunkSize);
-
             const groupContainer = document.createElement('div');
             groupContainer.className = 'search-result-group';
 
@@ -139,8 +187,8 @@ document.addEventListener('DOMContentLoaded', function() {
         clientSuggestions.style.display = 'none';
         clientNameInput.classList.remove('suggesting');
         customerNameDisplay.value = clientName;
+        selectedClientDisplay.textContent = clientName;
 
-        // Get next invoice number and date
         fetch('/sales/entry', {
             method: 'POST',
             headers: {
@@ -153,8 +201,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.status === 'success') {
                 invoiceNumber.value = data.invoice_number;
                 invoiceDate.value = data.current_date;
-
-                // Switch to transaction type selection
                 clientSearchSection.classList.remove('active');
                 transactionTypeSection.classList.add('active');
             }
@@ -188,11 +234,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     backToTransactionTypeBtn.addEventListener('click', function() {
+        selectedClientDisplay.textContent = customerNameDisplay.value || 'No client selected';
         salesFormSection.classList.remove('active');
         transactionTypeSection.classList.add('active');
     });
 
-    // Save sale
+    // Save sale functionality
     saveSaleBtn.addEventListener('click', function() {
         const formData = {
             invoice_date: invoiceDate.value,
@@ -205,10 +252,9 @@ document.addEventListener('DOMContentLoaded', function() {
             account: document.getElementById('account').value,
             notes: document.getElementById('notes').value,
             transaction_type: currentTransactionType,
-            add_another: 'no' // We'll handle this in the UI
+            add_another: 'no'
         };
 
-        // Basic validation
         if (!formData.product || !formData.price) {
             alert('Please fill in all required fields');
             return;
@@ -224,10 +270,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'success' || data.status === 'add_another') {
-                // Add the new item to our current items array
                 const quantity = currentTransactionType === 'take_back' ?
                     -Math.abs(formData.quantity) : formData.quantity;
-
                 const newItem = {
                     description: formData.product,
                     quantity: quantity,
@@ -238,7 +282,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 currentItems.push(newItem);
                 currentInvoiceUrl = data.invoice_url;
 
-                // Update invoice preview
                 updateInvoicePreview(
                     data.invoice_number,
                     formData.invoice_date,
@@ -247,7 +290,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentItems
                 );
 
-                // Show the "add another" section and hide the save button
                 saveSaleBtn.style.display = 'none';
                 addAnotherSection.style.display = 'block';
                 document.getElementById('invoicePreview').style.display = 'block';
@@ -259,51 +301,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add another item
     addAnotherYesBtn.addEventListener('click', function() {
-        // Reset product fields but keep invoice details
         document.getElementById('product').value = '';
         document.getElementById('quantity').value = '1';
         document.getElementById('price').value = '';
         document.getElementById('category').value = document.getElementById('category').options[0].value;
         document.getElementById('notes').value = '';
-
-        // Hide add another section and show save button
         addAnotherSection.style.display = 'none';
         saveSaleBtn.style.display = 'block';
-
-        // Focus on product field for next entry
         document.getElementById('product').focus();
     });
 
-    // Don't add another item - download invoice
+    // Download invoice
     addAnotherNoBtn.addEventListener('click', function() {
         if (currentInvoiceUrl) {
-            // Create a hidden iframe to trigger the download
             const iframe = document.createElement('iframe');
             iframe.style.display = 'none';
             iframe.src = currentInvoiceUrl;
             document.body.appendChild(iframe);
-
-            // Show success message
             downloadSuccessToast.show();
-
-            // Redirect after download
             setTimeout(function() {
                 window.location.href = '/sales';
             }, 2000);
         }
     });
 
-    // Download invoice button
     downloadInvoiceBtn.addEventListener('click', function(e) {
         e.preventDefault();
         if (currentInvoiceUrl) {
-            // Create a hidden iframe to trigger the download
             const iframe = document.createElement('iframe');
             iframe.style.display = 'none';
             iframe.src = currentInvoiceUrl;
             document.body.appendChild(iframe);
-
-            // Show success message
             downloadSuccessToast.show();
         }
     });
@@ -315,11 +343,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('previewTransactionType').textContent =
             transactionType === 'sell' ? 'Sale' : 'Take Back';
 
-        // Clear existing items
         invoiceItemsTable.innerHTML = '';
-
-        // Add all items
         let totalAmount = 0;
+
         items.forEach(item => {
             const row = document.createElement('tr');
             row.innerHTML = `
@@ -332,7 +358,6 @@ document.addEventListener('DOMContentLoaded', function() {
             totalAmount += parseFloat(item.total);
         });
 
-        // Update total
         document.getElementById('previewTotal').textContent = totalAmount.toFixed(2);
     }
 });
@@ -350,17 +375,10 @@ document.getElementById('addClientForm').addEventListener('submit', function(e) 
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            // Set the client name into the search field
             document.getElementById('clientName').value = data.customer_name;
-
-            // Optionally hide the modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('addClientModal'));
             modal.hide();
-
-            // Show success message
             alert('Client added successfully!');
-
-            // Add the new client to our local clientNames array
             if (typeof clientNames !== 'undefined') {
                 clientNames.push(data.customer_name);
             }
