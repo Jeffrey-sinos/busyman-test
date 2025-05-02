@@ -40,10 +40,72 @@
                 <button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search">
                     &larr; Back to Search
                 </button>
-                <h4>Account Details</h4>
-                <form id="editAccountForm" class="editable-form">
+                <h4 id="accountDetailsTitle">Account Details</h4>
+                <div id="viewAccountDetails" class="editable-form">
                     <table class="table table-bordered">
                         <tbody>
+                            <tr>
+                                <th>Invoice Number</th>
+                                <td id="view-invoice_number"></td>
+                            </tr>
+                            <tr>
+                                <th>Service Provider</th>
+                                <td id="view-service_provider"></td>
+                            </tr>
+                            <tr>
+                                <th>Account Name</th>
+                                <td id="view-account_name"></td>
+                            </tr>
+                            <tr>
+                                <th>Account No</th>
+                                <td id="view-account_number"></td>
+                            </tr>
+                            <tr>
+                                <th>Category</th>
+                                <td id="view-category"></td>
+                            </tr>
+                            <tr>
+                                <th>Account Owner</th>
+                                <td id="view-account_owner"></td>
+                            </tr>
+                            <tr>
+                                <th>Bank Account</th>
+                                <td id="view-bank_account"></td>
+                            </tr>
+                            <tr>
+                                <th>Paybill Number</th>
+                                <td id="view-paybill_number"></td>
+                            </tr>
+                            <tr>
+                                <th>USSD Number</th>
+                                <td id="view-ussd_number"></td>
+                            </tr>
+                            <tr>
+                                <th>Frequency</th>
+                                <td id="view-frequency"></td>
+                            </tr>
+                            <tr>
+                                <th>Billing Date</th>
+                                <td id="view-billing_date"></td>
+                            </tr>
+                            <tr>
+                                <th>Bill Amount</th>
+                                <td id="view-bill_amount"></td>
+                            </tr>
+
+                        </tbody>
+                    </table>
+                    <div class="text-right mt-3">
+                        <button type="button" id="editAccountBtn" class="btn btn-primary">Edit Account</button>
+                    </div>
+                </div>
+                <form id="editAccountForm" class="editable-form" style="display: none;">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th>Invoice Number</th>
+                                <td><input type="text" class="form-control" id="edit-invoice_number" name="invoice_number" disabled></td>
+                            </tr>
                             <tr>
                                 <th>Service Provider</th>
                                 <td><input type="text" class="form-control" id="edit-service_provider" name="service_provider"></td>
@@ -53,7 +115,7 @@
                                 <td><input type="text" class="form-control" id="edit-account_name" name="account_name"></td>
                             </tr>
                             <tr>
-                                <th>Account Number</th>
+                                <th>Account No</th>
                                 <td><input type="text" class="form-control" id="edit-account_number" name="account_number"></td>
                             </tr>
                             <tr>
@@ -72,6 +134,14 @@
                                 </td>
                             </tr>
                             <tr>
+                                <th>Account Owner</th>
+                                <td><input type="text" class="form-control" id="edit-account_owner" name="account_owner"></td>
+                            </tr>
+                            <tr>
+                                <th>Bank Account</th>
+                                <td><input type="text" class="form-control" id="edit-bank_account" name="bank_account"></td>
+                            </tr>
+                            <tr>
                                 <th>Paybill Number</th>
                                 <td><input type="text" class="form-control" id="edit-paybill_number" name="paybill_number"></td>
                             </tr>
@@ -86,7 +156,7 @@
                                         <option value="Monthly">Monthly</option>
                                         <option value="Quarterly">Quarterly</option>
                                         <option value="Annual">Annual</option>
-                                        <option value="One-time">Occasional</option>
+                                        <option value="Occasional">Occasional</option>
                                     </select>
                                 </td>
                             </tr>
@@ -98,18 +168,7 @@
                                 <th>Bill Amount</th>
                                 <td><input type="number" step="0.01" class="form-control" id="edit-bill_amount" name="bill_amount"></td>
                             </tr>
-                            <tr>
-                                <th>Account Owner</th>
-                                <td><input type="text" class="form-control" id="edit-account_owner" name="account_owner"></td>
-                            </tr>
-                            <tr>
-                                <th>Invoice Number</th>
-                                <td><input type="text" class="form-control" id="edit-invoice_number" name="invoice_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Bank Account</th>
-                                <td><input type="text" class="form-control" id="edit-bank_account" name="bank_account"></td>
-                            </tr>
+
                         </tbody>
                     </table>
                     <div class="text-right mt-3">
@@ -156,20 +215,9 @@ $(function() {
         $("#searchResultsPopup, #searchOverlay").hide();
     });
 
-    // Cancel edit button handler
-    $("#cancelEdit").on("click", function() {
-        showSearchSection();
-    });
-
     // Back to search button handler
     $("#backToSearch").on("click", function() {
         showSearchSection();
-    });
-
-    // Edit form submission handler
-    $("#editAccountForm").on("submit", function(e) {
-        e.preventDefault();
-        saveAccountChanges();
     });
 
     function performSearch() {
@@ -227,7 +275,7 @@ $(function() {
         $(".result-item").on("click", function() {
             const accountData = JSON.parse($(this).attr("data-account").replace(/&apos;/g, "'"));
             updateFormFields(accountData);
-            showAccountDetails();
+            showAccountDetails(accountData); // Pass the data here
             $("#searchResultsPopup, #searchOverlay").hide();
         });
 
@@ -276,14 +324,82 @@ $(function() {
         $("#edit-billing_date").val(data.billing_date);
         $("#edit-bill_amount").val(data.bill_amount);
         $("#edit-account_owner").val(data.account_owner);
-        $("#edit-invoice_number").val(data.invoice_number);
+        $("#edit-invoice_number").val($("#invoice_number").val());
         $("#edit-bank_account").val(data.bank_account);
     }
 
-    function showAccountDetails() {
+    function showAccountDetails(data) {
         $("#searchSection").addClass("hidden");
         $("#accountDetails").removeClass("hidden");
+
+        $("#view-service_provider").text(data.service_provider);
+        $("#view-account_name").text(data.account_name);
+        $("#view-account_number").text(data.account_number);
+        $("#view-category").text(data.category);
+        $("#view-paybill_number").text(data.paybill_number);
+        $("#view-ussd_number").text(data.ussd_number);
+        $("#view-frequency").text(data.frequency);
+        $("#view-billing_date").text(data.billing_date);
+        $("#view-bill_amount").text(data.bill_amount);
+        $("#view-account_owner").text(data.account_owner);
+        $("#view-invoice_number").text(data.invoice_number);
+        $("#view-bank_account").text(data.bank_account);
+
+        $("#viewAccountDetails").show();
+        $("#editAccountForm").hide();
+
+        $("#service_provider").val(data.service_provider);
+        $("#account_name").val(data.account_name);
+        $("#account_number").val(data.account_number);
+        $("#category").val(data.category);
+        $("#paybill_number").val(data.paybill_number);
+        $("#ussd_number").val(data.ussd_number);
+        $("#frequency").val(data.frequency);
+        $("#billing_date").val(data.billing_date);
+        $("#bill_amount").val(data.bill_amount);
+        $("#account_owner").val(data.account_owner);
+        $("#invoice_number").val(data.invoice_number);
+        $("#bank_account").val(data.bank_account);
     }
+
+    // Edit button handler
+    $("#editAccountBtn").on("click", function() {
+        // Hide read-only view, show edit form
+        $("#viewAccountDetails").hide();
+        $("#editAccountForm").show();
+
+        // Add editable class to all inputs except invoice number
+        $("#editAccountForm input:not(#edit-invoice_number)").addClass("editable-field");
+        $("#accountDetailsTitle").text("Edit Account Details");
+
+        // Populate editable fields from hidden fields
+        $("#edit-service_provider").val($("#service_provider").val());
+        $("#edit-account_name").val($("#account_name").val());
+        $("#edit-account_number").val($("#account_number").val());
+        $("#edit-category").val($("#category").val());
+        $("#edit-paybill_number").val($("#paybill_number").val());
+        $("#edit-ussd_number").val($("#ussd_number").val());
+        $("#edit-frequency").val($("#frequency").val());
+        $("#edit-billing_date").val($("#billing_date").val());
+        $("#edit-bill_amount").val($("#bill_amount").val());
+        $("#edit-account_owner").val($("#account_owner").val());
+        $("#edit-invoice_number").val($("#invoice_number").val());
+        $("#edit-bank_account").val($("#bank_account").val());
+    });
+
+    // Cancel edit handler
+    $("#cancelEdit").on("click", function() {
+        // Show read-only view, hide edit form
+        $("#viewAccountDetails").show();
+        $("#editAccountForm").hide();
+        $("#accountDetailsTitle").text("Account Details");
+    });
+
+    // Form submission handler remains the same
+    $("#editAccountForm").on("submit", function(e) {
+        e.preventDefault();
+        saveAccountChanges();
+    });
 
     function showSearchSection() {
         $("#accountDetails").addClass("hidden");
