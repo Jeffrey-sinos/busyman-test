@@ -1,10 +1,10 @@
-<button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search">
-    &larr; Back to Search
-</button>
-<h4>Edit Account</h4>
-<form id="editAccountForm" class="editable-form">
+<form id="editAccountForm" class="editable-form" style="display: none;">
                     <table class="table table-bordered">
                         <tbody>
+                            <tr>
+                                <th>Invoice Number</th>
+                                <td><input type="text" class="form-control" id="edit-invoice_number" name="invoice_number" disabled></td>
+                            </tr>
                             <tr>
                                 <th>Service Provider</th>
                                 <td><input type="text" class="form-control" id="edit-service_provider" name="service_provider"></td>
@@ -14,7 +14,7 @@
                                 <td><input type="text" class="form-control" id="edit-account_name" name="account_name"></td>
                             </tr>
                             <tr>
-                                <th>Account Number</th>
+                                <th>Account No</th>
                                 <td><input type="text" class="form-control" id="edit-account_number" name="account_number"></td>
                             </tr>
                             <tr>
@@ -33,6 +33,14 @@
                                 </td>
                             </tr>
                             <tr>
+                                <th>Account Owner</th>
+                                <td><input type="text" class="form-control" id="edit-account_owner" name="account_owner"></td>
+                            </tr>
+                            <tr>
+                                <th>Bank Account</th>
+                                <td><input type="text" class="form-control" id="edit-bank_account" name="bank_account"></td>
+                            </tr>
+                            <tr>
                                 <th>Paybill Number</th>
                                 <td><input type="text" class="form-control" id="edit-paybill_number" name="paybill_number"></td>
                             </tr>
@@ -47,7 +55,7 @@
                                         <option value="Monthly">Monthly</option>
                                         <option value="Quarterly">Quarterly</option>
                                         <option value="Annual">Annual</option>
-                                        <option value="One-time">Occasional</option>
+                                        <option value="Occasional">Occasional</option>
                                     </select>
                                 </td>
                             </tr>
@@ -59,18 +67,7 @@
                                 <th>Bill Amount</th>
                                 <td><input type="number" step="0.01" class="form-control" id="edit-bill_amount" name="bill_amount"></td>
                             </tr>
-                            <tr>
-                                <th>Account Owner</th>
-                                <td><input type="text" class="form-control" id="edit-account_owner" name="account_owner"></td>
-                            </tr>
-                            <tr>
-                                <th>Invoice Number</th>
-                                <td><input type="text" class="form-control" id="edit-invoice_number" name="invoice_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Bank Account</th>
-                                <td><input type="text" class="form-control" id="edit-bank_account" name="bank_account"></td>
-                            </tr>
+
                         </tbody>
                     </table>
                     <div class="text-right mt-3">
