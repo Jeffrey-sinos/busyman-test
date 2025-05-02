@@ -213,7 +213,7 @@
                                         <option value="Monthly">Monthly</option>
                                         <option value="Quarterly">Quarterly</option>
                                         <option value="Annual">Annual</option>
-                                        <option value="One-time">One-time</option>
+                                        <option value="One-time">Occasional</option>
                                     </select>
                                 </td>
                             </tr>
@@ -306,30 +306,36 @@ $(function() {
     });
 
     function performSearch() {
-        const searchTerm = $("#search_account").val().trim();
-        if (searchTerm === "") {
-            alert("Please enter a search term");
-            return;
-        }
+    const searchTerm = $("#search_account").val().trim();
 
-        $.ajax({
-            url: "{{ url_for('search_billing_account') }}",
-            dataType: "json",
-            data: { term: searchTerm },
-            success: function(data) {
-                if (data.length === 0) {
-                    alert("No results found");
-                    return;
-                }
+    // Show loading indicator immediately
+    $("#searchResultsContainer").html('<div class="text-center p-3"><div class="spinner-border text-primary"></div></div>');
+    $("#searchResultsPopup, #searchOverlay").show();
 
-                showSearchResults(data);
-            },
-            error: function(xhr, status, error) {
-                console.error("AJAX error:", error);
-                alert("An error occurred during search");
+    // Cache-busting with timestamp
+    const timestamp = new Date().getTime();
+
+    $.ajax({
+        url: "{{ url_for('search_billing_account') }}?term=" + encodeURIComponent(searchTerm) +
+             "&all=" + (searchTerm === "") + "&_=" + timestamp,
+        dataType: "json",
+        cache: false, // Prevent browser caching
+        beforeSend: function() {
+            // Show popup immediately while loading
+            $("#searchResultsPopup").css('opacity', '0.8');
+        },
+        success: function(data) {
+            if (!data || data.length === 0) {
+                showSearchResults([]);
+                return;
             }
-        });
-    }
+            showSearchResults(data);
+        },
+        complete: function() {
+            $("#searchResultsPopup").css('opacity', '1');
+        }
+    });
+}
 
     function showSearchResults(results) {
         const container = $("#searchResultsContainer");
@@ -445,7 +451,7 @@ $(function() {
 
     // Initialize autocomplete
     $("#search_account").autocomplete({
-        minLength: 1,
+        minLength: 0, // Show suggestions even when empty
         select: function(event, ui) {
             updateFormFields(ui.item.data);
             showAccountDetails();

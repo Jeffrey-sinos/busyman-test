@@ -1303,25 +1303,41 @@ def payments_menu():
 @app.route('/search_billing_account', methods=['GET', 'POST'])
 def search_billing_account():
     """Handle both page rendering and search requests"""
-    if request.method == 'GET' and request.args.get('term'):
+    if request.method == 'GET' and ('term' in request.args or 'all' in request.args):
         search_term = request.args.get('term', '').strip()
-        print(f"Search term received: {search_term}")
+        show_all = request.args.get('all', 'false').lower() == 'true'
+        print(f"Search term received: {search_term}, Show all: {show_all}")
 
         try:
             conn = get_db_connection()
             cur = conn.cursor()
 
+            # Main query
             query = sql.SQL("""
                 SELECT service_provider, account_name, account_number, category, paybill_number, ussd_number,
                        frequency, billing_date, bill_amount, account_owner, created_date, invoice_number,
                        status, bank_account
                 FROM billing_account
-                WHERE account_name ILIKE %s
-                ORDER BY account_name
-                LIMIT 10
             """)
 
-            cur.execute(query, (f'%{search_term}%',))
+            # Add WHERE clause only if not showing all and search term exists
+            if not show_all and search_term:
+                query = sql.SQL("""
+                    {base_query}
+                    WHERE account_name ILIKE %s OR service_provider ILIKE %s
+                """).format(base_query=query)
+                params = (f'%{search_term}%', f'%{search_term}%')
+            else:
+                params = ()
+
+            # Add ordering and limit
+            query = sql.SQL("""
+                {base_query}
+                ORDER BY account_name
+                LIMIT 100
+            """).format(base_query=query)
+
+            cur.execute(query, params)
             rows = cur.fetchall()
             cur.close()
             conn.close()
@@ -1338,7 +1354,7 @@ def search_billing_account():
                     billing_date = str(row[7])
 
                 results.append({
-                    'label': f"{row[1]} ({row[0]})",  # account_name (account_number)
+                    'label': f"{row[1]} ({row[0]})",
                     'value': row[1],  # account_name
                     'data': {
                         'service_provider': row[0],
