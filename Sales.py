@@ -1528,10 +1528,52 @@ def search_billing_account():
                 conn.close()
 
         elif form_type == 'add':
-            # Handle add form submission (if needed)
-            pass
-        return jsonify({'success': False, 'message': 'Invalid form type'}), 400
+            try:
+                # Get form fields
+                service_provider = request.form['service_provider']
+                account_name = request.form['account_name']
+                account_number = request.form['account_number']
+                category = request.form['category']
+                paybill_number = request.form['paybill_number']
+                ussd_number = request.form['ussd_number']
+                frequency = request.form['frequency']
+                billing_date = request.form['billing_date']
+                bill_amount = request.form['bill_amount']
+                account_owner = request.form['account_owner']
+                status = request.form.get('status', 'Active')
+                bank_account = request.form['bank_account']
 
+                conn = get_db_connection()
+                cur = conn.cursor()
+                insert_query = sql.SQL("""
+                    INSERT INTO billing_account (
+                        service_provider, account_name, account_number, category, paybill_number, 
+                        ussd_number, frequency, billing_date, bill_amount, account_owner, status, bank_account
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING invoice_number, created_date
+                """)
+                cur.execute(insert_query, (
+                    service_provider, account_name, account_number, category, paybill_number,
+                    ussd_number, frequency, billing_date, bill_amount, account_owner, status, bank_account
+                ))
+                invoice_number, created_date = cur.fetchone()
+                conn.commit()
+                return jsonify({
+                    'success': True,
+                    'message': 'Billing account added successfully',
+                    'invoice_number': invoice_number,
+                    'created_date': created_date.strftime('%Y-%m-%d')
+                })
+            except Exception as e:
+                print(f"Error adding billing account: {e}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to add billing account: {str(e)}'
+                }), 400
+            finally:
+                cur.close()
+                conn.close()
+        return jsonify({'success': False, 'message': 'Invalid form type'}), 400
     return render_template('billing-accounts/search-billing-account.html')
 
 
