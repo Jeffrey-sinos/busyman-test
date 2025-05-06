@@ -14,7 +14,7 @@ from reportlab.platypus import Paragraph, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT
 import psycopg2
-from psycopg2 import sql
+from psycopg2 import sql, errors
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash # password hashing
 from dotenv import load_dotenv
@@ -1543,26 +1543,32 @@ def search_billing_account():
                 status = request.form.get('status', 'Active')
                 bank_account = request.form['bank_account']
 
+                # Generate invoice number
+                invoice_number = generate_next_invoice_number()
+
                 conn = get_db_connection()
                 cur = conn.cursor()
                 insert_query = sql.SQL("""
-                    INSERT INTO billing_account (
-                        service_provider, account_name, account_number, category, paybill_number, 
-                        ussd_number, frequency, billing_date, bill_amount, account_owner, status, bank_account
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING invoice_number, created_date
-                """)
+                            INSERT INTO billing_account (
+                                service_provider, account_name, account_number, category, paybill_number, 
+                                ussd_number, frequency, billing_date, bill_amount, account_owner, 
+                                status, bank_account, invoice_number
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            RETURNING invoice_number, created_date
+                        """)
                 cur.execute(insert_query, (
                     service_provider, account_name, account_number, category, paybill_number,
-                    ussd_number, frequency, billing_date, bill_amount, account_owner, status, bank_account
+                    ussd_number, frequency, billing_date, bill_amount, account_owner,
+                    status, bank_account, invoice_number
                 ))
-                invoice_number, created_date = cur.fetchone()
+                result = cur.fetchone()
                 conn.commit()
+
                 return jsonify({
                     'success': True,
                     'message': 'Billing account added successfully',
-                    'invoice_number': invoice_number,
-                    'created_date': created_date.strftime('%Y-%m-%d')
+                    'invoice_number': invoice_number,  # Use the generated number
+                    'created_date': result[1].strftime('%Y-%m-%d')
                 })
             except Exception as e:
                 print(f"Error adding billing account: {e}")
@@ -1585,6 +1591,57 @@ def edit_billing_account():
 @app.route('/add_billing_account')
 def add_billing_account():
     return render_template('billing-accounts/add-billing-account.html')
+
+
+def generate_next_invoice_number():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Get current month and year
+    now = datetime.now()
+    month = f"{now.month:02d}"
+    year_short = f"{now.year % 100:02d}"
+
+    # Find the highest existing invoice number for this month/year
+    cur.execute(
+        sql.SQL("SELECT invoice_number FROM invoices WHERE invoice_number LIKE %s ORDER BY id DESC LIMIT 1"),
+        [f"TKB/{month}%/{year_short}"]
+    )
+    last_invoice = cur.fetchone()
+
+    if last_invoice:
+        # Extract the numeric part (e.g., "042" from "TKB/05042/25")
+        last_seq = int(last_invoice[0].split("/")[1][2:])  # Split and take digits after MM
+        next_seq = last_seq + 1
+    else:
+        # No invoices for this month/year yet; start at 1
+        next_seq = 1
+
+    # Format the next invoice number (3-digit sequence)
+    invoice_number = f"TKB/{month}{next_seq:03d}/{year_short}"
+
+    # Save to database (with error handling for race conditions)
+    try:
+        cur.execute(
+            sql.SQL("INSERT INTO invoices (invoice_number) VALUES (%s)"),
+            [invoice_number]
+        )
+        conn.commit()
+    except errors.UniqueViolation:
+        # Race condition: retry once if another request created the same invoice
+        conn.rollback()
+        return generate_next_invoice_number()
+    finally:
+        cur.close()
+        conn.close()
+
+    return invoice_number
+
+
+@app.route('/get_next_invoice_number')
+def get_next_invoice_number():
+    invoice_number = generate_next_invoice_number()
+    return {'invoice_number': invoice_number}
 
 
 # Allow external hosting
