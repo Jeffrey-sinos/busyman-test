@@ -575,9 +575,8 @@ def download_receipt(sales_id):
 @app.route('/search_invoices', methods=['GET', 'POST'])
 def search_invoices():
     invoices = []
-    customers = []
     categories = []
-    products = []
+    account_owners = []
 
     # Set default date range
     today = datetime.today()
@@ -589,25 +588,21 @@ def search_invoices():
         cur = conn.cursor()
 
         # Fetch dropdown values
-        cur.execute("SELECT DISTINCT customer_name FROM sales ORDER BY customer_name;")
-        customers = [row[0] for row in cur.fetchall()]
+        cur.execute("SELECT DISTINCT account_owner FROM account_owner ORDER BY account_owner;")
+        account_owners = [row[0] for row in cur.fetchall()]
 
         cur.execute("SELECT DISTINCT category FROM sales ORDER BY category;")
         categories = [row[0] for row in cur.fetchall()]
 
-        cur.execute("SELECT DISTINCT product FROM sales ORDER BY product;")
-        products = [row[0] for row in cur.fetchall()]
-
         if request.method == 'POST':
             start_date = request.form.get('start_date') or default_start_date
             end_date = request.form.get('end_date') or default_end_date
-            customer_name = request.form.get('customer_name')
+            account_owner = request.form.get('account_owner')
             category = request.form.get('category')
-            product = request.form.get('product')
 
             # Start building query
             query = """
-                       SELECT sales_id, invoice_date, invoice_no, customer_name, 
+                       SELECT sales_id, invoice_date, invoice_no, customer_name, account_owner,
                               product, qty, total, payment_status, category
                        FROM sales
                        WHERE 1=1
@@ -623,17 +618,13 @@ def search_invoices():
                 query += " AND invoice_date <= %s"
                 params.append(end_date)
 
-            if customer_name:
-                query += " AND customer_name = %s"
-                params.append(customer_name)
+            if account_owner:
+                query += " AND account_owner = %s"
+                params.append(account_owner)
 
             if category:
                 query += " AND category = %s"
                 params.append(category)
-
-            if product:
-                query += " AND product = %s"
-                params.append(product)
 
             query += " ORDER BY invoice_date DESC"
 
@@ -650,17 +641,15 @@ def search_invoices():
         return render_template('search_invoices.html',
                                error=f"Database error: {str(e)}",
                                invoices=invoices,
-                               customers=customers,
+                               account_owners=account_owners,
                                categories=categories,
-                               products=products,
                                default_start_date=default_start_date,
                                default_end_date=default_end_date)
 
     return render_template('search_invoices.html',
                            invoices=invoices,
-                           customers=customers,
+                           account_owners=account_owners,
                            categories=categories,
-                           products=products,
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
 
@@ -1329,6 +1318,215 @@ def create_invoice(invoice_data, filename):
     c.drawString(50, 180, "ACCOUNTANT")
     c.save()
 
+# Products route
+@app.route('/products', methods=['GET', 'POST'])
+def products():
+    if request.method == 'GET' and ('term' in request.args or 'all' in request.args):
+        search_term = request.args.get('term', '').strip()
+        show_all = request.args.get('all', 'false').lower() == 'true'
+        print(f"Search term received: {search_term}, Show all: {show_all}")
+
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            # Main query
+            query = sql.SQL("""
+                SELECT * FROM products
+            """)
+
+            # Add WHERE clause only if not showing all and search term exists
+            if not show_all and search_term:
+                query = sql.SQL("""
+                    {base_query}
+                    WHERE product ILIKE %s OR isbn ILIKE %s
+                """).format(base_query=query)
+                params = (f'%{search_term}%', f'%{search_term}%')
+            else:
+                params = ()
+
+            # Add ordering and limit
+            query = sql.SQL("""
+                {base_query}
+                ORDER BY product
+                LIMIT 100
+            """).format(base_query=query)
+
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            results = []
+            for idx, row in enumerate(rows):
+                print(f"Row {idx}: {row}")
+                # Safely handle date_created formatting
+                date_created = ''
+                try:
+                    date_created = row[7].strftime('%Y-%m-%d') if hasattr(row[7], 'strftime') else str(row[7])
+                except Exception as e:
+                    print(f"Date formatting error: {e}")
+                    date_created = str(row[7])
+
+                results.append({
+                    'label': f"{row[1]}",
+                    'value': row[1],  # product name
+                    'data': {
+                        'product_number': row[0],
+                        'product': row[1],
+                        'edition': row[2],
+                        'isbn': row[3],
+                        'date': row[4],
+                        'publisher': row[5],
+                        'author': row[6],
+                        'date_created': date_created,
+                        'frequency': row[8],
+                    }
+                })
+            return jsonify(results)
+        except Exception as e:
+            print(f"Database error: {e}")
+            return jsonify([])
+
+    elif request.method == 'POST':
+        form_type = request.form.get('form_type')
+        if form_type == 'edit':
+            try:
+                # Get all form data
+                product_number = request.form['product_number']
+                product = request.form['product']
+                edition = request.form['edition']
+                isbn = request.form['isbn']
+                date = request.form['date']
+                publisher = request.form['publisher']
+                author = request.form['author']
+                date_created = request.form['date_created']
+                frequency = request.form['frequency']
+                conn = get_db_connection()
+                cur = conn.cursor()
+
+                # Update query
+                update_query = sql.SQL("""
+                        UPDATE products
+                        SET 
+                            product = %s,
+                            edition = %s,
+                            isbn = %s,
+                            date = %s,
+                            publisher = %s,
+                            author = %s,
+                            date_created = %s,
+                            frequency = %s
+                        WHERE product_number = %s
+                        RETURNING *
+                    """)
+
+                cur.execute(update_query, (
+                    product,
+                    edition,
+                    isbn,
+                    date,
+                    publisher,
+                    author,
+                    date_created,
+                    frequency,
+                    product_number
+                ))
+
+                # Get the updated record
+                updated_record = cur.fetchone()
+                conn.commit()
+                # Format the updated record for response
+
+                date_created = ''
+                try:
+                    date_created = updated_record[7].strftime('%Y-%m-%d') if hasattr(updated_record[7],
+                                                                          'strftime') else str(
+                        updated_record[7])
+                except Exception as e:
+                    print(f"Date formatting error: {e}")
+                    date_created = str(updated_record[7])
+
+                updated_data = {
+                    'product_number':updated_record[0],
+                    'product': updated_record[1],
+                    'edition': updated_record[2],
+                    'isbn': updated_record[3],
+                    'date': updated_record[4],
+                    'publisher': updated_record[5],
+                    'author': updated_record[6],
+                    'date_created': date_created,
+                    'frequency': updated_record[8],
+                }
+
+                return jsonify({
+
+                    'success': True,
+                    'message': 'Product updated successfully',
+                    'updated_data': updated_data
+                })
+            except Exception as e:
+                print(f"Error updating product: {e}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to update product: {str(e)}'
+                }), 400
+            finally:
+                cur.close()
+                conn.close()
+
+        elif form_type == 'add':
+            try:
+                # Get form fields
+                product = request.form['product']
+                edition = request.form['edition']
+                isbn = request.form['isbn']
+                date = request.form['date']
+                publisher = request.form['publisher']
+                author = request.form['author']
+                date_created = request.form['date_created']
+                frequency = request.form['frequency']
+
+                conn = get_db_connection()
+                cur = conn.cursor()
+                insert_query = sql.SQL("""
+                    INSERT INTO products (
+                        product, edition, isbn, date, publisher, author, date_created, frequency
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING product_number, date_created
+                """)
+                cur.execute(insert_query, (
+                    product, edition, isbn, date, publisher, author, date_created, frequency
+                ))
+                product_number, date_created = cur.fetchone()
+                conn.commit()
+                return jsonify({
+                    'success': True,
+                    'message': 'Product added successfully',
+                    'product_number': product_number,
+                    'date_created': date_created.strftime('%Y-%m-%d')
+                })
+            except Exception as e:
+                print(f"Error adding product: {e}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to add product: {str(e)}'
+                }), 400
+            finally:
+                cur.close()
+                conn.close()
+        return jsonify({'success': False, 'message': 'Invalid form type'}), 400
+    return render_template('products/search_product.html')
+
+# Edit product Route
+@app.route('/edit_product')
+def edit_product():
+    return render_template('products/edit-product.html')
+
+# Add Product Route
+@app.route('/add_product')
+def add_product():
+    return render_template('products/add-product.html')
 
 # Logout Route
 @app.route('/logout')

@@ -55,11 +55,11 @@
             <!-- Additional Filters -->
             <div class="filters-container">
                 <div class="form-group">
-                    <label for="customer_name" class="form-label">Customer Name</label>
-                    <select class="form-control" id="customer_name" name="customer_name">
-                        <option value="">All Customers</option>
-                        {% for customer in customers %}
-                        <option value="{{ customer }}">{{ customer }}</option>
+                    <label for="account_owner" class="form-label">Account Owner</label>
+                    <select class="form-control" id="account_owner" name="account_owner">
+                        <option value="">All Account Owners</option>
+                        {% for account_owner in account_owners %}
+                        <option value="{{ account_owner }}">{{ account_owner }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -70,16 +70,6 @@
                         <option value="">All Categories</option>
                         {% for category in categories %}
                         <option value="{{ category }}">{{ category }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="product" class="form-label">Product</label>
-                    <select class="form-control" id="product" name="product">
-                        <option value="">All Products</option>
-                        {% for product in products %}
-                        <option value="{{ product }}">{{ product }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -103,7 +93,7 @@
                             <th>Customer</th>
                             <th>Category</th>
                             <th>Product</th>
-                            <th>Qty</th>
+                            <th>Quantity</th>
                             <th>Total</th>
                             <th>Status</th>
                         </tr>
@@ -114,13 +104,13 @@
                             <td>{{ invoice[2] }}</td>
                             <td>{{ invoice[1].strftime('%d-%m-%Y') }}</td>
                             <td>{{ invoice[3] }}</td>
-                            <td>{{ invoice[8] }}</td>
-                            <td>{{ invoice[4] }}</td>
+                            <td>{{ invoice[9] }}</td>
                             <td>{{ invoice[5] }}</td>
-                            <td>{{ "KSh {:,.2f}".format(invoice[6])}}</td>
+                            <td>{{ invoice[6] }}</td>
+                            <td>{{ "KSh {:,.2f}".format(invoice[7])}}</td>
                             <td>
-                                <span class="badge bg-{% if invoice[7] == 'Paid' %}success{% else %}danger{% endif %}">
-                                    {{ invoice[7] }}
+                                <span class="badge bg-{% if invoice[8] == 'Paid' %}success{% else %}danger{% endif %}">
+                                    {{ invoice[8] }}
                                 </span>
                             </td>
                             <td>

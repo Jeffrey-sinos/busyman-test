@@ -1,0 +1,54 @@
+<div id="productDetails2" class="mt-4">
+    <button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search mb-3">
+        &larr; Back to Search
+    </button>
+
+<form id="addProductForm" class="editable-form">
+    <input type="hidden" name="form_type" value="add">
+    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th>Product</th>
+                                <td><input type="text" class="form-control" id="add-product" name="product"></td>
+                            </tr>
+                            <tr>
+                                <th>Edition</th>
+                                <td><input type="text" class="form-control" id="add-edition" name="edition"></td>
+                            </tr>
+                            <tr>
+                                <th>ISBN</th>
+                                <td><input type="text" class="form-control" id="add-isbn" name="isbn"></td>
+                            </tr>
+                            <tr>
+                                <th>Date</th>
+                                <td><input type="text" class="form-control" id="add-date" name="date"></td>
+                            </tr>
+                            <tr>
+                                <th>Publisher</th>
+                                <td><input type="text" class="form-control" id="add-publisher" name="publisher"></td>
+                            </tr>
+                            <tr>
+                                <th>Author</th>
+                                <td><input type="text" class="form-control" id="add-author" name="author"></td>
+                            </tr>
+                            <tr>
+                                <th>Date Created</th>
+                                <td><input type="date" class="form-control" id="add-date_created" name="date_created"></td>
+                            </tr>
+                            <tr>
+                                <th>Frequency</th>
+                                <td>
+                                    <select class="form-control" id="add-frequency" name="frequency">
+                                        <option value="Monthly">Monthly</option>
+                                        <option value="Occasional">Occasional</option>
+                                    </select>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="text-right mt-3">
+                        <button type="button" id="cancelAdd" class="btn btn-secondary mr-2">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </div>
+                </form>
+    </div>
