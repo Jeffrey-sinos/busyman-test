@@ -75,7 +75,7 @@ $(function() {
             container.append("<p>No results found</p>");
         } else {
             results.forEach(function(item) {
-                container.append(`
+                const resultItem = $(`
                     <div class="result-item" data-account='${JSON.stringify(item.data).replace(/'/g, "&apos;")}'>
                         <strong>${item.label}</strong>
                         <div class="account-details">
@@ -83,19 +83,20 @@ $(function() {
                         </div>
                     </div>
                 `);
+
+            // Attach click handler directly to this element
+                resultItem.on("click", function() {
+                    const accountData = JSON.parse($(this).attr("data-account").replace(/&apos;/g, "'"));
+                    updateFormFields(accountData);
+                    showAccountDetails(accountData);
+                    $("#searchResultsPopup, #searchOverlay").hide();
+                });
+
+                container.append(resultItem);
             });
-        }
-
-        // Add click handler for result items
-        $(".result-item").on("click", function() {
-            const accountData = JSON.parse($(this).attr("data-account").replace(/&apos;/g, "'"));
-            updateFormFields(accountData);
-            showAccountDetails(accountData); // Pass the data here
-            $("#searchResultsPopup, #searchOverlay").hide();
-        });
-
-        $("#searchResultsPopup, #searchOverlay").show();
     }
+
+    $("#searchResultsPopup, #searchOverlay").show();
 
     function searchAccount(term) {
     if (term.trim() === "") return;
@@ -303,13 +304,11 @@ $(function() {
         });
     }
 
-    // Initialize autocomplete
+    // Replace the autocomplete initialization with:
     $("#search_account").autocomplete({
-        minLength: 0, // Show suggestions even when empty
-        select: function(event, ui) {
-            updateFormFields(ui.item.data);
-            showAccountDetails();
-            return false;
+        minLength: 0,
+        source: function(request, response) {
+            // Your existing search logic
         }
     }).autocomplete("instance")._renderItem = function(ul, item) {
         return $("<li>")
@@ -330,34 +329,60 @@ $(function() {
         loadAddAccountForm();
     });
 
+    function getNextInvoiceNumber(callback) {
+    $.ajax({
+        url: '/get_next_invoice_number',
+        type: 'GET',
+        dataType: 'json',
+        success: function(response) {
+            if (response.invoice_number) {
+                callback(response.invoice_number);
+            } else {
+                console.error('Failed to get invoice number');
+                callback('INV-ERROR'); // Fallback value
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('Error fetching invoice number:', error);
+            callback('INV-ERROR'); // Fallback value
+        }
+    });
+}
+
     function loadAddAccountForm() {
-        // Hide popup and search section
-        $("#searchResultsPopup, #searchOverlay").hide();
-        $("#searchSection").addClass("hidden");
+    // Hide popup and search section
+    $("#searchResultsPopup, #searchOverlay").hide();
+    $("#searchSection").addClass("hidden");
 
-        // Show loading state
-        $("#accountDetails").empty().removeClass("hidden").html(`
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4>Add New Billing Account</h4>
-                <button class="btn btn-secondary" id="backToAddSearch">
-                    <i class="fas fa-arrow-left"></i> Back to Search
-                </button>
-            </div>
-            <div class="text-center p-3">
-                <div class="spinner-border text-primary"></div>
-                <p>Loading form...</p>
-            </div>
-        `);
+    // Show loading state
+    $("#accountDetails").empty().removeClass("hidden").html(`
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>Add New Billing Account</h4>
+            <button class="btn btn-secondary" id="backToAddSearch">
+                <i class="fas fa-arrow-left"></i> Back to Search
+            </button>
+        </div>
+        <div class="text-center p-3">
+            <div class="spinner-border text-primary"></div>
+            <p>Loading form...</p>
+        </div>
+    `);
 
-        // Set up back button
-        $("#backToAddSearch").on("click", showSearchSection);
+    // Set up back button
+    $("#backToAddSearch").on("click", showSearchSection);
 
-        // Load form via AJAX
+    // First get the next invoice number
+    getNextInvoiceNumber(function(invoiceNumber) {
+        // Then load the form via AJAX
         $.ajax({
             url: "/add_billing_account",
             type: "GET",
             success: function(data) {
                 $("#accountDetails").html(data);
+
+                // Set the invoice number field
+                $("#add-invoice_number").val(invoiceNumber).prop('readonly', true);
+
                 setupAddFormHandlers();
             },
             error: function(xhr) {
@@ -376,7 +401,8 @@ $(function() {
                 $("#backToAddSearch").on("click", showSearchSection);
             }
         });
-    }
+    });
+}
 
     function setupAddFormHandlers() {
         // Cancel/back button
@@ -389,37 +415,38 @@ $(function() {
         });
     }
 
-    function saveNewAccount() {
-        const formData = $("#addAccountForm").serialize(); // Serializes form into URL-encoded string
+function saveNewAccount() {
+    const formData = $("#addAccountForm").serialize();
 
-        $.ajax({
-            url: "/search_billing_account",
-            type: "POST",
-            data: formData,
-            success: function(response) {
-                if (response.success) {
-                    $("#accountDetails").html(`
-                        <div class="alert alert-success">
-                            ${response.message}<br>
-                            <strong>Invoice #:</strong> ${response.invoice_number}<br>
-                            <strong>Created on:</strong> ${response.created_date}
-                        </div>
-                        <button class="btn btn-secondary mt-3" id="backToAddSearch">Back to Search</button>
-                    `);
-                    $("#backToAddSearch").on("click", showSearchSection);
-                } else {
-                    $("#accountDetails").prepend(`
-                        <div class="alert alert-danger">${response.message}</div>
-                    `);
-                }
-            },
-            error: function(xhr) {
-                $("#accountDetails").prepend(`
-                    <div class="alert alert-danger">
-                        Server error: ${xhr.responseText}
+    $.ajax({
+        url: "/search_billing_account",  // Make sure this is your correct endpoint
+        type: "POST",
+        data: formData,
+        success: function(response) {
+            if (response.success) {
+                $("#accountDetails").html(`
+                    <div class="alert alert-success">
+                        ${response.message}<br>
+                        <strong>Invoice #:</strong> ${response.invoice_number}<br>
+                        <strong>Created on:</strong> ${response.created_date}
                     </div>
+                    <button class="btn btn-secondary mt-3" id="backToAddSearch">Back to Search</button>
+                `);
+                $("#backToAddSearch").on("click", showSearchSection);
+            } else {
+                $("#accountDetails").prepend(`
+                    <div class="alert alert-danger">${response.message}</div>
                 `);
             }
-        });
-    }
+        },
+        error: function(xhr) {
+            $("#accountDetails").prepend(`
+                <div class="alert alert-danger">
+                    Server error: ${xhr.responseText}
+                </div>
+            `);
+        }
+    });
+}
+}
 }); // This closes the main jQuery function

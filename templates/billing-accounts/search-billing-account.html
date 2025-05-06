@@ -114,6 +114,6 @@
 
 {% block extra_js %}
 <script > var searchUrl = "{{ url_for('search_billing_account') }}";</script>
-<script src="{{ url_for('static', filename='js/billing-accounts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/billing-accounts.js') }}" defer></script>
 {% endblock %}
 {% endblock %}
