@@ -87,7 +87,7 @@ def read_product_names():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT DISTINCT product FROM sales ORDER BY product;")
+        cursor.execute("SELECT DISTINCT product FROM products ORDER BY product;")
         return [row[0] for row in cursor.fetchall()]
     except Exception as e:
         print(f"Error reading product names: {e}")
@@ -99,18 +99,11 @@ def read_product_names():
 
 # Display categories function
 def read_categories():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        cursor.execute("SELECT DISTINCT category FROM sales ORDER BY category;")
-        return [row[0] for row in cursor.fetchall()]
-    except Exception as e:
-        print(f"Error reading client names: {e}")
-        return []
-    finally:
-        cursor.close
-        conn.close
+    return [
+        "Books",
+        "Consultancy",
+        "Rent",
+    ]
 
 
 # Display account owners function
@@ -119,7 +112,7 @@ def read_account_owners():
     cursor = conn.cursor()
 
     try:
-        cursor.execute("SELECT DISTINCT account_owner FROM sales ORDER BY account_owner;")
+        cursor.execute("SELECT DISTINCT account_owner FROM account_owner ORDER BY account_owner;")
         return [row[0] for row in cursor.fetchall()]
     except Exception as e:
         print(f"Error reading client names: {e}")
@@ -575,8 +568,8 @@ def download_receipt(sales_id):
 @app.route('/search_invoices', methods=['GET', 'POST'])
 def search_invoices():
     invoices = []
-    categories = []
-    account_owners = []
+    categories = read_categories()
+    account_owners = read_account_owners()
 
     # Set default date range
     today = datetime.today()
@@ -586,13 +579,6 @@ def search_invoices():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-
-        # Fetch dropdown values
-        cur.execute("SELECT DISTINCT account_owner FROM account_owner ORDER BY account_owner;")
-        account_owners = [row[0] for row in cur.fetchall()]
-
-        cur.execute("SELECT DISTINCT category FROM sales ORDER BY category;")
-        categories = [row[0] for row in cur.fetchall()]
 
         if request.method == 'POST':
             start_date = request.form.get('start_date') or default_start_date
@@ -906,10 +892,10 @@ def user_details(user_id):
     if 'user_id' not in session:
         flash("Please log in first.", "warning")
         return redirect(url_for('login'))
-    
+
     conn = get_db_connection()
     cur = conn.cursor()
-    
+
     try:
         if session.get('role') == 1 or session.get('role') == 2:
             cur.execute("""
@@ -934,7 +920,7 @@ def user_details(user_id):
             return redirect(url_for('manage_users'))
 
         return render_template('user_details.html', user=user)
-    
+
     except Exception as e:
         flash(f"Error: {str(e)}", "danger")
         return redirect(url_for('manage_users'))
@@ -1222,7 +1208,7 @@ def view_invoice(invoice_number):
 def create_invoice(invoice_data, filename):
     # Create canvas
     c = canvas.Canvas(filename, pagesize=letter)
-    
+
     # Create style
     styles = getSampleStyleSheet()
     style_normal = styles["Normal"]
@@ -1242,7 +1228,7 @@ def create_invoice(invoice_data, filename):
     c.drawString(430,700,email)
     c.drawString(430, 690, kra_pin)
     c.drawString(430, 660, "")
-    
+
     # Invoice title and details
     c.setFont("Helvetica-Bold", 20)
     c.drawString(280, 640, "Invoice")
@@ -1265,7 +1251,7 @@ def create_invoice(invoice_data, filename):
     c.drawString(50, 540, client_label)
 
     label_width = c.stringWidth(client_label, "Helvetica-Bold", 12)
-    
+
     # Client name next to the label
     c.setFont("Helvetica", 12)
     c.drawString(50 + label_width + 5, 540, client_name)
@@ -1332,7 +1318,7 @@ def products():
 
             # Main query
             query = sql.SQL("""
-                SELECT * FROM products
+                SELECT * FROM products WHERE status = 'Active'
             """)
 
             # Add WHERE clause only if not showing all and search term exists
@@ -1376,7 +1362,7 @@ def products():
                         'product': row[1],
                         'edition': row[2],
                         'isbn': row[3],
-                        'date': row[4],
+                        'date_published': row[4],
                         'publisher': row[5],
                         'author': row[6],
                         'date_created': date_created,
@@ -1390,6 +1376,22 @@ def products():
 
     elif request.method == 'POST':
         form_type = request.form.get('form_type')
+        if form_type == 'delete':
+            try:
+                product_number = request.form['product_number']
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute("""
+                            UPDATE products SET status = 'Inactive' WHERE product_number = %s
+                        """, (product_number,))
+                conn.commit()
+                return jsonify({'success': True, 'message': 'Product deleted successfully'})
+            except Exception as e:
+                print(f"Error deleting product: {e}")
+                return jsonify({'success': False, 'message': 'Failed to delete product'}), 400
+            finally:
+                cur.close()
+                conn.close()
         if form_type == 'edit':
             try:
                 # Get all form data
@@ -1397,7 +1399,7 @@ def products():
                 product = request.form['product']
                 edition = request.form['edition']
                 isbn = request.form['isbn']
-                date = request.form['date']
+                date_published = request.form['date_published']
                 publisher = request.form['publisher']
                 author = request.form['author']
                 date_created = request.form['date_created']
@@ -1412,7 +1414,7 @@ def products():
                             product = %s,
                             edition = %s,
                             isbn = %s,
-                            date = %s,
+                            date_published = %s,
                             publisher = %s,
                             author = %s,
                             date_created = %s,
@@ -1425,7 +1427,7 @@ def products():
                     product,
                     edition,
                     isbn,
-                    date,
+                    date_published,
                     publisher,
                     author,
                     date_created,
@@ -1452,7 +1454,7 @@ def products():
                     'product': updated_record[1],
                     'edition': updated_record[2],
                     'isbn': updated_record[3],
-                    'date': updated_record[4],
+                    'date_published': updated_record[4],
                     'publisher': updated_record[5],
                     'author': updated_record[6],
                     'date_created': date_created,
@@ -1477,35 +1479,63 @@ def products():
 
         elif form_type == 'add':
             try:
-                # Get form fields
-                product = request.form['product']
-                edition = request.form['edition']
-                isbn = request.form['isbn']
-                date = request.form['date']
-                publisher = request.form['publisher']
-                author = request.form['author']
-                date_created = request.form['date_created']
-                frequency = request.form['frequency']
+                # Get form fields with proper default values
+                product = request.form.get('product', '').strip()
+                edition = request.form.get('edition', '').strip()
+                isbn = request.form.get('isbn', '').strip()
+                date_published = request.form.get('date_published', '').strip()
+                publisher = request.form.get('publisher', '').strip()
+                author = request.form.get('author', '').strip()
+                date_created = request.form.get('date_created', '').strip()
+                frequency = request.form.get('frequency', '').strip()
+
+                if not product:
+                    return jsonify({'success': False, 'message': 'Product name is required'}), 400
+                if not isbn:
+                    return jsonify({'success': False, 'message': 'ISBN is required'}), 400
+                if not date_published:
+                    return jsonify({'success': False, 'message': 'Date Published is required'}), 400
 
                 conn = get_db_connection()
                 cur = conn.cursor()
-                insert_query = sql.SQL("""
-                    INSERT INTO products (
-                        product, edition, isbn, date, publisher, author, date_created, frequency
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING product_number, date_created
-                """)
+
+                insert_query = """
+                            INSERT INTO products (
+                                product, edition, isbn, date_published, publisher, 
+                                author, date_created, frequency, status
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Active')
+                            RETURNING product, date_created
+                        """
+
                 cur.execute(insert_query, (
-                    product, edition, isbn, date, publisher, author, date_created, frequency
+                    product, edition, isbn, date_published,
+                    publisher, author, date_created, frequency
                 ))
-                product_number, date_created = cur.fetchone()
+
+                # Safely handle the returned data
+                result = cur.fetchone()
+                if not result:
+                    raise Exception("No data returned after insert")
+
+                product, date_created = result
                 conn.commit()
+
+                # Format the date safely
+                formatted_date = ''
+                try:
+                    formatted_date = date_created.strftime('%Y-%m-%d') if hasattr(date_created, 'strftime') else str(
+                        date_created)
+                except Exception as e:
+                    print(f"Date formatting error: {e}")
+                    formatted_date = str(date_created)
+
                 return jsonify({
                     'success': True,
                     'message': 'Product added successfully',
-                    'product_number': product_number,
-                    'date_created': date_created.strftime('%Y-%m-%d')
+                    'product': product,
+                    'date_created': formatted_date
                 })
+
             except Exception as e:
                 print(f"Error adding product: {e}")
                 return jsonify({
@@ -1513,9 +1543,11 @@ def products():
                     'message': f'Failed to add product: {str(e)}'
                 }), 400
             finally:
-                cur.close()
-                conn.close()
+                if 'cur' in locals(): cur.close()
+                if 'conn' in locals(): conn.close()
+
         return jsonify({'success': False, 'message': 'Invalid form type'}), 400
+
     return render_template('products/search_product.html')
 
 # Edit product Route
@@ -1527,6 +1559,11 @@ def edit_product():
 @app.route('/add_product')
 def add_product():
     return render_template('products/add-product.html')
+
+# Stores Route
+@app.route('/stores')
+def stores_menu():
+    return render_template('stores_menu.html')
 
 # Logout Route
 @app.route('/logout')
