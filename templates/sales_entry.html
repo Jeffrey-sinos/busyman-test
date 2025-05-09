@@ -129,6 +129,7 @@
                         <div class="col-md-4">
                             <label for="category" class="form-label">Category</label>
                             <select class="form-select" id="category">
+                                <option value=""> Select a Category</option>
                                 {% for category in categories %}
                                     <option value="{{ category }}">{{ category }}</option>
                                 {% endfor %}
@@ -138,6 +139,7 @@
                         <div class="col-md-4">
                             <label for="account" class="form-label">Account Owner</label>
                             <select class="form-select" id="account">
+                                <option value=""> Select an Account Owner</option>
                                 {% for account in accounts %}
                                     <option value="{{ account }}">{{ account }}</option>
                                 {% endfor %}

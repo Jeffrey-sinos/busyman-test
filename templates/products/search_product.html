@@ -18,7 +18,7 @@
                             <input type="hidden" id="product" name="product">
                             <input type="hidden" id="edition" name="edition">
                             <input type="hidden" id="isbn" name="isbn">
-                            <input type="hidden" id="date" name="date">
+                            <input type="hidden" id="date_published" name="date_published">
                             <input type="hidden" id="publisher" name="publisher">
                             <input type="hidden" id="author" name="author">
                             <input type="hidden" id="date_created" name="date_created">
@@ -27,7 +27,7 @@
                         </div>
                         <div class="button-group">
                             <button type="button" id="searchButton" class="btn btn-primary">Search</button>
-                            <a href="{{ url_for('admin_dashboard') if session.get('role') == 2 else url_for('superuser_dashboard') }}" class="btn btn-secondary">Back to Main Menu</a>
+                            <a href="{{ url_for('stores_menu') }}" class="btn btn-secondary">Back to Stores Menu</a>
                         </div>
                     </div>
                 </form>
@@ -59,8 +59,8 @@
                                 <td id="view-isbn"></td>
                             </tr>
                             <tr>
-                                <th>Date</th>
-                                <td id="view-date"></td>
+                                <th>Date Published</th>
+                                <td id="view-date_published"></td>
                             </tr>
                             <tr>
                                 <th>Publisher</th>

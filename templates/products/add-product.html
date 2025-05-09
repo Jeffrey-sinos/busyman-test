@@ -1,15 +1,14 @@
-<div id="productDetails2" class="mt-4">
+<div id="productDetails" class="mt-4">
     <button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search mb-3">
         &larr; Back to Search
     </button>
-
 <form id="addProductForm" class="editable-form">
     <input type="hidden" name="form_type" value="add">
     <table class="table table-bordered">
                         <tbody>
                             <tr>
                                 <th>Product</th>
-                                <td><input type="text" class="form-control" id="add-product" name="product"></td>
+                                <td><input type="text" class="form-control" id="add-product" name="product" required></td>
                             </tr>
                             <tr>
                                 <th>Edition</th>
@@ -17,11 +16,11 @@
                             </tr>
                             <tr>
                                 <th>ISBN</th>
-                                <td><input type="text" class="form-control" id="add-isbn" name="isbn"></td>
+                                <td><input type="text" class="form-control" id="add-isbn" name="isbn" required></td>
                             </tr>
                             <tr>
-                                <th>Date</th>
-                                <td><input type="text" class="form-control" id="add-date" name="date"></td>
+                                <th>Date Published</th>
+                                <td><input type="text" class="form-control" id="add-date_published" name="date" required></td>
                             </tr>
                             <tr>
                                 <th>Publisher</th>
@@ -33,7 +32,7 @@
                             </tr>
                             <tr>
                                 <th>Date Created</th>
-                                <td><input type="date" class="form-control" id="add-date_created" name="date_created"></td>
+                                <td><input type="date" class="form-control" id="add-date_created" name="date_created" required></td>
                             </tr>
                             <tr>
                                 <th>Frequency</th>

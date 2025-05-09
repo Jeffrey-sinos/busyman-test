@@ -119,7 +119,7 @@ $(function() {
         $("#product").val(data.product);
         $("#edition").val(data.edition);
         $("#isbn").val(data.isbn);
-        $("#date").val(data.date);
+        $("#date_published").val(data.date_published);
         $("#publisher").val(data.publisher);
         $("#author").val(data.author);
         $("#date_created").val(data.date_created);
@@ -129,7 +129,7 @@ $(function() {
         $("#edit-product").val(data.product);
         $("#edit-edition").val(data.edition);
         $("#edit-isbn").val(data.isbn);
-        $("#edit-date").val(data.date);
+        $("#edit-date_published").val(data.date_published);
         $("#edit-publisher").val(data.publisher);
         $("#edit-author").val(data.author);
         $("#edit-date_created").val(data.date_created);
@@ -144,7 +144,7 @@ $(function() {
         $("#view-product").text(data.product);
         $("#view-edition").text(data.edition);
         $("#view-isbn").text(data.isbn);
-        $("#view-date").text(data.date);
+        $("#view-date_published").text(data.date_published);
         $("#view-publisher").text(data.publisher);
         $("#view-author").text(data.author);
         $("#view-date_created").text(data.date_created);
@@ -157,7 +157,7 @@ $(function() {
         $("#product").val(data.product);
         $("#edition").val(data.edition);
         $("#isbn").val(data.isbn);
-        $("#date").val(data.date);
+        $("#date_published").val(data.date_published);
         $("#publisher").val(data.publisher);
         $("#author").val(data.author);
         $("#date_created").val(data.date_created);
@@ -179,7 +179,7 @@ $(function() {
         $("#edit-product").val($("#product").val());
         $("#edit-edition").val($("#edition").val());
         $("#edit-isbn").val($("#isbn").val());
-        $("#edit-date").val($("#date").val());
+        $("#edit-date_published").val($("#date_published").val());
         $("#edit-publisher").val($("#publisher").val());
         $("#edit-author").val($("#author").val());
         $("#edit-date_created").val($("#date_created").val());
@@ -236,7 +236,7 @@ $(function() {
                     product: $("#edit-product").val(),
                     edition: $("#edit-edition").val(),
                     isbn: $("#edit-isbn").val(),
-                    date: $("#edit-date").val(),
+                    date_published: $("#edit-date_published").val(),
                     publisher: $("#edit-publisher").val(),
                     author: $("#edit-author").val(),
                     date_created: $("#edit-date_created").val(),
@@ -315,7 +315,7 @@ $(function() {
         // Hide popup and search section
         $("#searchResultsPopup, #searchOverlay").hide();
         $("#searchSection").addClass("hidden");
-
+        $("#productDetails").removeClass("hidden");
         // Show loading state
         $("#productDetails").empty().removeClass("hidden").html(`
             <div class="d-flex justify-content-between align-items-center mb-3">
@@ -382,7 +382,7 @@ $(function() {
                     $("#productDetails").html(`
                         <div class="alert alert-success">
                             ${response.message}<br>
-                            <strong>Product #:</strong> ${response.product_number}<br>
+                            <strong>Product Name:</strong> ${response.product}<br>
                             <strong>Created on:</strong> ${response.date_created}
                         </div>
                         <button class="btn btn-secondary mt-3" id="backToAddSearch">Back to Search</button>
@@ -403,4 +403,40 @@ $(function() {
             }
         });
     }
+    document.getElementById('deleteProductBtn').addEventListener('click', function () {
+        const productNumber = document.getElementById('product_number').value;
+
+        if (!productNumber) {
+            alert("No product selected.");
+            return;
+        }
+
+        if (!confirm("Are you sure you want to delete this product?")) {
+            return;
+        }
+
+        fetch("/products", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: new URLSearchParams({
+                form_type: 'delete',
+                product_number: productNumber
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert("Product deleted successfully.");
+                showSearchSection();
+            } else {
+                alert("Error deleting product: " + data.message);
+            }
+        })
+        .catch(error => {
+            alert("An error occurred while deleting the product.");
+            console.error(error);
+        });
+    });
 }); // This closes the main jQuery function
