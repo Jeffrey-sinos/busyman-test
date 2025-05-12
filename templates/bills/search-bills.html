@@ -1,4 +1,4 @@
-{% extends "billing-accounts/main-template.html" %}
+{% extends "bills/main-template.html" %}
 
 {% block content %}
 <div class="container mt-4">
@@ -6,13 +6,13 @@
         <div class="card-body">
             <!-- Search Section -->
             <div id="searchSection" class="search-section">
-                <h2 class="card-title">Search Billing Account</h2>
+                <h2 class="card-title">Search Bills</h2>
                 <form method="POST" id="searchForm">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="search_account" class="sr-only">Account Search</label>
+                            <label for="search_account" class="sr-only">Search Bills</label>
                             <input type="text" class="form-control" id="search_account"
-                                   name="search_account" placeholder="Search billing account..." autocomplete="off">
+                                   name="search_account" placeholder="Search bills..." autocomplete="off">
                             <!-- Hidden fields for all data -->
                             <input type="hidden" id="service_provider" name="service_provider">
                             <input type="hidden" id="account_name" name="account_name">
@@ -36,12 +36,12 @@
             </div>
 
             <!-- Results display area - will be populated dynamically -->
-            <div id="accountDetails" class="mt-4 hidden">
+            <div id="BillsDetails" class="mt-4 hidden">
                 <button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search">
                     &larr; Back to Search
                 </button>
-                <h4 id="accountDetailsTitle">Account Details</h4>
-                <div id="viewAccountDetails" class="editable-form">
+                <h4 id="BillsDetailsTitle">Bills Details</h4>
+                <div id="viewBillsDetails" class="editable-form">
                     <table class="table table-bordered">
                         <tbody>
                             <tr>
@@ -96,22 +96,22 @@
                         </tbody>
                     </table>
                     <div class="text-right mt-3">
-                        <button type="button" id="editAccountBtn" class="btn btn-primary">Edit Account</button>
-                        <button type="button" id="deleteAccountBtn" class="btn btn-primary">Delete Account</button>
+                        <button type="button" id="editBillsBtn" class="btn btn-primary">Edit Bills</button>
+                        <button type="button" id="deleteBillsBtn" class="btn btn-primary">Delete Bills</button>
                     </div>
                 </div>
-                {% include "billing-accounts/edit-billing-account.html" %}
+                {% include "bills/edit-bills.html" %}
             </div>
         </div>
     </div>
 </div>
 
 <!-- Include results popup -->
-{% include "billing-accounts/results-popup.html" %}
+{% include "bills/results-popup.html" %}
 
 
 {% block extra_js %}
-<script > var searchUrl = "{{ url_for('search_billing_account') }}";</script>
-<script src="{{ url_for('static', filename='js/billing-accounts.js') }}" defer></script>
+<script > var searchUrl = "{{ url_for('search_bills') }}";</script>
+<script src="{{ url_for('static', filename='js/bills.js') }}" defer></script>
 {% endblock %}
 {% endblock %}

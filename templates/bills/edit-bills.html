@@ -1,32 +1,27 @@
-<div id="accountDetails2" class="mt-4">
-    <button type="button" id="backToAddSearch" class="btn btn-outline-secondary back-to-search mb-3">
-        &larr; Back to Search
-    </button>
-
-<form id="addAccountForm" class="editable-form">
-    <input type="hidden" name="form_type" value="add">
-    <table class="table table-bordered">
+<form id="editAccountForm" class="editable-form" method="POST" action="{{ url_for('search_bills') }}" style="display: none;">
+    <input type="hidden" name="form_type" value="edit">
+                    <table class="table table-bordered">
                         <tbody>
                             <tr>
                                 <th>Invoice Number</th>
-                                <td><input type="text" class="form-control" id="add-invoice_number" name="invoice_number"></td>
+                                <td><input type="text" class="form-control" id="edit-invoice_number" name="invoice_number" readonly></td>
                             </tr>
                             <tr>
                                 <th>Service Provider</th>
-                                <td><input type="text" class="form-control" id="add-service_provider" name="service_provider"></td>
+                                <td><input type="text" class="form-control" id="edit-service_provider" name="service_provider"></td>
                             </tr>
                             <tr>
                                 <th>Account Name</th>
-                                <td><input type="text" class="form-control" id="add-account_name" name="account_name"></td>
+                                <td><input type="text" class="form-control" id="edit-account_name" name="account_name"></td>
                             </tr>
                             <tr>
                                 <th>Account No</th>
-                                <td><input type="text" class="form-control" id="add-account_number" name="account_number"></td>
+                                <td><input type="text" class="form-control" id="edit-account_number" name="account_number"></td>
                             </tr>
                             <tr>
                                 <th>Category</th>
                                 <td>
-                                    <select class="form-control" id="add-category" name="category">
+                                    <select class="form-control" id="edit-category" name="category">
                                         <option value="Licenses">Licenses</option>
                                         <option value="Payroll">Payroll</option>
                                         <option value="Utilities">Utilities</option>
@@ -40,24 +35,24 @@
                             </tr>
                             <tr>
                                 <th>Account Owner</th>
-                                <td><input type="text" class="form-control" id="add-account_owner" name="account_owner"></td>
+                                <td><input type="text" class="form-control" id="edit-account_owner" name="account_owner"></td>
                             </tr>
                             <tr>
                                 <th>Bank Account</th>
-                                <td><input type="text" class="form-control" id="add-bank_account" name="bank_account"></td>
+                                <td><input type="text" class="form-control" id="edit-bank_account" name="bank_account"></td>
                             </tr>
                             <tr>
                                 <th>Paybill Number</th>
-                                <td><input type="text" class="form-control" id="add-paybill_number" name="paybill_number"></td>
+                                <td><input type="text" class="form-control" id="edit-paybill_number" name="paybill_number"></td>
                             </tr>
                             <tr>
                                 <th>USSD Number</th>
-                                <td><input type="text" class="form-control" id="add-ussd_number" name="ussd_number"></td>
+                                <td><input type="text" class="form-control" id="edit-ussd_number" name="ussd_number"></td>
                             </tr>
                             <tr>
                                 <th>Frequency</th>
                                 <td>
-                                    <select class="form-control" id="add-frequency" name="frequency">
+                                    <select class="form-control" id="edit-frequency" name="frequency">
                                         <option value="Monthly">Monthly</option>
                                         <option value="Quarterly">Quarterly</option>
                                         <option value="Annual">Annual</option>
@@ -67,34 +62,17 @@
                             </tr>
                             <tr>
                                 <th>Billing Date</th>
-                                <td><input type="date" class="form-control" id="add-billing_date" name="billing_date"></td>
+                                <td><input type="date" class="form-control" id="edit-billing_date" name="billing_date"></td>
                             </tr>
                             <tr>
                                 <th>Bill Amount</th>
-                                <td><input type="number" step="0.01" class="form-control" id="add-bill_amount" name="bill_amount"></td>
+                                <td><input type="number" step="0.01" class="form-control" id="edit-bill_amount" name="bill_amount"></td>
                             </tr>
 
                         </tbody>
                     </table>
                     <div class="text-right mt-3">
-                        <button type="button" id="cancelAdd" class="btn btn-secondary mr-2">Cancel</button>
+                        <button type="button" id="cancelEdit" class="btn btn-secondary mr-2">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>
                 </form>
-    </div>
-
-<!--<script>-->
-<!--document.addEventListener('DOMContentLoaded', function() {-->
-<!--    // Fetch and set the next invoice number-->
-<!--    fetch('/get_next_invoice_number')-->
-<!--        .then(response => response.json())-->
-<!--        .then(data => {-->
-<!--            document.getElementById('add-invoice_number').value = data.invoice_number;-->
-<!--        })-->
-<!--        .catch(error => {-->
-<!--            console.error('Error fetching invoice number:', error);-->
-<!--            document.getElementById('add-invoice_number').placeholder = 'Error loading invoice number';-->
-<!--        });-->
-
-<!--});-->
-<!--</script>-->

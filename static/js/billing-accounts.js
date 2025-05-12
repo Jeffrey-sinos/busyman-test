@@ -90,6 +90,7 @@ $(function() {
                     updateFormFields(accountData);
                     showAccountDetails(accountData);
                     $("#searchResultsPopup, #searchOverlay").hide();
+                    $("#loadAddAccountForm").hide();
                 });
 
                 container.append(resultItem);
@@ -177,6 +178,46 @@ $(function() {
         $("#invoice_number").val(data.invoice_number);
         $("#bank_account").val(data.bank_account);
     }
+
+    // Delete button handler
+    $("#deleteAccountBtn").on("click", function(e) {
+        e.preventDefault();
+
+        const invoiceNumber = $("#view-invoice_number").text().trim();
+
+        if (!invoiceNumber) {
+            alert('Invoice number not found.');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete the billing account with invoice number ${invoiceNumber}?`)) {
+            return;
+        }
+
+        $.ajax({
+            url: '/delete_billing_account',
+            method: 'POST',
+            data: {
+                invoice_number: invoiceNumber
+            },
+            success: function(data) {
+                if (data.success) {
+                    alert(data.message);
+                    $("#accountDetails").addClass("hidden");
+                    $("#searchSection").removeClass("hidden");
+                    // Optional: Clear search results
+                    $("#search_account").val('');
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Delete failed:', error);
+                alert('An error occurred. Please try again.');
+            }
+        });
+    });
+
 
     // Edit button handler
     $("#editAccountBtn").on("click", function() {
@@ -371,37 +412,37 @@ $(function() {
     // Set up back button
     $("#backToAddSearch").on("click", showSearchSection);
 
-    // First get the next invoice number
-    getNextInvoiceNumber(function(invoiceNumber) {
-        // Then load the form via AJAX
-        $.ajax({
-            url: "/add_billing_account",
-            type: "GET",
-            success: function(data) {
-                $("#accountDetails").html(data);
+    // Just load the form directly
+    $.ajax({
+        url: "/add_billing_account",
+        type: "GET",
+        success: function(data) {
+            $("#accountDetails").html(data);
 
-                // Set the invoice number field
-                $("#add-invoice_number").val(invoiceNumber).prop('readonly', true);
+            //Generate and populate invoice number field
+            getNextInvoiceNumber(function(invoiceNumber) {
+                $("#add-invoice_number").val(invoiceNumber);
+            });
 
-                setupAddFormHandlers();
-            },
-            error: function(xhr) {
-                let errorMsg = "Failed to load form";
-                if (xhr.status === 404) {
-                    errorMsg = "Form template not found";
-                }
-                $("#accountDetails").html(`
-                    <div class="alert alert-danger">
-                        ${errorMsg}
-                        <button class="btn btn-secondary mt-2" id="backToAddSearch">
-                            Back to Search
-                        </button>
-                    </div>
-                `);
-                $("#backToAddSearch").on("click", showSearchSection);
+            setupAddFormHandlers();
+        },
+        error: function(xhr) {
+            let errorMsg = "Failed to load form";
+            if (xhr.status === 404) {
+                errorMsg = "Form template not found";
             }
-        });
+            $("#accountDetails").html(`
+                <div class="alert alert-danger">
+                    ${errorMsg}
+                    <button class="btn btn-secondary mt-2" id="backToAddSearch">
+                        Back to Search
+                    </button>
+                </div>
+            `);
+            $("#backToAddSearch").on("click", showSearchSection);
+        }
     });
+
 }
 
     function setupAddFormHandlers() {
