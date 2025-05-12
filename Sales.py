@@ -1317,13 +1317,14 @@ def search_billing_account():
                        frequency, billing_date, bill_amount, account_owner, created_date, invoice_number,
                        status, bank_account
                 FROM billing_account
+                WHERE status != 'Not Active'
             """)
 
             # Add WHERE clause only if not showing all and search term exists
             if not show_all and search_term:
                 query = sql.SQL("""
                     {base_query}
-                    WHERE account_name ILIKE %s OR service_provider ILIKE %s
+                    WHERE account_name ILIKE %s OR service_provider ILIKE %s AND status != 'Not Active'
                 """).format(base_query=query)
                 params = (f'%{search_term}%', f'%{search_term}%')
             else:
@@ -1486,7 +1487,7 @@ def search_billing_account():
 
         elif form_type == 'add':
             try:
-                # Get form fields
+                invoice_number = request.form['invoice_number']  # Get the invoice number from the form
                 service_provider = request.form['service_provider']
                 account_name = request.form['account_name']
                 account_number = request.form['account_number']
@@ -1500,24 +1501,32 @@ def search_billing_account():
                 status = request.form.get('status', 'Active')
                 bank_account = request.form['bank_account']
 
-                # Generate invoice number
-                invoice_number = generate_next_invoice_number()
-
                 conn = get_db_connection()
                 cur = conn.cursor()
-                insert_query = sql.SQL("""
-                            INSERT INTO billing_account (
-                                service_provider, account_name, account_number, category, paybill_number, 
-                                ussd_number, frequency, billing_date, bill_amount, account_owner, 
-                                status, bank_account, invoice_number
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                            RETURNING invoice_number, created_date
-                        """)
-                cur.execute(insert_query, (
+                # Insert into billing_account table
+                insert_billing_query = sql.SQL("""
+                           INSERT INTO billing_account (
+                               service_provider, account_name, account_number, category, paybill_number, 
+                               ussd_number, frequency, billing_date, bill_amount, account_owner, 
+                               status, bank_account, invoice_number
+                           ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                           RETURNING created_date
+                       """)
+                cur.execute(insert_billing_query, (
                     service_provider, account_name, account_number, category, paybill_number,
                     ussd_number, frequency, billing_date, bill_amount, account_owner,
                     status, bank_account, invoice_number
                 ))
+                created_date = cur.fetchone()[0]
+
+                # Insert into invoices table
+                insert_invoice_query = sql.SQL("""
+                           INSERT INTO invoices (
+                               invoice_number
+                           ) VALUES (%s)
+                       """)
+                cur.execute(insert_invoice_query, (
+                    invoice_number))
                 result = cur.fetchone()
                 conn.commit()
 
@@ -1550,16 +1559,62 @@ def add_billing_account():
     return render_template('billing-accounts/add-billing-account.html')
 
 
+@app.route('/delete_billing_account', methods=['POST'])
+def delete_billing_account():
+    try:
+        invoice_number = request.form.get('invoice_number')
+        if not invoice_number:
+            return jsonify({
+                'success': False,
+                'message': 'Invoice number is required'
+            }), 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Update the status to 'Not active'
+        update_query = sql.SQL("""
+            UPDATE billing_account
+            SET status = 'Not Active'
+            WHERE invoice_number = %s
+            RETURNING invoice_number, account_name
+        """)
+
+        cur.execute(update_query, (invoice_number,))
+        result = cur.fetchone()
+        conn.commit()
+
+        if result:
+            return jsonify({
+                'success': True,
+                'message': f"Billing Account '{result[1]}' (with invoice number: {result[0]}) has been deleted",
+                'invoice_number': result[0]
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No account found with that invoice number'
+            }), 404
+
+    except Exception as e:
+        print(f"Error deleting the account: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Failed to delete account: {str(e)}'
+        }), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 def generate_next_invoice_number():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Get current month and year
     now = datetime.now()
     month = f"{now.month:02d}"
     year_short = f"{now.year % 100:02d}"
 
-    # Find the highest existing invoice number for this month/year
     cur.execute(
         sql.SQL("SELECT invoice_number FROM invoices WHERE invoice_number LIKE %s ORDER BY id DESC LIMIT 1"),
         [f"TKB/{month}%/{year_short}"]
@@ -1567,31 +1622,14 @@ def generate_next_invoice_number():
     last_invoice = cur.fetchone()
 
     if last_invoice:
-        # Extract the numeric part (e.g., "042" from "TKB/05042/25")
-        last_seq = int(last_invoice[0].split("/")[1][2:])  # Split and take digits after MM
+        last_seq = int(last_invoice[0].split("/")[1][2:])
         next_seq = last_seq + 1
     else:
-        # No invoices for this month/year yet; start at 1
         next_seq = 1
 
-    # Format the next invoice number (3-digit sequence)
     invoice_number = f"TKB/{month}{next_seq:03d}/{year_short}"
-
-    # Save to database (with error handling for race conditions)
-    try:
-        cur.execute(
-            sql.SQL("INSERT INTO invoices (invoice_number) VALUES (%s)"),
-            [invoice_number]
-        )
-        conn.commit()
-    except errors.UniqueViolation:
-        # Race condition: retry once if another request created the same invoice
-        conn.rollback()
-        return generate_next_invoice_number()
-    finally:
-        cur.close()
-        conn.close()
-
+    cur.close()
+    conn.close()
     return invoice_number
 
 

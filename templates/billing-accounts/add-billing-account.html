@@ -1,5 +1,5 @@
 <div id="accountDetails2" class="mt-4">
-    <button type="button" id="backToSearchFromAdd" class="btn btn-outline-secondary back-to-search mb-3">
+    <button type="button" id="backToAddSearch" class="btn btn-outline-secondary back-to-search mb-3">
         &larr; Back to Search
     </button>
 
@@ -83,18 +83,18 @@
                 </form>
     </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Fetch and set the next invoice number
-    fetch('/get_next_invoice_number')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('add-invoice_number').value = data.invoice_number;
-        })
-        .catch(error => {
-            console.error('Error fetching invoice number:', error);
-            document.getElementById('add-invoice_number').placeholder = 'Error loading invoice number';
-        });
+<!--<script>-->
+<!--document.addEventListener('DOMContentLoaded', function() {-->
+<!--    // Fetch and set the next invoice number-->
+<!--    fetch('/get_next_invoice_number')-->
+<!--        .then(response => response.json())-->
+<!--        .then(data => {-->
+<!--            document.getElementById('add-invoice_number').value = data.invoice_number;-->
+<!--        })-->
+<!--        .catch(error => {-->
+<!--            console.error('Error fetching invoice number:', error);-->
+<!--            document.getElementById('add-invoice_number').placeholder = 'Error loading invoice number';-->
+<!--        });-->
 
-});
-</script>
+<!--});-->
+<!--</script>-->
