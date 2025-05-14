@@ -1,117 +1,67 @@
-{% extends "bills/main-template.html" %}
+{% extends 'bills/main-template.html' %}
+
+{% block title %}Search Bills{% endblock %}
+
+{% block extra_css %}
+
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="card form-container">
-        <div class="card-body">
-            <!-- Search Section -->
-            <div id="searchSection" class="search-section">
-                <h2 class="card-title">Search Bills</h2>
-                <form method="POST" id="searchForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="search_account" class="sr-only">Search Bills</label>
-                            <input type="text" class="form-control" id="search_account"
-                                   name="search_account" placeholder="Search bills..." autocomplete="off">
-                            <!-- Hidden fields for all data -->
-                            <input type="hidden" id="service_provider" name="service_provider">
-                            <input type="hidden" id="account_name" name="account_name">
-                            <input type="hidden" id="account_number" name="account_number">
-                            <input type="hidden" id="category" name="category">
-                            <input type="hidden" id="paybill_number" name="paybill_number">
-                            <input type="hidden" id="ussd_number" name="ussd_number">
-                            <input type="hidden" id="frequency" name="frequency">
-                            <input type="hidden" id="billing_date" name="billing_date">
-                            <input type="hidden" id="bill_amount" name="bill_amount">
-                            <input type="hidden" id="account_owner" name="account_owner">
-                            <input type="hidden" id="invoice_number" name="invoice_number">
-                            <input type="hidden" id="bank_account" name="bank_account">
-                        </div>
-                        <div class="button-group">
-                            <button type="button" id="searchButton" class="btn btn-primary">Search</button>
-                            <a href="{{ url_for('payments_menu') }}" class="btn btn-secondary">Back</a>
-                        </div>
-                    </div>
-                </form>
+<!--<h2>Search Bills</h2>-->
+
+<div class="form-container">
+    <h2>Search Bills</h2>
+    <form id="filter-form" class="mb-4">
+        <div class="form-row align-items-end">
+
+            <!-- Category -->
+            <div class="form-group col-md-3">
+                <label for="category">Category:</label>
+                <select id="category" name="category" class="form-control">
+                    <option value="">All Categories</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Subscription">Subscription</option>
+                    <option value="Loan">Loan</option>
+                    <option value="Rent">Rent</option>
+                </select>
             </div>
 
-            <!-- Results display area - will be populated dynamically -->
-            <div id="BillsDetails" class="mt-4 hidden">
-                <button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search">
-                    &larr; Back to Search
-                </button>
-                <h4 id="BillsDetailsTitle">Bills Details</h4>
-                <div id="viewBillsDetails" class="editable-form">
-                    <table class="table table-bordered">
-                        <tbody>
-                            <tr>
-                                <th>Invoice Number</th>
-                                <td id="view-invoice_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Service Provider</th>
-                                <td id="view-service_provider"></td>
-                            </tr>
-                            <tr>
-                                <th>Account Name</th>
-                                <td id="view-account_name"></td>
-                            </tr>
-                            <tr>
-                                <th>Account No</th>
-                                <td id="view-account_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Category</th>
-                                <td id="view-category"></td>
-                            </tr>
-                            <tr>
-                                <th>Account Owner</th>
-                                <td id="view-account_owner"></td>
-                            </tr>
-                            <tr>
-                                <th>Bank Account</th>
-                                <td id="view-bank_account"></td>
-                            </tr>
-                            <tr>
-                                <th>Paybill Number</th>
-                                <td id="view-paybill_number"></td>
-                            </tr>
-                            <tr>
-                                <th>USSD Number</th>
-                                <td id="view-ussd_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Frequency</th>
-                                <td id="view-frequency"></td>
-                            </tr>
-                            <tr>
-                                <th>Billing Date</th>
-                                <td id="view-billing_date"></td>
-                            </tr>
-                            <tr>
-                                <th>Bill Amount</th>
-                                <td id="view-bill_amount"></td>
-                            </tr>
+            <!-- Account Owner -->
+            <div class="form-group col-md-3">
+                <label for="account_owner">Account Owner:</label>
+                <select id="account_owner" name="account_owner" class="form-control">
+                    <option value="">All Owners</option>
+                </select>
+            </div>
 
-                        </tbody>
-                    </table>
-                    <div class="text-right mt-3">
-                        <button type="button" id="editBillsBtn" class="btn btn-primary">Edit Bills</button>
-                        <button type="button" id="deleteBillsBtn" class="btn btn-primary">Delete Bills</button>
-                    </div>
-                </div>
-                {% include "bills/edit-bills.html" %}
+            <!-- Start Date -->
+            <div class="form-group col-md-2">
+                <label for="start_date">Start Date:</label>
+                <input type="text" id="start_date" name="start_date" class="form-control" autocomplete="off">
+            </div>
+
+            <!-- End Date -->
+            <div class="form-group col-md-2">
+                <label for="end_date">End Date:</label>
+                <input type="text" id="end_date" name="end_date" class="form-control" autocomplete="off">
+            </div>
+
+        </div>
+
+        <!-- Button Row -->
+        <div class="form-row">
+            <div class="form-group col-md-2 offset-md-8">
+                <button type="submit" class="btn btn-success btn-block">Search</button>
+            </div>
+            <div class="form-group col-md-2">
+                <a href="{{ url_for('payments_menu') }}" class="btn btn-secondary">Back To Menu</a>
             </div>
         </div>
-    </div>
+    </form>
 </div>
 
-<!-- Include results popup -->
-{% include "bills/results-popup.html" %}
-
+{% endblock %}
 
 {% block extra_js %}
-<script > var searchUrl = "{{ url_for('search_bills') }}";</script>
-<script src="{{ url_for('static', filename='js/bills.js') }}" defer></script>
-{% endblock %}
+<script src="{{ url_for('static', filename='js/bills.js') }}"></script>
 {% endblock %}
