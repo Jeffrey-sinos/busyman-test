@@ -1,4 +1,4 @@
-<form id="editAccountForm" class="editable-form" method="POST" action="{{ url_for('search_bills') }}" style="display: none;">
+<form id="editBillForm" class="editable-form" method="POST" action="{{ url_for('search_bills') }}" style="display: none;">
     <input type="hidden" name="form_type" value="edit">
                     <table class="table table-bordered">
                         <tbody>
@@ -48,17 +48,6 @@
                             <tr>
                                 <th>USSD Number</th>
                                 <td><input type="text" class="form-control" id="edit-ussd_number" name="ussd_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Frequency</th>
-                                <td>
-                                    <select class="form-control" id="edit-frequency" name="frequency">
-                                        <option value="Monthly">Monthly</option>
-                                        <option value="Quarterly">Quarterly</option>
-                                        <option value="Annual">Annual</option>
-                                        <option value="Occasional">Occasional</option>
-                                    </select>
-                                </td>
                             </tr>
                             <tr>
                                 <th>Billing Date</th>
