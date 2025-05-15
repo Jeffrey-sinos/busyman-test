@@ -28,11 +28,14 @@
 
             <!-- Account Owner -->
             <div class="form-group col-md-3">
-                <label for="account_owner">Account Owner:</label>
-                <select id="account_owner" name="account_owner" class="form-control">
-                    <option value="">All Owners</option>
-                </select>
-            </div>
+            <label for="account_owner">Account Owner:</label>
+            <select id="account_owner" name="account_owner" class="form-control">
+                <option value="">All Owners</option>
+                {% for owner in owners %}
+                <option value="{{ owner }}">{{ owner }}</option>
+                {% endfor %}
+            </select>
+        </div>
 
             <!-- Start Date -->
             <div class="form-group col-md-2">
@@ -58,6 +61,23 @@
             </div>
         </div>
     </form>
+
+   <!-- Results Table -->
+    <div id="results-container" style="margin-top: 20px;">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Account Name</th>
+                    <th>Account Number</th>
+                    <th>Due Date</th>
+                    <th>Bill Amount</th>
+                </tr>
+            </thead>
+            <tbody id="results-body">
+                <!-- Results will be inserted here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
 </div>
 
 {% endblock %}
