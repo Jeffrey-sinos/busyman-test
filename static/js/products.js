@@ -204,8 +204,7 @@ $(function() {
         submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
 
         // Collect form data
-        const formData = $(this).serialize();
-
+        const formData = $(this).serialize() + '&product_number=' + encodeURIComponent($("#product_number").val());
         $.ajax({
             url: $(this).attr('action'),
             type: 'POST',
@@ -232,7 +231,7 @@ $(function() {
 
                 // Update the view with new data
                 const updatedData = {
-                    product_number: $("#edit-product_number").val(),
+                    product_number: $("#product_number").val(),
                     product: $("#edit-product").val(),
                     edition: $("#edit-edition").val(),
                     isbn: $("#edit-isbn").val(),
