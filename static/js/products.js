@@ -1,6 +1,7 @@
 $(function() {
     function showSearchSection() {
         $("#productDetails").addClass("hidden");
+        $("#addProductContainer").addClass("hidden");
         $("#searchSection").removeClass("hidden");
         $("#search_product").val('').focus(); // Keeps search UX clean
     }
@@ -138,6 +139,7 @@ $(function() {
 
     function showProductDetails(data) {
         $("#searchSection").addClass("hidden");
+        $("#addProductContainer").addClass("hidden");
         $("#productDetails").removeClass("hidden");
 
         $("#view-product_number").text(data.product_number);
@@ -314,9 +316,9 @@ $(function() {
         // Hide popup and search section
         $("#searchResultsPopup, #searchOverlay").hide();
         $("#searchSection").addClass("hidden");
-        $("#productDetails").removeClass("hidden");
+        $("#productDetails").addClass("hidden");
         // Show loading state
-        $("#productDetails").empty().removeClass("hidden").html(`
+        $("#addProductContainer").empty().removeClass("hidden").html(`
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4>Add New Product</h4>
                 <button class="btn btn-secondary" id="backToAddSearch">
@@ -337,7 +339,7 @@ $(function() {
             url: "/add_product",
             type: "GET",
             success: function(data) {
-                $("#productDetails").html(data);
+                $("#addProductContainer").html(data);
                 setupAddFormHandlers();
             },
             error: function(xhr) {
@@ -345,7 +347,7 @@ $(function() {
                 if (xhr.status === 404) {
                     errorMsg = "Form template not found";
                 }
-                $("#productDetails").html(`
+                $("#addProductContainer").html(`
                     <div class="alert alert-danger">
                         ${errorMsg}
                         <button class="btn btn-secondary mt-2" id="backToAddSearch">
@@ -378,7 +380,7 @@ $(function() {
             data: formData,
             success: function(response) {
                 if (response.success) {
-                    $("#productDetails").html(`
+                    $("#addProductContainer").html(`
                         <div class="alert alert-success">
                             ${response.message}<br>
                             <strong>Product Name:</strong> ${response.product}<br>
@@ -388,13 +390,13 @@ $(function() {
                     `);
                     $("#backToAddSearch").on("click", showSearchSection);
                 } else {
-                    $("#productDetails").prepend(`
+                    $("#addProductContainer").prepend(`
                         <div class="alert alert-danger">${response.message}</div>
                     `);
                 }
             },
             error: function(xhr) {
-                $("#productDetails").prepend(`
+                $("#addProductContainer").prepend(`
                     <div class="alert alert-danger">
                         Server error: ${xhr.responseText}
                     </div>
