@@ -145,12 +145,31 @@
                                 {% endfor %}
                             </select>
                         </div>
-
+                        <div class="col-md-4">
+                            <label for="bank_account" class="form-label">Bank Account</label>
+                            <select class="form-select" id="bank_account">
+                                <option value=""> Select a Bank Account</option>
+                                {% for bank_account in bank_accounts %}
+                                    <option value="{{ bank_account }}">{{ bank_account }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                         <div class="col-md-4">
                             <label class="form-label">Transaction Type</label>
                             <input type="text" class="form-control" id="transactionTypeDisplay" readonly>
                         </div>
-
+                        <!--
+                        <div class="col-md-4">
+                            <label for="frequency" class="form-label">Frequency</label>
+                            <select class="form-select" id="frequency">
+                                <option value=""> Select Frequency</option>
+                                <option value="Monthly">Monthly</option>
+                                <option value="Quarterly">Quarterly</option>
+                                <option value="Annual">Annual</option>
+                                <option value="Occasional">Occasional</option>
+                            </select>
+                        </div>
+                        -->
                         <div class="col-12">
                             <label for="notes" class="form-label">Notes</label>
                             <textarea class="form-control" id="notes" rows="2"></textarea>

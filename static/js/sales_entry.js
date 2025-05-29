@@ -250,6 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
             price: document.getElementById('price').value,
             category: document.getElementById('category').value,
             account: document.getElementById('account').value,
+            bank_account: document.getElementById('bank_account').value,
             notes: document.getElementById('notes').value,
             transaction_type: currentTransactionType,
             add_another: 'no'

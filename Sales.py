@@ -3,7 +3,8 @@ from flask import Flask,flash, session, render_template, request, redirect, url_
 import os
 import io
 from io import BytesIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+from dateutil.relativedelta import relativedelta
 import re
 import shutil
 from reportlab.lib.pagesizes import letter
@@ -53,35 +54,6 @@ def get_current_date():
 def get_current_datetime():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-
-# Create the next invoice number
-def get_next_invoice_number():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        current_month = datetime.now().strftime('%m') # Month
-        current_year = datetime.now().strftime('%y') # Year
-        cursor.execute("""
-            SELECT MAX(invoice_no) FROM sales 
-            WHERE invoice_no LIKE %s
-        """, (f'TKB/{current_month}%/{current_year}',))
-
-        last_invoice = cursor.fetchone()[0]
-
-        if last_invoice:
-            parts = last_invoice.split('/')
-            number = int(parts[1][2:]) + 1
-            return f"TKB/{current_month}{number:03d}/{current_year}"
-
-        return f"TKB/{current_month}001/{current_year}"
-    except Exception as e:
-        print(f"Error getting next invoice number: {e}")
-        return f"TKB/{current_month}001/{current_year}"
-    finally:
-        cursor.close()
-        conn.close()
-
-
 # Display products function
 def read_product_names():
     conn = get_db_connection()
@@ -104,8 +76,6 @@ def read_categories():
         "Consultancy",
         "Rent",
     ]
-
-
 # Display account owners function
 def read_account_owners():
     conn = get_db_connection()
@@ -121,7 +91,6 @@ def read_account_owners():
         cursor.close
         conn.close
 
-
 # Display clients function
 def read_client_names():
     conn = get_db_connection()
@@ -136,6 +105,20 @@ def read_client_names():
         cursor.close()
         conn.close()
 
+# Bank Accounts function
+def read_bank_accounts():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT account_name || '-' || bank_name FROM banks ORDER BY account_name;") # Concatenation of the account name and bank name
+        return [row[0] for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Error reading bank accounts: {e}")
+        return []
+    finally:
+        cursor.close()
+        conn.close()
 
 # Password validation page
 def validate_password(password):
@@ -287,7 +270,7 @@ def login():
 # User dashboard route
 @app.route('/user_dashboard')
 def user_dashboard():
-    if 'user_id' not in session or session.get('role') != 3: # Redirect to login if not user
+    if 'user_id' not in session or session.get('role') != 3: # Redirect to login page if not user
         return redirect(url_for('login'))
 
     return render_template('user_dashboard.html')
@@ -342,7 +325,7 @@ def sales_entry():
             else:
                 return jsonify({
                     'status': 'multiple_results',
-                    'clients': found_clients[:10]  # Limit to 10 results
+                    'clients': found_clients[:10]
                 })
 
         elif action == 'select_client':
@@ -350,13 +333,14 @@ def sales_entry():
             return jsonify({
                 'status': 'success',
                 'client_name': client_name,
-                'invoice_number': get_next_invoice_number(),
+                'invoice_number': generate_next_invoice_number(),
                 'current_date': get_current_date()
             })
 
         elif action == 'save_sale':
+            conn = None
+            cursor = None
             try:
-                # Get form data
                 invoice_date = datetime.strptime(request.form.get('invoice_date'), '%Y-%m-%d')
                 invoice_number = request.form.get('invoice_number')
                 customer_name = request.form.get('client_name')
@@ -365,71 +349,185 @@ def sales_entry():
                 price = float(request.form.get('price'))
                 category = request.form.get('category')
                 account_owner = request.form.get('account')
+                date_created = datetime.now()
                 notes = request.form.get('notes', '')
-                transaction_type = request.form.get('transaction_type')  # 'sell' or 'take_back'
+                transaction_type = request.form.get('transaction_type')
                 add_another = request.form.get('add_another', 'no') == 'yes'
+                bank_account = request.form.get('bank_account', '')
 
-                # Adjust quantity based on transaction type
-                if transaction_type == 'take_back':
-                    quantity = -abs(quantity)  # quantity is negative for take back
-
-                # Calculation of Values
-                total = round(quantity * price, 2)
-                paid = 0
-                balance = total
-                paid_date = None
-                acc_status = 'Active'
-                payment_status = 'Not Paid'
-
-                current_datetime = get_current_datetime()
-
-                # Save to database
                 conn = get_db_connection()
                 cursor = conn.cursor()
 
-                cursor.execute("""
-                    INSERT INTO sales (
-                        invoice_date, invoice_no, customer_name, product, qty, 
-                        amt, total, paid, bal, paid_date, category, 
-                        account_owner, acc_status, payment_status
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING sales_id;
-                """, (
-                    invoice_date, invoice_number, customer_name, product, quantity,
-                    price, total, paid, balance, paid_date, category,
-                    account_owner, acc_status, payment_status
-                ))
+                cursor.execute("SELECT frequency FROM products WHERE product = %s", (product,))
+                product_frequency = cursor.fetchone()
+                if product_frequency is None:
+                    return jsonify({'status': 'error', 'message': f'Product "{product}" not found in database'}), 400
 
-                sale_id = cursor.fetchone()[0]
+                frequency = product_frequency[0] if product_frequency else 'Occasional'
+                sales_acc_invoice_no = None
+
+                if transaction_type == 'take_back':
+                    quantity = -abs(quantity)
+
+                total = round(quantity * price, 2)
+                current_datetime = datetime.now()
+
+                # Handle occasional products (immediate sale)
+                if frequency == 'Occasional':
+                    cursor.execute("""
+                        INSERT INTO sale (
+                            invoice_date, invoice_no, customer_name, product, quantity, 
+                            price, total, date_created, category, account_owner, 
+                            sales_acc_invoice_no, bank_account
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        invoice_date, invoice_number, customer_name, product, quantity,
+                        price, total, current_datetime, category, account_owner,
+                        None, bank_account
+                    ))
+
+                    # Insert or update invoice in invoices table
+                    cursor.execute("""
+                        INSERT INTO invoices (invoice_number, created_at)
+                        VALUES (%s, %s)
+                        ON CONFLICT (invoice_number) DO NOTHING
+                    """, (invoice_number, current_datetime))
+
+                    # Calculate the total for this invoice (sum of all items)
+                    cursor.execute("""
+                        SELECT SUM(total) FROM sale WHERE invoice_no = %s
+                    """, (invoice_number,))
+                    invoice_total = cursor.fetchone()[0] or 0
+
+                    # Check if this invoice already exists in sales_list
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM sales_list WHERE invoice_no = %s
+                    """, (invoice_number,))
+                    exists = cursor.fetchone()[0] > 0
+
+                    if exists:
+                        # Update existing sales_list entry
+                        cursor.execute("""
+                            UPDATE sales_list 
+                            SET invoice_amount = %s, 
+                                balance = %s
+                            WHERE invoice_no = %s
+                        """, (invoice_total, invoice_total, invoice_number))
+                    else:
+                        # Insert new sales_list entry
+                        cursor.execute("""
+                            INSERT INTO sales_list (
+                                customer_name, invoice_no, invoice_date, invoice_amount, 
+                                paid_amount, balance, payment_status, category, account_owner, reference_no
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            customer_name, invoice_number, invoice_date, invoice_total,
+                            0, invoice_total, 'Not Paid', category, account_owner, None
+                        ))
+
+                # Handle recurring products (Monthly, Quarterly, Annual)
+                elif frequency in ['Monthly', 'Quarterly', 'Annual']:
+                    cursor.execute("SELECT MAX(sales_acc_id) FROM sales_account;")
+                    max_result = cursor.fetchone()
+                    last_sales_acc_id = max_result[0] if max_result and max_result[0] is not None else 0
+                    sales_acc_id = last_sales_acc_id + 1
+
+                    cursor.execute("""
+                        INSERT INTO sales_account (
+                            sales_acc_id, invoice_date, invoice_number, customer_name, 
+                            product, quantity, price, total, created_at, 
+                            category, account_owner, frequency, status, bank_account
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING invoice_number
+                    """, (
+                        sales_acc_id, invoice_date, invoice_number, customer_name,
+                        product, quantity, price, total, current_datetime,
+                        category, account_owner, frequency, 'Active', bank_account
+                    ))
+
+                    result = cursor.fetchone()
+                    if result is None:
+                        raise Exception("Failed to create sales account entry")
+                    sales_acc_invoice_no = result[0]
+
+                    cursor.execute("""
+                        INSERT INTO invoices (invoice_number, created_at)
+                        VALUES (%s, %s)
+                        ON CONFLICT (invoice_number) DO NOTHING
+                    """, (sales_acc_invoice_no, current_datetime))
+                    conn.commit()
+
+                    today = datetime.today().date()
+
+                    if frequency == 'Monthly':
+                        delta = relativedelta(months=1)
+                    elif frequency == 'Quarterly':
+                        delta = relativedelta(months=3)
+                    elif frequency == 'Annual':
+                        delta = relativedelta(years=1)
+                    else:
+                        delta = None
+
+                    if delta:
+                        next_due_date = invoice_date.date()
+                        while next_due_date <= today + delta:
+                            new_invoice_number = generate_next_invoice_number()
+
+                            cursor.execute("""
+                                INSERT INTO sale (
+                                    invoice_date, invoice_no, customer_name, product, quantity, 
+                                    price, total, date_created, category, account_owner, 
+                                    sales_acc_invoice_no, bank_account
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                next_due_date, new_invoice_number, customer_name, product, quantity,
+                                price, total, current_datetime, category, account_owner,
+                                sales_acc_invoice_no, bank_account
+                            ))
+
+                            cursor.execute("""
+                                INSERT INTO invoices (invoice_number, created_at)
+                                VALUES (%s, %s)
+                                ON CONFLICT (invoice_number) DO NOTHING
+                            """, (new_invoice_number, current_datetime))
+
+                            # Calculate the total for this invoice (sum of all items)
+                            cursor.execute("""
+                                SELECT SUM(total) FROM sale WHERE invoice_no = %s
+                            """, (new_invoice_number,))
+                            invoice_total = cursor.fetchone()[0] or 0
+
+                            cursor.execute("""
+                                INSERT INTO sales_list (
+                                    customer_name, invoice_no, invoice_date, invoice_amount, 
+                                    paid_amount, balance, payment_status, category, account_owner, reference_no
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                customer_name, new_invoice_number, next_due_date, invoice_total,
+                                0, invoice_total, 'Not Paid', category, account_owner, sales_acc_invoice_no
+                            ))
+
+                            conn.commit()
+                            next_due_date += delta
+
                 conn.commit()
 
                 cursor.execute("""
-                    SELECT product as description, qty as quantity, 
-                           amt as unit_price, total as total
-                    FROM sales 
-                    WHERE invoice_no = %s
-                    ORDER BY sales_id
+                    SELECT product as description, quantity, price as unit_price, total
+                    FROM sale WHERE invoice_no = %s ORDER BY sales_id
                 """, (invoice_number,))
-
+                items_result = cursor.fetchall()
                 columns = [desc[0] for desc in cursor.description]
-                all_items = []
-                for row in cursor.fetchall():
-                    all_items.append(dict(zip(columns, row)))
+                all_items = [dict(zip(columns, row)) for row in items_result] if items_result else []
 
-                # Generate invoice PDF
                 invoice_data = {
                     'customer_name': customer_name,
                     'invoice_number': invoice_number,
                     'invoice_date': invoice_date.strftime('%d-%m-%Y'),
-                    'items': [{
-                        'description': item['description'],
-                        'quantity': item['quantity'],
-                        'unit_price': item['unit_price'],
-                        'total': item['total'],
-                    } for item in all_items],
+                    'items': all_items,
                     'total_amount': sum(item['total'] for item in all_items),
                     'notes': notes,
-                    'payment_status': payment_status
+                    'payment_status': 'Not Paid'
                 }
 
                 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -445,45 +543,39 @@ def sales_entry():
                 }
 
                 if add_another:
-                    # Prepare data for next entry
                     return jsonify({
                         'status': 'add_another',
                         'message': 'Sale added successfully! Add another item?',
                         'invoice_number': invoice_number,
                         'client_name': customer_name,
-                        'invoice_date': invoice_date,
+                        'invoice_date': invoice_date.strftime('%Y-%m-%d'),
                         'invoice_url': url_for('download_invoice', filename=filename),
                         'current_items': all_items
                     })
                 else:
-                    return jsonify({
-                        'status': 'success',
-                        'message': 'Sales saved successfully!',
-                        'invoice_url': url_for('download_invoice', filename=filename),
-                        'invoice_number': invoice_number
-                    })
+                    return jsonify(response)
 
             except Exception as e:
-                conn.rollback()
-                return jsonify({
-                    'status': 'error',
-                    'message': f'An error occurred: {str(e)}'
-                }), 500
+                if conn:
+                    conn.rollback()
+                app.logger.error(f"Error saving sale: {str(e)}")
+                return jsonify({'status': 'error', 'message': f'An error occurred: {str(e)}'}), 500
             finally:
-                cursor.close()
-                conn.close()
+                if cursor:
+                    cursor.close()
+                if conn:
+                    conn.close()
 
-    # GET request - show the form
     product_names = read_product_names()
-    next_invoice_number = get_next_invoice_number()
+    next_invoice_number = generate_next_invoice_number()
     categories = read_categories()
     accounts = read_account_owners()
     client_names = read_client_names()
+    bank_accounts = read_bank_accounts()
 
-    # Initialize customer name and invoice number from query parameters if they exist
     customer_name = request.args.get('customer_name', '')
     invoice_number = request.args.get('invoice_number', next_invoice_number)
-    date_created = datetime.today().strftime('%d-%m-%Y')
+    date_created = datetime.today().strftime('%Y-%m-%d')
 
     return render_template('sales_entry.html',
                            product_names=product_names,
@@ -492,9 +584,9 @@ def sales_entry():
                            categories=categories,
                            accounts=accounts,
                            client_names=client_names,
+                           bank_accounts=bank_accounts,
                            current_date=get_current_date(),
                            date_created=date_created)
-
 
 # Download invoice route
 @app.route('/invoices/<filename>')
