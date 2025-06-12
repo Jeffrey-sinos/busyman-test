@@ -470,6 +470,7 @@ def sales_entry():
 
                     if delta:
                         next_due_date = invoice_date.date()
+                        pdf_urls = [] # PDF links for backdated invoices
                         while next_due_date <= today + delta:
                             new_invoice_number = generate_next_invoice_number()
 
@@ -507,8 +508,41 @@ def sales_entry():
                                 0, invoice_total, 'Not Paid', category, account_owner, sales_acc_invoice_no
                             ))
 
+                            invoice_data = {
+                                'customer_name': customer_name,
+                                'invoice_number': new_invoice_number,
+                                'invoice_date': next_due_date.strftime('%d/%m/%Y'),
+                                'items': [
+                                    {
+                                        'description': product,
+                                        'quantity': quantity,
+                                        'unit_price': price,
+                                        'total': total
+                                    }
+                                ],
+                                'total_amount': total,
+                                'notes': notes,
+                                'payment_status': 'Not Paid'
+                            }
+                            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                            sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', new_invoice_number)
+                            filename = f"invoice_{sanitized_invoice_no}.pdf"
+
+                            create_invoice(invoice_data, os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+                            pdf_urls.append({
+                                'date': next_due_date.strftime('%d/%m/%Y'),
+                                'url': url_for('download_invoice', filename=filename)
+                            })
                             conn.commit()
                             next_due_date += delta
+
+                        return jsonify({
+                            'status': 'success',
+                            'message': f'{len(pdf_urls)} invoices generated successfully',
+                            'pdf_urls': pdf_urls,
+                            'invoice_number': invoice_number,
+                        })
 
                 conn.commit()
 

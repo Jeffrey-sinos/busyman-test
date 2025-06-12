@@ -241,6 +241,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Save sale functionality
     saveSaleBtn.addEventListener('click', function() {
+        saveSaleBtn.disabled = true;
+        const loader = document.createElement('span');
+        loader.className = 'spinner-border spinner-border-sm';
+        saveSaleBtn.appendChild(loader);
+
         const formData = {
             invoice_date: invoiceDate.value,
             invoice_number: invoiceNumber.value,
@@ -270,6 +275,9 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
+            // Remove loader
+            saveSaleBtn.disabled = false;
+            saveSaleBtn.removeChild(loader);
             if (data.status === 'success' || data.status === 'add_another') {
                 const quantity = currentTransactionType === 'take_back' ?
                     -Math.abs(formData.quantity) : formData.quantity;
@@ -281,7 +289,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     type: currentTransactionType
                 };
                 currentItems.push(newItem);
-                currentInvoiceUrl = data.invoice_url;
+
+                if (data.pdf_urls){
+                    showMultiplePdfLinks(data.pdf_urls);
+                    currentInvoiceUrl = data.pdf_urls[0].url;
+                } else{
+                    currentInvoiceUrl = data.invoice_url;
+                }
 
                 updateInvoicePreview(
                     data.invoice_number,
@@ -299,6 +313,24 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Function to show multiple PDF links
+
+    function showMultiplePdfLinks(pdfUrls){
+        const pdfLinksContainer = document.getElementById('pdfLinksContainer');
+        pdfLinksContainer.innerHTML = '<h6> Generated Invoices: </h6>';
+
+        pdfUrls.forEach(pdf => {
+            const link = document.createElement('a');
+            link.href = pdf.url;
+            link.className = 'd-block mb-2';
+            link.textContent = `Download ${pdf.date} Invoice`;
+            link.target = '_blank';
+            pdfLinksContainer.appendChild(link);
+        });
+
+        pdfLinksContainer.style.display = 'block';
+    }
 
     // Add another item
     addAnotherYesBtn.addEventListener('click', function() {
