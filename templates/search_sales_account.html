@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search Invoices - Busyman Pro</title>
+    <title>Search Sales Account - Busyman Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .date-range-container, .filters-container {
@@ -33,7 +33,7 @@
 
 <body>
     <div class="container py-5">
-        <h1 class="mb-4">Search Invoices</h1>
+        <h1 class="mb-4">Search Sales Account</h1>
         {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -47,7 +47,7 @@
                 {% endif %}
             {% endwith %}
 
-        <form method="POST" action="{{ url_for('search_invoices') }}">
+        <form method="POST" action="{{ url_for('search_sales_account') }}">
             <!-- Date Range Filter -->
             <div class="date-range-container">
                 <div class="form-group">
@@ -101,7 +101,7 @@
                         <tr>
                             <th>Invoice Date</th>
                             <th>Invoice Number</th>
-                            <th>Customer Name</th>
+                            <th>Customer</th>
                             <th>Product</th>
                             <th>Quantity</th>
                             <th>Price</th>
@@ -121,24 +121,26 @@
                             <td>{{ invoice[5] }}</td>
                             <td>{{ invoice[6] }}</td>
                             <td>{{ "KSh {:,.2f}".format(invoice[7])}}</td>
-                            <td>{{ invoice[8] }}</td>
+                            <td>{{ invoice[9] }}</td>
                             <td>
-                                <span class="badge bg-{% if invoice[11] == 'Active' %}success{% else %}danger{% endif %}">
-                                    {{ invoice[11] }}
+                                <span class="badge bg-{% if invoice[12] == 'Active' %}success{% else %}danger{% endif %}">
+                                    {{ invoice[12] }}
                                 </span>
                             </td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-warning edit-btn" data-bs-toggle="modal" data-bs-target="#editModal"
-                                    data-sales-id="{{ invoice[0] }}"
+                                    data-sales-acc-id="{{ invoice[0] }}"
                                     data-invoice-date="{{ invoice[1].strftime('%Y-%m-%d') }}"
                                     data-invoice-no="{{ invoice[2] }}"
                                     data-customer-name="{{ invoice[3] }}"
                                     data-product="{{ invoice[4] }}"
                                     data-quantity="{{ invoice[5] }}"
                                     data-price="{{ invoice[6] }}"
-                                    data-category="{{ invoice[8] }}"
-                                    data-account-owner="{{ invoice[9] }}"
-                                    data-status="{{ invoice[11] }}">
+                                    data-category="{{ invoice[9] }}"
+                                    data-account-owner="{{ invoice[10] }}"
+                                    data-status="{{ invoice[12] }}"
+                                    data-frequency="{{ invoice[11] }}"
+                                    data-bank-account="{{ invoice[13] }}">
                                     Edit
                                 </button>
                             </td>
@@ -155,16 +157,16 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Edit Invoice</h5>
+                    <h5 class="modal-title">Edit Sales Account</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="editForm">
                     <div class="modal-body">
-                    <input type="hidden" id="modalSalesId">
+                    <input type="hidden" id="modalSalesAccId">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Invoice Date</label>
-                            <input type="date" class="form-control" name="invoice_date" id="modal_invoice_date" readonly>
+                            <input type="date" class="form-control editable-field" name="invoice_date" id="modal_invoice_date">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Invoice No</label>
@@ -199,6 +201,8 @@
                             <label class="form-label">Status</label>
                             <input type="text" class="form-control" name="status" id="modal_status" readonly>
                         </div>
+                        <input type="hidden" id="modal_frequency" name="frequency">
+                        <input type="hidden" id="modal_bank_account" name="bank_account">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -225,78 +229,104 @@
     });
     </script>
     <script>
-    // Handle modal show event to populate data
-    document.getElementById('editModal').addEventListener('show.bs.modal', function (event) {
-        const button = event.relatedTarget; // Button that triggered the modal
-        const modal = this;
+        // Handle modal show event to populate data
+        document.getElementById('editModal').addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const modal = this;
 
-        // Extract data from button attributes
-        modal.querySelector('#modalSalesId').value = button.getAttribute('data-sales-id');
-        modal.querySelector('#modal_invoice_date').value = button.getAttribute('data-invoice-date');
-        modal.querySelector('#modal_invoice_no').value = button.getAttribute('data-invoice-no');
-        modal.querySelector('#modal_customer_name').value = button.getAttribute('data-customer-name');
-        modal.querySelector('#modal_product').value = button.getAttribute('data-product');
-        modal.querySelector('#modal_quantity').value = button.getAttribute('data-quantity');
-        modal.querySelector('#modal_price').value = button.getAttribute('data-price');
-        modal.querySelector('#modal_category').value = button.getAttribute('data-category');
-        modal.querySelector('#modal_account_owner').value = button.getAttribute('data-account-owner');
-        modal.querySelector('#modal_status').value = button.getAttribute('data-status');
-    });
-
-    document.getElementById('editForm').addEventListener('submit', function (e) {
-        e.preventDefault();
-        const saveBtn = document.getElementById('saveChangesBtn');
-        const saveText = document.getElementById('saveChangesText');
-        const spinner = document.getElementById('saveChangesSpinner');
-
-        // Show loading state
-        saveBtn.disabled = true;
-        saveText.textContent = 'Saving...';
-        spinner.classList.remove('d-none');
-
-        const salesId = document.getElementById('modalSalesId').value;
-        const formData = new FormData(this);
-        const payload = Object.fromEntries(formData.entries());
-
-        // Add sales_id to the payload
-        payload.sales_id = salesId;
-
-        fetch(`/edit_sale/${salesId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(res => {
-            if (!res.ok) {
-                throw new Error('Network response was not ok');
-            }
-            return res.json();
-        })
-        .then(data => {
-            if (data.status === "success") {
-                alert("Invoice updated successfully!");
-                // Close the modal
-                const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
-                modal.hide();
-                // Optionally, refresh the page or update the table row
-                location.reload();
-            } else {
-                alert("Error: " + (data.message || 'Unknown error occurred'));
-            }
-        })
-        .catch(error => {
-            console.error('Error updating invoice:', error);
-            alert('Error updating invoice');
-        })
-        .finally(() => {
-            // Reset button state whether success or failure
-            saveBtn.disabled = false;
-            saveText.textContent = 'Save Changes';
-            spinner.classList.add('d-none');
+            // Populate form fields from data attributes
+            modal.querySelector('#modalSalesAccId').value = button.getAttribute('data-sales-acc-id');
+            modal.querySelector('#modal_invoice_date').value = button.getAttribute('data-invoice-date');
+            modal.querySelector('#modal_invoice_no').value = button.getAttribute('data-invoice-no');
+            modal.querySelector('#modal_customer_name').value = button.getAttribute('data-customer-name');
+            modal.querySelector('#modal_product').value = button.getAttribute('data-product');
+            modal.querySelector('#modal_quantity').value = button.getAttribute('data-quantity');
+            modal.querySelector('#modal_price').value = button.getAttribute('data-price');
+            modal.querySelector('#modal_category').value = button.getAttribute('data-category');
+            modal.querySelector('#modal_account_owner').value = button.getAttribute('data-account-owner');
+            modal.querySelector('#modal_status').value = button.getAttribute('data-status');
+            modal.querySelector('#modal_frequency').value = button.getAttribute('data-frequency');
+            modal.querySelector('#modal_bank_account').value = button.getAttribute('data-bank-account');
         });
-    });
+
+        // Handle form submission
+        document.getElementById('editForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const saveBtn = document.getElementById('saveChangesBtn');
+            const saveText = document.getElementById('saveChangesText');
+            const spinner = document.getElementById('saveChangesSpinner');
+            const modal = document.getElementById('editModal');
+
+            // Show loading state
+            saveBtn.disabled = true;
+            saveText.textContent = 'Saving...';
+            spinner.classList.remove('d-none');
+
+            try {
+                const accountId = modal.querySelector('#modalSalesAccId').value;
+                const formData = {
+                    invoice_date: modal.querySelector('#modal_invoice_date').value,
+                    invoice_number: modal.querySelector('#modal_invoice_no').value,
+                    customer_name: modal.querySelector('#modal_customer_name').value,
+                    product: modal.querySelector('#modal_product').value,
+                    quantity: modal.querySelector('#modal_quantity').value,
+                    price: modal.querySelector('#modal_price').value,
+                    category: modal.querySelector('#modal_category').value,
+                    account_owner: modal.querySelector('#modal_account_owner').value,
+                    status: modal.querySelector('#modal_status').value,
+                    frequency: modal.querySelector('#modal_frequency').value,
+                    bank_account: modal.querySelector('#modal_bank_account').value
+                };
+
+                // Validate required fields
+                if (!formData.invoice_date || !formData.customer_name || !formData.product) {
+                    throw new Error('Please fill all required fields');
+                }
+
+                const response = await fetch(`/edit_sales_account/${accountId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to update account');
+                }
+
+                if (data.status === "success") {
+                    // Build success message
+                    let successMsg = `Account updated successfully!`;
+
+                    if (data.generated_invoices?.length > 0) {
+                        successMsg += `\n\nGenerated ${data.generated_invoices.length} invoices:`;
+                        data.generated_invoices.forEach(inv => {
+                            successMsg += `\n- ${inv.date}: ${inv.invoice_no}`;
+                        });
+                    }
+
+                    alert(successMsg);
+
+                    // Close modal and refresh
+                    bootstrap.Modal.getInstance(modal).hide();
+                    location.reload();
+                } else {
+                    throw new Error(data.message || 'Unknown error occurred');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error: ${error.message}`);
+            } finally {
+                // Reset button state
+                saveBtn.disabled = false;
+                saveText.textContent = 'Save Changes';
+                spinner.classList.add('d-none');
+            }
+        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

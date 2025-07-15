@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Sales - Busyman Pro</title>
+    <title>Search Receipts - Busyman Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -29,12 +29,19 @@
             background-color: #BCB8B1;
             cursor: not-allowed;
         }
+        .balance-preview {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 
 <body>
     <div class="container py-5">
-        <h1 class="mb-4">View Sales</h1>
+        <h1 class="mb-4">Search Receipts</h1>
 
         <!-- Flask flash messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -48,7 +55,7 @@
             {% endif %}
         {% endwith %}
 
-        <form method="POST" action="{{ url_for('view_sales') }}">
+        <form method="POST" action="{{ url_for('search_receipts') }}">
             <!-- Date Range Filter -->
             <div class="date-range-container">
                 <div class="form-group">
@@ -91,10 +98,10 @@
             <a href="{{ url_for('receipts_menu') }}" class="btn btn-secondary">Back to Receipts Menu</a>
         </form>
 
-        {% if invoices %}
+        {% if receipts %}
         <div class="invoice-table">
             <h2>Search Results</h2>
-            <p>Found {{ invoices|length }} invoices</p>
+            <p>Found {{ receipts|length }} receipts</p>
 
             <div class="table-responsive">
                 <table class="table table-striped table-hover">
@@ -103,38 +110,33 @@
                             <th>Invoice Date</th>
                             <th>Invoice Number</th>
                             <th>Customer Name</th>
-                            <th>Invoice Amount</th>
+                            <th>Paid Amount</th>
                             <th>Balance</th>
-                            <th>Payment Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for invoice in invoices %}
+                        {% for receipt in receipts %}
                         <tr>
-                            <td>{{ invoice[3].strftime('%d-%m-%Y') }}</td>
-                            <td>{{ invoice[2] }}</td>
-                            <td>{{ invoice[1] }}</td>
-                            <td>{{ "KSh {:,.2f}".format(invoice[4])}}</td>
-                            <td>{{ "KSh {:,.2f}".format(invoice[6])}}</td>
-                            <td>
-                                <span class="badge bg-{% if invoice[7] == 'Paid' %}success{% else %}danger{% endif %}">
-                                    {{ invoice[7] }}
-                                </span>
-                            </td>
+                            <td>{{ receipt[3].strftime('%d-%m-%Y') }}</td>
+                            <td>{{ receipt[2] }}</td>
+                            <td>{{ receipt[4] }}</td>
+                            <td>{{ "KSh {:,.2f}".format(receipt[5])}}</td>
+                            <td>{{ "KSh {:,.2f}".format(receipt[6])}}</td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-warning edit-btn" data-bs-toggle="modal" data-bs-target="#editModal"
-                                    data-sales-list-id="{{ invoice[0] }}"
-                                    data-invoice-date="{{ invoice[3].strftime('%Y-%m-%d') }}"
-                                    data-invoice-no="{{ invoice[2] }}"
-                                    data-customer-name="{{ invoice[1] }}"
-                                    data-invoice-amount="{{ invoice[4] }}"
-                                    data-paid-amount="{{ invoice[5] }}"
-                                    data-balance="{{ invoice[6] }}"
-                                    data-reference-no="{{ invoice[10] }}"
-                                    data-category="{{ invoice[8] }}"
-                                    data-account-owner="{{ invoice[9] }}"
-                                    data-status="{{ invoice[7] }}">
+                                    data-receipt-id="{{ receipt[0] }}"
+                                    data-paid-date="{{ receipt[1] }}"
+                                    data-invoice-date="{{ receipt[3].strftime('%Y-%m-%d') }}"
+                                    data-invoice-no="{{ receipt[2] }}"
+                                    data-customer-name="{{ receipt[4] }}"
+                                    data-paid-amount="{{ receipt[5] }}"
+                                    data-balance="{{ receipt[6] }}"
+                                    data-receipt-invoice-number="{{ receipt[7] }}"
+                                    data-category="{{ receipt[8] }}"
+                                    data-account-owner="{{ receipt[9] }}"
+                                    data-original-total="{{ receipt[5] + receipt[6] }}"
+                                    >
                                     Edit
                                 </button>
                             </td>
@@ -152,13 +154,18 @@
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Edit Sale</h5>
+                    <h5 class="modal-title">Edit Receipt</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="editForm">
                     <div class="modal-body">
-                        <input type="hidden" id="modalSalesListId">
+                        <input type="hidden" id="modalReceiptId">
+                        <input type="hidden" id="modalOriginalTotal">
                         <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Paid Date</label>
+                                <input type="date" class="form-control" name="paid_date" id="modal_paid_date" readonly>
+                            </div>
                             <div class="col-md-6">
                                 <label class="form-label">Invoice Date</label>
                                 <input type="date" class="form-control" name="invoice_date" id="modal_invoice_date" readonly>
@@ -172,16 +179,16 @@
                                 <input type="text" class="form-control" name="customer_name" id="modal_customer_name" readonly>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Invoice Amount</label>
-                                <input type="number" class="form-control" name="invoice_amount" id="modal_invoice_amount" readonly>
-                            </div>
-                            <div class="col-md-6">
                                 <label class="form-label">Paid amount</label>
                                 <input type="number" class="form-control editable-field" name="paid_amount" id="modal_paid_amount">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Balance</label>
                                 <input type="number" class="form-control" name="balance" id="modal_balance" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Receipt Invoice Number</label>
+                                <input type="text" class="form-control" name="receipt_invoice_number" id="modal_receipt_invoice_number" readonly>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Category</label>
@@ -191,12 +198,8 @@
                                 <label class="form-label">Account Owner</label>
                                 <input type="text" class="form-control" name="account_owner" id="modal_account_owner" readonly>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Status</label>
-                                <input type="text" class="form-control" name="status" id="modal_status" readonly>
-                            </div>
                         </div>
-                    </div>
+                        </div>
                     <div class="modal-footer">
                         <button type="submit" class="btn btn-primary" id="saveChangesBtn">
                             <span id="saveChangesText">Save Changes</span>
@@ -226,32 +229,46 @@
             const button = event.relatedTarget; // Button that triggered the modal
             const modal = this;
 
+            const originalTotal = parseFloat(button.getAttribute('data-original-total')) || 0;
             // Extract data from button attributes
-            modal.querySelector('#modalSalesListId').value = button.getAttribute('data-sales-list-id');
+            modal.querySelector('#modalReceiptId').value = button.getAttribute('data-receipt-id');
+            modal.querySelector('#modalOriginalTotal').value = originalTotal;
+            modal.querySelector('#modal_paid_date').value = button.getAttribute('data-paid-date');
             modal.querySelector('#modal_invoice_date').value = button.getAttribute('data-invoice-date');
             modal.querySelector('#modal_invoice_no').value = button.getAttribute('data-invoice-no');
             modal.querySelector('#modal_customer_name').value = button.getAttribute('data-customer-name');
-            modal.querySelector('#modal_invoice_amount').value = button.getAttribute('data-invoice-amount');
             modal.querySelector('#modal_paid_amount').value = button.getAttribute('data-paid-amount');
             modal.querySelector('#modal_balance').value = button.getAttribute('data-balance');
+            modal.querySelector('#modal_receipt_invoice_number').value = button.getAttribute('data-receipt-invoice-number');
             modal.querySelector('#modal_category').value = button.getAttribute('data-category');
             modal.querySelector('#modal_account_owner').value = button.getAttribute('data-account-owner');
-            modal.querySelector('#modal_status').value = button.getAttribute('data-status');
+
+            updateBalance();
         });
+
+        function updateBalance() {
+            const originalTotal = parseFloat(document.getElementById('modalOriginalTotal').value) || 0;
+            const paidAmount = parseFloat(document.getElementById('modal_paid_amount').value) || 0;
+            const newBalance = Math.max(0, originalTotal - paidAmount);
+
+            // Update the balance field (even though it's readonly, it helps with visual feedback)
+            document.getElementById('modal_balance').value = newBalance.toFixed(2);
+
+            // Add validation styling
+            const paidAmountInput = document.getElementById('modal_paid_amount');
+            if (paidAmount > originalTotal) {
+                paidAmountInput.classList.add('is-invalid');
+            } else {
+                paidAmountInput.classList.remove('is-invalid');
+            }
+        }
 
         // Calculate balance when paid amount changes
         document.getElementById('modal_paid_amount').addEventListener('input', function() {
-            const invoiceAmount = parseFloat(document.getElementById('modal_invoice_amount').value) || 0;
-            const paidAmount = parseFloat(this.value) || 0;
-            const balance = Math.max(0, invoiceAmount - paidAmount);
-            document.getElementById('modal_balance').value = balance.toFixed(2);
-
-            // Update status based on balance
-            const statusField = document.getElementById('modal_status');
-            statusField.value = balance === 0 ? 'Paid' : 'Not Paid';
+            updateBalance();
         });
 
-        // Handle form submission for editing invoices
+        // Handle form submission for editing receipts
         document.getElementById('editForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
@@ -259,26 +276,34 @@
             const text = document.getElementById('saveChangesText');
             const spinner = document.getElementById('saveChangesSpinner');
 
+            const originalTotal = parseFloat(document.getElementById('modalOriginalTotal').value) || 0;
+            const paidAmount = parseFloat(document.getElementById('modal_paid_amount').value) || 0;
+
+            if (paidAmount > originalTotal) {
+                showErrorAlert('Paid amount cannot be greater than the original total amount');
+                return;
+            }
+
             btn.disabled = true;
             text.textContent = 'Saving...';
             spinner.classList.remove('d-none');
 
             const formData = {
-                sales_list_id: document.getElementById('modalSalesListId').value,
+                receipt_id: document.getElementById('modalReceiptId').value,
+                paid_date: document.getElementById('modal_paid_date').value,
                 invoice_date: document.getElementById('modal_invoice_date').value,
                 invoice_no: document.getElementById('modal_invoice_no').value,
                 customer_name: document.getElementById('modal_customer_name').value,
-                invoice_amount: document.getElementById('modal_invoice_amount').value,
                 paid_amount: document.getElementById('modal_paid_amount').value,
                 balance: document.getElementById('modal_balance').value,
+                receipt_invoice_number: document.getElementById('modal_receipt_invoice_number').value,
                 category: document.getElementById('modal_category').value,
-                account_owner: document.getElementById('modal_account_owner').value,
-                status: document.getElementById('modal_status').value
+                account_owner: document.getElementById('modal_account_owner').value
             };
 
-            const salesListId = document.getElementById('modalSalesListId').value;
+            const receiptId = document.getElementById('modalReceiptId').value;
 
-            fetch(`/record_payment/${salesListId}`, {
+            fetch(`/edit_receipt/${receiptId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -292,15 +317,9 @@
                 return response.json();
             })
             .then(data => {
-                if (data.success) {
-                    // Create success message with download button
-                    const successMessage = `
-                        ${data.message}
-                        <button onclick="window.open('${data.download_url}', '_blank')"
-                                class="btn btn-sm btn-success ms-2">
-                            <i class="bi bi-download"></i> Download Receipt
-                        </button>
-                    `;
+                if (data.status === 'success') {
+                    // Success message
+                    const successMessage = 'Receipt updated successfully!';
 
                     // Create and show Bootstrap alert
                     const alertDiv = document.createElement('div');
@@ -353,14 +372,6 @@
             const container = document.querySelector('.container.py-5');
             container.insertBefore(alertDiv, container.firstChild);
         }
-
-        // Optional: Add event listener for download buttons if they exist on page load
-        document.querySelectorAll('.download-receipt-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const receiptUrl = this.getAttribute('data-receipt-url');
-                window.open(receiptUrl, '_blank');
-            });
-        });
     </script>
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
