@@ -144,20 +144,41 @@ def validate_password(password):
 
 
 # Generate Receipt function
-def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, new_bal, payment_date, items):
+def generate_receipt(receipt_data, filename):
+    """
+    Generate a PDF receipt with the provided data
+    Args:
+        receipt_data (dict): {
+            'receipt_id': int,
+            'invoice_no': str,
+            'customer_name': str,
+            'invoice_date': str (YYYY-MM-DD),
+            'amount_paid': float,
+            'new_bal': float,
+            'payment_date': date,
+            'receipt_invoice_number': str,
+            'category': str,
+            'account_owner': str,
+            'items': list of dicts [{
+                'product': str,
+                'quantity': float,
+                'unit_price': float,
+                'total': float
+            }]
+        }
+        filename (str): Path/filename for the PDF file
+    Returns:
+        tuple: (filepath, BytesIO buffer)
+    """
 
-    os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
-    sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', invoice_no)
-    filename = f"receipt_{sanitized_invoice_no}.pdf"
-    filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
-
-    c = canvas.Canvas(filepath, pagesize=letter)
+    # Create canvas
+    c = canvas.Canvas(filename, pagesize=letter)
     styles = getSampleStyleSheet()
     style_normal = styles["Normal"]
 
     # Company information
     address = "Brightwoods Apartment, Chania Ave"
-    city_state_zip = "PO. Box 74080-00200, Nairobi, KENYA"
+    city_state_zip = "PO. Box 74080-00200, Nairobi, KENYA "
     phone = "Phone: +254-705917383"
     email = "Email: info@teknobyte.ltd"
     kra_pin = "PIN: P051155522R"
@@ -171,63 +192,75 @@ def generate_receipt(sales_id, customer_name, invoice_no, amount_paid, new_bal, 
     c.drawString(430, 690, kra_pin)
     c.drawString(430, 660, "")
 
-    # Receipt title and payment details
+    # Receipt title
     c.setFont("Helvetica-Bold", 20)
-    c.drawString(250, 640, "Receipt")
+    c.drawString(280, 640, "Receipt")
 
+    # Receipt details
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, 600, f"Date: {payment_date.strftime('%d-%m-%Y')}")
-    c.drawString(50, 580, f"Invoice No: {invoice_no}")
+    c.drawString(50, 620, "")
+    c.drawString(50, 600, f"Date: {receipt_data['payment_date'].strftime('%d-%m-%Y')}")
+    receipt_label = "Receipt No:"
 
+    invoice_label = "Invoice No:"
+    invoice_number = receipt_data['invoice_no']
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, 560, f"Client: {customer_name}")
+    c.drawString(50, 580, invoice_label)
+    label_width = c.stringWidth(invoice_label)
+    c.setFont("Helvetica", 12)
+    c.drawString(50 + label_width + 5, 580, invoice_number)
+
+    c.drawString(50, 560, "")
+    client_label = "Client: "
+    client_name = receipt_data['customer_name']
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 540, client_label)
+
+    label_width = c.stringWidth(client_label, "Helvetica-Bold", 12)
+    c.setFont("Helvetica", 12)
+    c.drawString(50 + label_width + 5, 540, client_name)
 
     # Items table
-    data = [
+    table_data = [
         ['Description', 'Qty', 'Unit Price', 'Amount']
     ]
-    for item in items:
-        data.append([
-            item['description'],
-            str(item['quantity']),
-            f"Ksh {item['unit_price']:,.1f}",
-            f"Ksh {item['total']:,.1f}"
+    for item in receipt_data['items']:
+        table_data.append([
+            item['product'],
+            item['quantity'],
+            f"Ksh {item['unit_price']:,.2f}",
+            f"Ksh {item['total']:,.2f}"
         ])
 
-    table = Table(data, colWidths=[3 * inch, 1 * inch, 1.5 * inch, 1.5 * inch])
+    table = Table(table_data,
+                  colWidths=[3 * inch, 1 * inch, 1.5 * inch, 1.5 * inch],
+                  )
+
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.gray),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+    ]))
 
-    table_height = len(data) * 20
+    table_height = len(table_data) * 20
     table.wrapOn(c, 0, 0)
     table.drawOn(c, 50, 500 - table_height)
 
-    # Payment details
+    # Add total amount
     c.setFont("Helvetica-Bold", 12)
-    c.drawString(400, 480 - table_height, f"Paid: Ksh {amount_paid:,.1f}")
+    c.drawString(400, 480 - table_height, f"Total Paid: {receipt_data['amount_paid']:,.2f} ")
+    c.drawString(400, 460 - table_height, f"Balance: {receipt_data['new_bal']:,.2f} ")
 
-    # Payment status (Paid or Balance remaining)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(400, 460 - table_height, f"Balance: Ksh {new_bal:,.1f}")
-
-    # Accountant details
     c.setFont("Helvetica", 12)
     c.drawString(50, 200, "John Kungu")
     c.setFont("Helvetica-Bold", 12)
     c.drawString(50, 180, "ACCOUNTANT")
 
     c.save()
-    with open(filepath, 'rb') as f:
-        receipt_buffer = BytesIO(f.read())
-    receipt_buffer.seek(0)
-    return receipt_buffer
 
 
 # Login Page
@@ -375,7 +408,7 @@ def sales_entry():
                 # Handle occasional products (immediate sale)
                 if frequency == 'Occasional':
                     cursor.execute("""
-                        INSERT INTO sale (
+                        INSERT INTO sales (
                             invoice_date, invoice_no, customer_name, product, quantity, 
                             price, total, date_created, category, account_owner, 
                             sales_acc_invoice_no, bank_account
@@ -395,7 +428,7 @@ def sales_entry():
 
                     # Calculate the total for this invoice (sum of all items)
                     cursor.execute("""
-                        SELECT SUM(total) FROM sale WHERE invoice_no = %s
+                        SELECT SUM(total) FROM sales WHERE invoice_no = %s
                     """, (invoice_number,))
                     invoice_total = cursor.fetchone()[0] or 0
 
@@ -421,7 +454,7 @@ def sales_entry():
                                 paid_amount, balance, payment_status, category, account_owner, reference_no
                             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         """, (
-                            customer_name, invoice_number, invoice_date, invoice_total,
+                            customer_name, invoice_number, invoice_date.date(), invoice_total,
                             0, invoice_total, 'Not Paid', category, account_owner, None
                         ))
 
@@ -475,7 +508,7 @@ def sales_entry():
                             new_invoice_number = generate_next_invoice_number()
 
                             cursor.execute("""
-                                INSERT INTO sale (
+                                INSERT INTO sales (
                                     invoice_date, invoice_no, customer_name, product, quantity, 
                                     price, total, date_created, category, account_owner, 
                                     sales_acc_invoice_no, bank_account
@@ -494,7 +527,7 @@ def sales_entry():
 
                             # Calculate the total for this invoice (sum of all items)
                             cursor.execute("""
-                                SELECT SUM(total) FROM sale WHERE invoice_no = %s
+                                SELECT SUM(total) FROM sales WHERE invoice_no = %s
                             """, (new_invoice_number,))
                             invoice_total = cursor.fetchone()[0] or 0
 
@@ -548,7 +581,7 @@ def sales_entry():
 
                 cursor.execute("""
                     SELECT product as description, quantity, price as unit_price, total
-                    FROM sale WHERE invoice_no = %s ORDER BY sales_id
+                    FROM sales WHERE invoice_no = %s ORDER BY sales_id
                 """, (invoice_number,))
                 items_result = cursor.fetchall()
                 columns = [desc[0] for desc in cursor.description]
@@ -633,62 +666,18 @@ def download_invoice(filename):
 
 
 # Download receipt route
-@app.route('/download_receipt/<int:sales_id>')
-def download_receipt(sales_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
+@app.route('/receipts/<filename>')
+def download_receipt(filename):
+    return send_from_directory(
+        app.config['RECEIPT_FOLDER'],
+        filename,
+        as_attachment=True
+    )
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    cur.execute("SELECT * FROM sales WHERE sales_id = %s", (sales_id,))
-    invoice = cur.fetchone()
-
-    if not invoice:
-        flash("Invoice not found", "danger")
-        return redirect(url_for('search_invoices'))
-
-    # Extract fields from the invoice row
-    customer_name = invoice[3]
-    invoice_no = invoice[2]
-    product = invoice[6]
-    quantity = invoice[7]
-    amount = invoice[8]
-    paid = invoice[10]
-    balance = invoice[11]
-
-    sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', invoice_no)
-    filename = f"receipt_{sanitized_invoice_no}.pdf"
-    filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
-
-    if not os.path.exists(filepath):
-
-        receipt_buffer = generate_receipt(
-            sales_id = sales_id,
-            customer_name = customer_name,
-            invoice_no = invoice_no,
-            amount_paid = paid,
-            new_bal = balance,
-            payment_date = datetime.now().date(),
-            items=[{
-                'description': product,
-                'quantity': int(quantity),
-                'unit_price': float(amount),
-                'total': int(quantity) * float(amount)
-            }]
-        )
-        flash("Receipt generated for download", "info")
-    else:
-        # Read existing receipt
-        with open(filepath, 'rb') as f:
-            receipt_buffer = BytesIO(f.read())
-        receipt_buffer.seek(0)
-
-    # Prepare download
-    response = make_response(receipt_buffer.getvalue())
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename={filename}'
-    return response
+# Search Invoices Menu
+@app.route('/search_menu', methods=['GET', 'POST'])
+def search_menu():
+    return render_template('search_menu.html')
 
 # Search invoices route
 @app.route('/search_invoices', methods=['GET', 'POST'])
@@ -714,10 +703,11 @@ def search_invoices():
 
             # Start building query
             query = """
-                       SELECT sales_id, invoice_date, invoice_no, customer_name, account_owner,
-                              product, qty, total, payment_status, category
-                       FROM sales
-                       WHERE 1=1
+                       SELECT sales_id, invoice_date, invoice_no, customer_name, product, quantity, 
+                       price, total, category, account_owner, sales_acc_invoice_no, 
+                       status, bank_account
+                       FROM sales WHERE status = 'Active'
+                       AND 1=1
                    """
             params = []
 
@@ -765,109 +755,695 @@ def search_invoices():
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
 
+# Edit specific sales
+@app.route('/edit_sale/<int:sales_id>', methods=['GET', 'POST'])
+def edit_sale(sales_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
 
-# Update payment
-@app.route('/update_payment/<int:sales_id>', methods=['GET', 'POST'])
-def update_payment(sales_id):
+    if session.get('role') not in [1,2]:
+        cur.close()
+        conn.close()
+        flash('You do not have access to edit sales', 'danger')
+        return redirect(url_for('search_invoices'))
+
+    if request.method == 'POST':
+        data = request.get_json()
+        invoice_date = data.get('invoice_date')
+        invoice_no = data.get('invoice_no')
+        customer_name = data.get('customer_name')
+        product = data.get('product')
+        quantity = int(data.get('quantity'))
+        price = float(data.get('price'))
+        total = quantity * price
+        category = data.get('category')
+        account_owner = data.get('account_owner')
+        status = data.get('status')
+
+        try:
+            cur.execute("""
+                UPDATE sales SET
+                    invoice_date = %s,
+                    invoice_no = %s,
+                    customer_name = %s,
+                    product = %s,
+                    quantity = %s,
+                    price = %s,
+                    total = %s,
+                    category = %s,
+                    account_owner = %s,
+                    status = %s
+                WHERE sales_id = %s
+            """, (
+                invoice_date, invoice_no, customer_name, product,
+                quantity, price, total, category, account_owner,
+                status, sales_id
+            ))
+
+            # Update sales_list total and balance
+            cur.execute("SELECT SUM(total) FROM sales WHERE invoice_no = %s", (invoice_no,))
+            invoice_total = cur.fetchone()[0] or 0
+
+            cur.execute("SELECT paid_amount FROM sales_list WHERE invoice_no = %s", (invoice_no,))
+            paid_amount_result = cur.fetchone()
+            paid_amount = paid_amount_result[0] if paid_amount_result else 0
+            new_balance = invoice_total - paid_amount
+
+            cur.execute("""
+                UPDATE sales_list
+                SET invoice_amount = %s, balance = %s
+                WHERE invoice_no = %s
+            """, (invoice_total, new_balance, invoice_no))
+
+            conn.commit()
+
+            return jsonify({
+                "status": "success",
+                "invoice": {
+                    "invoice_date": invoice_date,
+                    "invoice_no": invoice_no,
+                    "customer_name": customer_name,
+                    "product": product,
+                    "quantity": quantity,
+                    "price": price,
+                    "total": total,
+                    "category": category,
+                    "account_owner": account_owner,
+                    "status": status
+                }
+            })
+
+        except Exception as e:
+            conn.rollback()
+            return jsonify({"status": "error", "message": str(e)}), 500
+        finally:
+            cur.close()
+            conn.close()
+
+    # Fallback for GET (not used in modal AJAX)
+    cur.execute("SELECT * FROM sales WHERE sales_id = %s", (sales_id,))
+    invoice = cur.fetchone()
+    cur.close()
+    conn.close()
+    return jsonify({"invoice": invoice})
+
+# Search sales account route
+@app.route('/search_sales_account', methods=['GET', 'POST'])
+def search_sales_account():
+    invoices = []
+    categories = read_categories()
+    account_owners = read_account_owners()
+
+    # Set default date range
+    today = datetime.today()
+    default_start_date = (today - timedelta(days=730)).strftime('%Y-%m-%d')
+    default_end_date = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if request.method == 'POST':
+            start_date = request.form.get('start_date') or default_start_date
+            end_date = request.form.get('end_date') or default_end_date
+            account_owner = request.form.get('account_owner')
+            category = request.form.get('category')
+
+            # Start building query
+            query = """
+                       SELECT * FROM sales_account
+                       WHERE 1=1 AND status = 'Active'
+                   """
+            params = []
+
+            # Apply filters only if they are selected
+            if start_date:
+                query += " AND invoice_date >= %s"
+                params.append(start_date)
+
+            if end_date:
+                query += " AND invoice_date <= %s"
+                params.append(end_date)
+
+            if account_owner:
+                query += " AND account_owner = %s"
+                params.append(account_owner)
+
+            if category:
+                query += " AND category = %s"
+                params.append(category)
+
+            query += " ORDER BY invoice_date DESC"
+
+            cur.execute(query, tuple(params))
+            invoices = cur.fetchall()
+
+            if not invoices:
+                flash('No invoices found matching the selected filters.', 'info')
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        return render_template('search_sales_account.html',
+                               error=f"Database error: {str(e)}",
+                               invoices=invoices,
+                               account_owners=account_owners,
+                               categories=categories,
+                               default_start_date=default_start_date,
+                               default_end_date=default_end_date)
+
+    return render_template('search_sales_account.html',
+                           invoices=invoices,
+                           account_owners=account_owners,
+                           categories=categories,
+                           default_start_date=default_start_date,
+                           default_end_date=default_end_date)
+
+# Edit sales account
+@app.route('/edit_sales_account/<int:sales_acc_id>', methods=['POST'])
+def edit_sales_account(sales_acc_id):
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('search_sales_account'))
 
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Verify if it is superuser and fetch invoice
-    if session.get('role') != 1:  # If not superuser
+    # Only superuser and admin can edit
+    if session.get('role') not in [1, 2]:
         cur.close()
         conn.close()
-        flash("You don't have permission to edit payments", "danger")
-        return redirect(url_for('search_invoices'))
+        flash("You don't have permission to edit sales accounts", "danger")
+        return redirect(url_for('search_sales_account'))
 
-    cur.execute("SELECT * FROM sales WHERE sales_id = %s", (sales_id,))
-    invoice = cur.fetchone()
+    try:
+        data = request.get_json()
+        invoice_date = datetime.strptime(data.get('invoice_date'), '%Y-%m-%d').date()
+        customer_name = data.get('customer_name')
+        product = data.get('product')
+        quantity = int(data.get('quantity'))
+        price = float(data.get('price'))
+        total = quantity * price
+        category = data.get('category')
+        account_owner = data.get('account_owner')
+        frequency = data.get('frequency')
+        bank_account = data.get('bank_account', '')
 
-    if not invoice:
-        flash("Invoice not found or access denied", "danger")
-        return redirect(url_for('search_invoices'))
+        # Deactivate old sales account and related records
+        cur.execute("UPDATE sales_account SET status = 'Not Active' WHERE sales_acc_id = %s RETURNING invoice_number", (sales_acc_id,))
+        original_invoice_no = cur.fetchone()[0]
+
+        cur.execute("UPDATE sales SET status = 'Not Active' WHERE sales_acc_invoice_no = %s", (original_invoice_no,))
+        cur.execute("UPDATE sales_list SET notes = 'Not Active' WHERE reference_no = %s", (original_invoice_no,))
+
+        # Generate new invoice number
+        new_invoice_no = generate_next_invoice_number()
+
+        # Create new sales_account
+        cur.execute("SELECT MAX(sales_acc_id) FROM sales_account")
+        max_id = cur.fetchone()[0] or 0
+        new_sales_acc_id = max_id + 1
+
+        cur.execute("""
+            INSERT INTO sales_account (
+                sales_acc_id, invoice_date, invoice_number, customer_name, product,
+                quantity, price, total, created_at, category, account_owner,
+                frequency, status, bank_account
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active', %s)
+        """, (
+            new_sales_acc_id, invoice_date, new_invoice_no, customer_name, product,
+            quantity, price, total, datetime.now(), category, account_owner,
+            frequency, bank_account
+        ))
+
+        # Insert invoice
+        cur.execute("""
+            INSERT INTO invoices (invoice_number, created_at)
+            VALUES (%s, %s)
+            ON CONFLICT (invoice_number) DO NOTHING
+        """, (new_invoice_no, datetime.now()))
+
+        conn.commit()
+        # Frequency handling
+        today = datetime.today().date()
+
+        if frequency == 'Monthly':
+            delta = relativedelta(months=1)
+        elif frequency == 'Quarterly':
+            delta = relativedelta(months=3)
+        elif frequency == 'Annual':
+            delta = relativedelta(years=1)
+        else:
+            delta = None
+
+        if delta:
+            next_due_date = invoice_date
+            generated_invoices = []  # PDF links for backdated invoices
+            while next_due_date <= today + delta:
+                new_invoice_number = generate_next_invoice_number()
+
+                cur.execute("""
+                    INSERT INTO sales (
+                        invoice_date, invoice_no, customer_name, product, quantity, 
+                        price, total, date_created, category, account_owner, 
+                        sales_acc_invoice_no, bank_account
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    next_due_date, new_invoice_number, customer_name, product, quantity,
+                    price, total, datetime.now(), category, account_owner,
+                    new_invoice_no, bank_account
+                ))
+
+                cur.execute("""
+                    INSERT INTO invoices (invoice_number, created_at)
+                    VALUES (%s, %s)
+                    ON CONFLICT (invoice_number) DO NOTHING
+                """, (new_invoice_number, datetime.now()))
+
+                generated_invoices.append({
+                    'date': next_due_date.strftime('%Y-%m-%d'),
+                    'invoice_no': new_invoice_number
+                })
+
+                # Calculate the total for this invoice (sum of all items)
+                cur.execute("""
+                    SELECT SUM(total) FROM sales WHERE invoice_no = %s
+                """, (new_invoice_number,))
+                invoice_total = cur.fetchone()[0] or 0
+
+                cur.execute("""
+                    INSERT INTO sales_list (
+                        customer_name, invoice_no, invoice_date, invoice_amount, 
+                        paid_amount, balance, category, account_owner, reference_no
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    """, (
+                    customer_name, new_invoice_number, next_due_date, invoice_total,
+                    0, invoice_total, category, account_owner, new_invoice_no
+                ))
+
+                conn.commit()
+                next_due_date += delta
+
+            return jsonify({
+                'status': 'success',
+                'message': 'Sales account updated successfully',
+                'generated_invoices': generated_invoices
+            })
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# Receipts Menu route
+@app.route('/receipts_menu', methods=['GET', 'POST'])
+def receipts_menu():
+    return render_template('receipts_menu.html')
+
+# View receipts
+@app.route('/view_sales', methods=['GET', 'POST'])
+def view_sales():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    invoices = []
+    categories = read_categories()
+    account_owners = read_account_owners()
+
+    # Set default date range
+    today = datetime.today()
+    default_start_date = (today - timedelta(days=730)).strftime('%Y-%m-%d')
+    default_end_date = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if request.method == 'POST':
+            start_date = request.form.get('start_date') or default_start_date
+            end_date = request.form.get('end_date') or default_end_date
+            account_owner = request.form.get('account_owner')
+            category = request.form.get('category')
+
+            # Start building query
+            query = """
+                           SELECT id, customer_name, invoice_no, invoice_date, invoice_amount,
+                           paid_amount, balance, payment_status, category, account_owner, reference_no
+                           FROM sales_list
+                           WHERE 1=1
+                       """
+            params = []
+
+            # Apply filters only if they are selected
+            if start_date:
+                query += " AND invoice_date >= %s"
+                params.append(start_date)
+
+            if end_date:
+                query += " AND invoice_date <= %s"
+                params.append(end_date)
+
+            if account_owner:
+                query += " AND account_owner = %s"
+                params.append(account_owner)
+
+            if category:
+                query += " AND category = %s"
+                params.append(category)
+
+            query += " ORDER BY invoice_date DESC"
+
+            cur.execute(query, tuple(params))
+            invoices = cur.fetchall()
+
+            if not invoices:
+                flash('No invoices found matching the selected filters.', 'info')
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        return render_template('view_sales.html',
+                               error=f"Database error: {str(e)}",
+                               invoices=invoices,
+                               account_owners=account_owners,
+                               categories=categories,
+                               default_start_date=default_start_date,
+                               default_end_date=default_end_date)
+
+    return render_template('view_sales.html',
+                           invoices=invoices,
+                           account_owners=account_owners,
+                           categories=categories,
+                           default_start_date=default_start_date,
+                           default_end_date=default_end_date)
+
+
+# Record Payment
+@app.route('/record_payment/<int:sales_list_id>', methods=['GET', 'POST'])
+def record_payment(sales_list_id):
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+
+    if session.get('role') not in [1, 2]:
+        return jsonify({'success': False, 'message': 'Permission denied'}), 403
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # Get JSON data from modal form
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'No data received'}), 400
+
+        # Extract form data
+        invoice_date = data.get('invoice_date')
+        invoice_no = data.get('invoice_no')
+        customer_name = data.get('customer_name')
+        invoice_amount = float(data.get('invoice_amount'))
+        paid_amount = float(data.get('paid_amount'))
+        balance = float(max(0, invoice_amount - paid_amount))
+        category = data.get('category')
+        account_owner = data.get('account_owner')
+        payment_status = 'Paid' if balance == 0 else 'Not Paid'
+
+        # Get all products for this invoice
+        cur.execute("""
+            SELECT product, quantity, price as unit_price, total 
+            FROM sales 
+            WHERE invoice_no = %s
+        """, (invoice_no,))
+        items_raw = cur.fetchall()
+
+        # Convert tuples to dictionaries for easier access
+        items = []
+        for item in items_raw:
+            items.append({
+                'product': item[0],
+                'quantity': item[1],
+                'unit_price': float(item[2]),
+                'total': float(item[3])
+            })
+
+        # Generate receipt number
+        receipt_invoice_number = generate_next_invoice_number()
+
+        # Create receipt record
+        cur.execute("""
+            INSERT INTO receipts (
+                paid_date, invoice_number, invoice_date, customer_name,
+                paid_amount, balance, receipt_invoice_number,
+                category, account_owner
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING receipt_id
+        """, (
+            datetime.now().date(), invoice_no, invoice_date, customer_name,
+            paid_amount, balance, receipt_invoice_number,
+            category, account_owner
+        ))
+        receipt_id = cur.fetchone()[0]
+
+        cur.execute("""
+            INSERT INTO invoices (invoice_number, created_at)
+                VALUES (%s, %s)
+                ON CONFLICT (invoice_number) DO NOTHING
+        """, (receipt_invoice_number, datetime.now()))
+
+        # Update sales_list table
+        cur.execute("""
+            UPDATE sales_list
+            SET 
+                paid_amount = %s,
+                balance = %s,
+                payment_status = %s
+            WHERE id = %s
+        """, (paid_amount, balance, payment_status, sales_list_id))
+
+        # Update sales records
+        cur.execute("""
+            UPDATE sales
+            SET 
+                payment_status = %s
+            WHERE invoice_no = %s
+        """, (payment_status, invoice_no))
+
+        # Generate receipt PDF
+        receipt_data = {
+            'receipt_id': receipt_id,
+            'invoice_no': invoice_no,
+            'customer_name': customer_name,
+            'invoice_date': invoice_date,
+            'amount_paid': float(paid_amount),
+            'new_bal': float(balance),
+            'payment_date': datetime.now().date(),
+            'receipt_invoice_number': receipt_invoice_number,
+            'category': category,
+            'account_owner': account_owner,
+            'items': items
+        }
+
+        sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', receipt_invoice_number)
+        filename = f"receipt_{sanitized_invoice_no}.pdf"
+        filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
+
+        generate_receipt(receipt_data, filepath)
+
+
+
+        conn.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Payment recorded! Receipt #{receipt_invoice_number}',
+            'receipt_number': receipt_invoice_number,
+            'new_balance': balance,
+            'payment_status': payment_status,
+            'download_url': url_for('download_receipt', filename=filename)
+        })
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({
+            'success': False,
+            'message': f'Error recording payment: {str(e)}'
+        }), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# Search receipts
+@app.route('/search_receipts', methods =['GET', 'POST'])
+def search_receipts():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    receipts = []
+    categories = read_categories()
+    account_owners = read_account_owners()
+
+    # Set default date range
+    today = datetime.today()
+    default_start_date = (today - timedelta(days=730)).strftime('%Y-%m-%d')
+    default_end_date = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if request.method == 'POST':
+            start_date = request.form.get('start_date') or default_start_date
+            end_date = request.form.get('end_date') or default_end_date
+            account_owner = request.form.get('account_owner')
+            category = request.form.get('category')
+
+            # Start building query
+            query = """
+                           SELECT * FROM receipts
+                           WHERE 1=1
+                       """
+            params = []
+
+            # Apply filters only if they are selected
+            if start_date:
+                query += " AND invoice_date >= %s"
+                params.append(start_date)
+
+            if end_date:
+                query += " AND invoice_date <= %s"
+                params.append(end_date)
+
+            if account_owner:
+                query += " AND account_owner = %s"
+                params.append(account_owner)
+
+            if category:
+                query += " AND category = %s"
+                params.append(category)
+
+            query += " ORDER BY invoice_date DESC"
+
+            cur.execute(query, tuple(params))
+            receipts = cur.fetchall()
+
+            if not receipts:
+                flash('No receipts found matching the selected filters.', 'info')
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        return render_template('search_receipts.html',
+                               error=f"Database error: {str(e)}",
+                               receipts=receipts,
+                               account_owners=account_owners,
+                               categories=categories,
+                               default_start_date=default_start_date,
+                               default_end_date=default_end_date)
+
+    return render_template('search_receipts.html',
+                           receipts=receipts,
+                           account_owners=account_owners,
+                           categories=categories,
+                           default_start_date=default_start_date,
+                           default_end_date=default_end_date)
+
+# Edit receipts route
+@app.route('/edit_receipt/<int:receipt_id>', methods=['GET', 'POST'])
+def edit_receipt(receipt_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    if session.get('role') not in [1, 2]:
+        cur.close()
+        conn.close()
+        flash('You do not have access to edit receipts', 'danger')
+        return redirect(url_for('search_receipts'))
 
     if request.method == 'POST':
-        invoice_date = request.form['invoice_date']
-        invoice_no = request.form['invoice_no']
-        customer_name = request.form['customer_name']
-        product = request.form['product']
-        quantity = request.form['quantity']
-        amount = float(request.form['amount'])
-        total =float(request.form['total'])
-        paid = float(request.form['paid'])
-        balance = float(max(0, total - paid))
-        paid_date = datetime.now().date() if balance == 0 else None # Only update when balance is zero
-        category = request.form['category']
-        account_owner = request.form['account_owner']
-        payment_status = 'Paid' if balance == 0 else 'Not Paid' # Set Paid if there is no balance
+        data = request.get_json()
+        invoice_date = data.get('invoice_date')
+        invoice_number = data.get('invoice_no')
+        customer_name = data.get('customer_name')
+        paid_date = data.get('paid_date')
+        paid_amount = float(data.get('paid_amount'))
+        receipt_invoice_number = data.get('receipt_invoice_number')
+        category = data.get('category')
+        account_owner = data.get('account_owner')
+
         try:
-            # Update invoice
+            cur.execute("SELECT invoice_amount FROM sales_list WHERE invoice_no = %s", (invoice_number,))
+            result = cur.fetchone()
+
+            if result:
+                original_total = float(result[0])
+            else:
+                # If not found in sales_list, get from receipts table
+                cur.execute("SELECT paid_amount + balance FROM receipts WHERE receipt_id = %s", (receipt_id,))
+                result = cur.fetchone()
+                original_total = float(result[0]) if result else 0
+
+            new_balance = original_total - paid_amount
+
+            if new_balance < 0:
+                new_balance = 0
+
             cur.execute("""
-                UPDATE sales SET
-                invoice_date = %s,
-                invoice_no = %s,
-                customer_name = %s,
-                product = %s,
-                qty = %s,
-                amt = %s,
-                total = %s,
-                paid = %s,
-                bal = %s,
-                paid_date = CASE WHEN %s = 0 THEN CURRENT_DATE ELSE paid_date END,
-                category = %s,
-                account_owner = %s,
-                payment_status = %s
-                WHERE sales_id = %s
-            """, (
-                invoice_date,
-                invoice_no,
-                customer_name,
-                product,
-                quantity,
-                amount,
-                total,
-                paid,
-                balance,
-                balance,
-                category,
-                account_owner,
-                payment_status,
-                sales_id
+                    UPDATE receipts SET
+                        paid_date = %s,
+                        invoice_number = %s,
+                        invoice_date = %s,
+                        customer_name = %s,
+                        paid_amount = %s,
+                        balance = %s,
+                        receipt_invoice_number = %s,
+                        category = %s,
+                        account_owner = %s
+
+                    WHERE receipt_id = %s
+                """, (
+                datetime.now(), invoice_number, invoice_date, customer_name, paid_amount,
+                new_balance, receipt_invoice_number, category, account_owner,
+                receipt_id
             ))
+
+            cur.execute("""
+                    UPDATE sales_list
+                    SET balance = %s, paid_amount = %s
+                    WHERE invoice_no = %s
+                """, (new_balance, paid_amount, invoice_number))
+
             conn.commit()
-            if paid > 0:
-                generate_receipt(
-                    sales_id=sales_id,
-                    customer_name=customer_name,
-                    invoice_no=invoice_no,
-                    amount_paid=paid,
-                    new_bal=balance,
-                    payment_date=datetime.now().date(),
-                    items=[{
-                        'description': product,
-                        'quantity': quantity,
-                        'unit_price': amount,
-                        'total': total
-                    }]
-                )
-            return redirect(url_for('view_sales', sales_id=sales_id))
+
+            return jsonify({
+                "status": "success",
+                "receipt": {
+                    "invoice_date": invoice_date,
+                    "invoice_number": invoice_number,
+                    "customer_name": customer_name,
+                    "paid_amount": paid_amount,
+                    "balance": new_balance,
+                    "category": category,
+                    "account_owner": account_owner,
+                }
+            })
 
         except Exception as e:
             conn.rollback()
-            flash(f"Error: {str(e)}", "danger")
+            return jsonify({"status": "error", "message": str(e)}), 500
         finally:
             cur.close()
             conn.close()
-        return redirect(url_for('search_invoices'))
 
-    return render_template('update_payment.html', invoice=invoice)
-
+    # Fallback for GET (not used in modal AJAX)
+    cur.execute("SELECT * FROM receipts WHERE receipt_id = %s", (receipt_id,))
+    receipt = cur.fetchone()
+    cur.close()
+    conn.close()
+    return jsonify({"receipt": receipt})
 
 # View sales route
-@app.route('/invoice/<int:sales_id>')
+"""@app.route('/invoice/<int:sales_id>')
 def view_sales(sales_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -885,7 +1461,7 @@ def view_sales(sales_id):
 
     return render_template('view_sales.html', invoice=invoice)
 
-
+"""
 # Manage users route
 @app.route('/manage_users')
 def manage_users():
@@ -1396,8 +1972,8 @@ def create_invoice(invoice_data, filename):
 
     table = Table(data, colWidths=[3 * inch, 1 * inch, 1.5 * inch, 1.5 * inch])
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.gray),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 10),
