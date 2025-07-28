@@ -186,4 +186,5 @@ cython_debug/
 /.idea/vcs.xml
 /.idea/workspace.xml
 /.idea/Sales-demo.iml
-
+/.idea/busyman-pro-demo.iml
+/.idea
