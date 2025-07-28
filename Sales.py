@@ -1,4 +1,4 @@
-# import appropriate libraries
+# import  libraries
 from flask import Flask,flash, session, render_template, request, redirect, url_for, send_from_directory, jsonify, make_response
 import os
 import io
@@ -1169,16 +1169,21 @@ def record_payment(sales_list_id):
         account_owner = data.get('account_owner')
         payment_status = 'Paid' if balance == 0 else 'Not Paid'
 
-        # Get all products for this invoice
+        # Get all products for this invoice along with their frequencies
         cur.execute("""
-            SELECT product, quantity, price as unit_price, total 
-            FROM sales 
-            WHERE invoice_no = %s
+            SELECT s.product, s.quantity, s.price as unit_price, s.total, s.sales_acc_invoice_no, p.frequency, s.bank_account
+            FROM sales s
+            JOIN products p ON s.product = p.product
+            WHERE s.invoice_no = %s
         """, (invoice_no,))
         items_raw = cur.fetchall()
 
-        # Convert tuples to dictionaries for easier access
+        # Convert tuples to dictionaries and get frequency
         items = []
+        sales_acc_invoice_no = None
+        frequency = None
+        bank_account = None
+
         for item in items_raw:
             items.append({
                 'product': item[0],
@@ -1187,29 +1192,74 @@ def record_payment(sales_list_id):
                 'total': float(item[3])
             })
 
-        # Generate receipt number
-        receipt_invoice_number = generate_next_invoice_number()
+            if item[4]:  # sales_acc_invoice_no exists
+                sales_acc_invoice_no = item[4]
+                frequency = item[5]  # frequency from joined products table
+                bank_account = item[6]
 
-        # Create receipt record
+        # For safety, if we didn't get a frequency but have a sales account
+        if sales_acc_invoice_no and not frequency and items:
+            first_product = items[0]['product']
+            cur.execute("SELECT frequency FROM products WHERE product = %s", (first_product,))
+            frequency_result = cur.fetchone()
+            if frequency_result:
+                frequency = frequency_result[0]
+
+        # Check if receipt already exists for this invoice
         cur.execute("""
-            INSERT INTO receipts (
-                paid_date, invoice_number, invoice_date, customer_name,
+            SELECT receipt_id, receipt_invoice_number 
+            FROM receipts 
+            WHERE invoice_number = %s
+        """, (invoice_no,))
+        existing_receipt = cur.fetchone()
+
+        if existing_receipt:
+            # Update existing receipt
+            receipt_id = existing_receipt[0]
+            receipt_invoice_number = existing_receipt[1]
+
+            cur.execute("""
+                UPDATE receipts 
+                SET 
+                    paid_date = %s,
+                    invoice_date = %s,
+                    customer_name = %s,
+                    paid_amount = %s,
+                    balance = %s,
+                    category = %s,
+                    account_owner = %s
+                WHERE receipt_id = %s
+            """, (
+                datetime.now().date(), invoice_date, customer_name,
+                paid_amount, balance, category, account_owner, receipt_id
+            ))
+
+            message = f'Payment updated! Receipt #{receipt_invoice_number}'
+        else:
+            # Create new receipt record
+            receipt_invoice_number = generate_next_invoice_number()
+
+            cur.execute("""
+                INSERT INTO receipts (
+                    paid_date, invoice_number, invoice_date, customer_name,
+                    paid_amount, balance, receipt_invoice_number,
+                    category, account_owner
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING receipt_id
+            """, (
+                datetime.now().date(), invoice_no, invoice_date, customer_name,
                 paid_amount, balance, receipt_invoice_number,
                 category, account_owner
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING receipt_id
-        """, (
-            datetime.now().date(), invoice_no, invoice_date, customer_name,
-            paid_amount, balance, receipt_invoice_number,
-            category, account_owner
-        ))
-        receipt_id = cur.fetchone()[0]
+            ))
+            receipt_id = cur.fetchone()[0]
 
-        cur.execute("""
-            INSERT INTO invoices (invoice_number, created_at)
-                VALUES (%s, %s)
-                ON CONFLICT (invoice_number) DO NOTHING
-        """, (receipt_invoice_number, datetime.now()))
+            cur.execute("""
+                INSERT INTO invoices (invoice_number, created_at)
+                    VALUES (%s, %s)
+                    ON CONFLICT (invoice_number) DO NOTHING
+            """, (receipt_invoice_number, datetime.now()))
+
+            message = f'Payment recorded! Receipt #{receipt_invoice_number}'
 
         # Update sales_list table
         cur.execute("""
@@ -1250,13 +1300,89 @@ def record_payment(sales_list_id):
 
         generate_receipt(receipt_data, filepath)
 
+        # Check if this is a sales account payment and create next due sale
+        if sales_acc_invoice_no and frequency and payment_status == 'Paid':
+            # Get the most recent invoice date for this sales account
+            cur.execute("""
+                SELECT invoice_date, payment_status 
+                FROM sales_list 
+                WHERE reference_no = %s 
+                ORDER BY invoice_date DESC 
+                LIMIT 1
+            """, (sales_acc_invoice_no,))
+            most_recent_invoice = cur.fetchone()
 
+            if most_recent_invoice:
+                most_recent_date, most_recent_status = most_recent_invoice
+
+                # Only proceed if the current payment is for the most recent invoice
+                current_invoice_date = datetime.strptime(invoice_date, '%Y-%m-%d').date()
+                if most_recent_date == current_invoice_date:
+                    # Calculate delta based on frequency
+                    if frequency == 'Monthly':
+                        delta = relativedelta(months=1)
+                    elif frequency == 'Quarterly':
+                        delta = relativedelta(months=3)
+                    elif frequency == 'Annual':
+                        delta = relativedelta(years=1)
+                    else:
+                        delta = None
+
+                    if delta:
+                        next_due_date = most_recent_date + delta
+
+                        # Check if this next invoice already exists
+                        cur.execute("""
+                            SELECT COUNT(*) FROM sales_list 
+                            WHERE reference_no = %s 
+                            AND invoice_date = %s
+                        """, (sales_acc_invoice_no, next_due_date))
+                        invoice_exists = cur.fetchone()[0] > 0
+
+                        if not invoice_exists:
+                            new_invoice_number = generate_next_invoice_number()
+                            current_datetime = datetime.now()
+
+                            # Create new sales records for each product
+                            for item in items:
+                                cur.execute("""
+                                    INSERT INTO sales (
+                                        invoice_date, invoice_no, customer_name, product, quantity, 
+                                        price, total, date_created, category, account_owner, 
+                                        sales_acc_invoice_no, bank_account
+                                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """, (
+                                    next_due_date, new_invoice_number, customer_name,
+                                    item['product'], item['quantity'], item['unit_price'],
+                                    item['total'], current_datetime, category, account_owner,
+                                    sales_acc_invoice_no, bank_account
+                                ))
+
+                            # Create invoice record
+                            cur.execute("""
+                                INSERT INTO invoices (invoice_number, created_at)
+                                VALUES (%s, %s)
+                                ON CONFLICT (invoice_number) DO NOTHING
+                            """, (new_invoice_number, current_datetime))
+
+                            # Create sales_list entry
+                            cur.execute("""
+                                INSERT INTO sales_list (
+                                    customer_name, invoice_no, invoice_date, invoice_amount, 
+                                    paid_amount, balance, category, 
+                                    account_owner, reference_no
+                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                customer_name, new_invoice_number, next_due_date,
+                                invoice_amount, 0, invoice_amount,
+                                category, account_owner, sales_acc_invoice_no
+                            ))
 
         conn.commit()
 
         return jsonify({
             'success': True,
-            'message': f'Payment recorded! Receipt #{receipt_invoice_number}',
+            'message': message,
             'receipt_number': receipt_invoice_number,
             'new_balance': balance,
             'payment_status': payment_status,
@@ -1362,61 +1488,237 @@ def edit_receipt(receipt_id):
 
     if request.method == 'POST':
         data = request.get_json()
-        invoice_date = data.get('invoice_date')
-        invoice_number = data.get('invoice_no')
-        customer_name = data.get('customer_name')
-        paid_date = data.get('paid_date')
-        paid_amount = float(data.get('paid_amount'))
-        receipt_invoice_number = data.get('receipt_invoice_number')
-        category = data.get('category')
-        account_owner = data.get('account_owner')
-
         try:
-            cur.execute("SELECT invoice_amount FROM sales_list WHERE invoice_no = %s", (invoice_number,))
-            result = cur.fetchone()
+            invoice_date = data.get('invoice_date')
+            invoice_number = data.get('invoice_no')
+            customer_name = data.get('customer_name')
+            paid_date_str = data.get('paid_date')
+            paid_date = datetime.strptime(paid_date_str, '%Y-%m-%d').date() if paid_date_str else datetime.now().date()
+            paid_amount = float(data.get('paid_amount', 0))
+            receipt_invoice_number = data.get('receipt_invoice_number')
+            category = data.get('category')
+            account_owner = data.get('account_owner')
 
-            if result:
-                original_total = float(result[0])
+            cur.execute("""
+                        SELECT s.product,
+                               s.quantity,
+                               s.price as unit_price,
+                               s.total,
+                               s.sales_acc_invoice_no,
+                               p.frequency,
+                               s.bank_account
+                        FROM sales s
+                                 JOIN products p ON s.product = p.product
+                        WHERE s.invoice_no = %s
+                        """, (invoice_number,))
+            items_raw = cur.fetchall()
+            items = []
+
+            for item in items_raw:
+                items.append({
+                    'product': item[0],
+                    'quantity': item[1],
+                    'unit_price': float(item[2]),
+                    'total': float(item[3])
+                })
+
+            # Get the original total and reference_no from sales_list
+            cur.execute("""
+                        SELECT invoice_amount, reference_no
+                        FROM sales_list
+                        WHERE invoice_no = %s
+                        """, (invoice_number,))
+            sales_list_result = cur.fetchone()
+
+            original_total = 0
+            sales_acc_invoice_no = None
+            frequency = None
+
+            if sales_list_result:
+                original_total = float(sales_list_result[0]) if sales_list_result[0] else 0
+                sales_acc_invoice_no = sales_list_result[1] if sales_list_result[1] else None
+
+                # Get frequency from products table via sales table
+                cur.execute("""
+                            SELECT p.frequency
+                            FROM sales s
+                                     JOIN products p ON s.product = p.product
+                            WHERE s.invoice_no = %s LIMIT 1
+                            """, (invoice_number,))
+                freq_result = cur.fetchone()
+                frequency = freq_result[0] if freq_result and freq_result[0] else None
             else:
                 # If not found in sales_list, get from receipts table
-                cur.execute("SELECT paid_amount + balance FROM receipts WHERE receipt_id = %s", (receipt_id,))
+                cur.execute("""
+                            SELECT paid_amount + balance
+                            FROM receipts
+                            WHERE receipt_id = %s
+                            """, (receipt_id,))
                 result = cur.fetchone()
-                original_total = float(result[0]) if result else 0
+                original_total = float(result[0]) if result and result[0] else 0
 
-            new_balance = original_total - paid_amount
+            new_balance = max(0, original_total - paid_amount)
+            payment_status = 'Paid' if new_balance == 0 else 'Not Paid'
 
-            if new_balance < 0:
-                new_balance = 0
-
+            # Update receipts table
             cur.execute("""
-                    UPDATE receipts SET
-                        paid_date = %s,
-                        invoice_number = %s,
-                        invoice_date = %s,
-                        customer_name = %s,
-                        paid_amount = %s,
-                        balance = %s,
-                        receipt_invoice_number = %s,
-                        category = %s,
-                        account_owner = %s
+                        UPDATE receipts
+                        SET paid_date              = %s,
+                            invoice_number         = %s,
+                            invoice_date           = %s,
+                            customer_name          = %s,
+                            paid_amount            = %s,
+                            balance                = %s,
+                            receipt_invoice_number = %s,
+                            category               = %s,
+                            account_owner          = %s
+                        WHERE receipt_id = %s
+                        """, (
+                            paid_date, invoice_number, invoice_date, customer_name,
+                            paid_amount, new_balance, receipt_invoice_number,
+                            category, account_owner, receipt_id
+                        ))
 
-                    WHERE receipt_id = %s
-                """, (
-                datetime.now(), invoice_number, invoice_date, customer_name, paid_amount,
-                new_balance, receipt_invoice_number, category, account_owner,
-                receipt_id
-            ))
-
+            # Update sales_list table
             cur.execute("""
-                    UPDATE sales_list
-                    SET balance = %s, paid_amount = %s
-                    WHERE invoice_no = %s
-                """, (new_balance, paid_amount, invoice_number))
+                        UPDATE sales_list
+                        SET balance        = %s,
+                            paid_amount    = %s,
+                            payment_status = %s
+                        WHERE invoice_no = %s
+                        """, (new_balance, paid_amount, payment_status, invoice_number))
+
+            # Update sales table
+            cur.execute("""
+                UPDATE sales
+                SET payment_status = %s
+                WHERE invoice_no = %s
+            """, (payment_status, invoice_number))
+
+            message = f'Receipt updated! Receipt #{receipt_invoice_number}'
+            # Generate receipt PDF
+            receipt_data = {
+                'receipt_id': receipt_id,
+                'invoice_no': invoice_number,
+                'customer_name': customer_name,
+                'invoice_date': invoice_date,
+                'amount_paid': float(paid_amount),
+                'new_bal': float(new_balance),
+                'payment_date': paid_date,
+                'receipt_invoice_number': receipt_invoice_number,
+                'category': category,
+                'account_owner': account_owner,
+                'items': items
+            }
+
+            sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', receipt_invoice_number)
+            filename = f"receipt_{sanitized_invoice_no}.pdf"
+            filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
+
+            generate_receipt(receipt_data, filepath)
+
+            # Check if we should create a next due sale
+            next_invoice_generated = False
+            if sales_acc_invoice_no and frequency and payment_status == 'Paid':
+                # Get the most recent invoice date for this sales account
+                cur.execute("""
+                            SELECT invoice_date, payment_status
+                            FROM sales_list
+                            WHERE reference_no = %s
+                            ORDER BY invoice_date DESC LIMIT 1
+                            """, (sales_acc_invoice_no,))
+                most_recent_invoice = cur.fetchone()
+
+                if most_recent_invoice and most_recent_invoice[0]:
+                    most_recent_date = most_recent_invoice[0]
+                    current_invoice_date = datetime.strptime(invoice_date, '%Y-%m-%d').date()
+
+                    if most_recent_date == current_invoice_date:
+                        # Calculate delta based on frequency
+                        delta = None
+                        if frequency == 'Monthly':
+                            delta = relativedelta(months=1)
+                        elif frequency == 'Quarterly':
+                            delta = relativedelta(months=3)
+                        elif frequency == 'Annual':
+                            delta = relativedelta(years=1)
+
+                        if delta:
+                            next_due_date = most_recent_date + delta
+
+                            # Check if this next invoice already exists
+                            cur.execute("""
+                                        SELECT COUNT(*)
+                                        FROM sales_list
+                                        WHERE reference_no = %s
+                                          AND invoice_date = %s
+                                        """, (sales_acc_invoice_no, next_due_date))
+                            invoice_exists = cur.fetchone()[0] > 0
+
+                            if not invoice_exists:
+                                # Get product details from the original sale
+                                cur.execute("""
+                                            SELECT s.product, s.quantity, s.price, s.total, s.bank_account
+                                            FROM sales s
+                                                     JOIN products p ON s.product = p.product
+                                            WHERE s.invoice_no = %s
+                                            """, (invoice_number,))
+                                items = []
+                                bank_account = None
+                                for row in cur.fetchall():
+                                    items.append({
+                                        'product': row[0],
+                                        'quantity': row[1],
+                                        'unit_price': row[2],
+                                        'total': row[3]
+                                    })
+                                    bank_account = row[4] if row[4] else None
+
+                                if items:
+                                    new_invoice_number = generate_next_invoice_number()
+                                    current_datetime = datetime.now()
+
+                                    # Create new sales records for each product
+                                    for item in items:
+                                        cur.execute("""
+                                                    INSERT INTO sales (invoice_date, invoice_no, customer_name, product,
+                                                                       quantity,
+                                                                       price, total, date_created, category,
+                                                                       account_owner,
+                                                                       sales_acc_invoice_no, bank_account)
+                                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                    """, (
+                                                        next_due_date, new_invoice_number, customer_name,
+                                                        item['product'], item['quantity'], item['unit_price'],
+                                                        item['total'], current_datetime, category, account_owner,
+                                                        sales_acc_invoice_no, bank_account
+                                                    ))
+
+                                    # Create invoice record
+                                    cur.execute("""
+                                                INSERT INTO invoices (invoice_number, created_at)
+                                                VALUES (%s, %s) ON CONFLICT (invoice_number) DO NOTHING
+                                                """, (new_invoice_number, current_datetime))
+
+                                    # Create sales_list entry
+                                    invoice_amount = sum(item['total'] for item in items)
+                                    cur.execute("""
+                                                INSERT INTO sales_list (customer_name, invoice_no, invoice_date,
+                                                                        invoice_amount, paid_amount, balance, category,
+                                                                        account_owner, reference_no)
+                                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                """, (
+                                                    customer_name, new_invoice_number, next_due_date,
+                                                    invoice_amount, 0, invoice_amount,
+                                                    category, account_owner, sales_acc_invoice_no,
+                                                ))
+                                    next_invoice_generated = True
 
             conn.commit()
 
             return jsonify({
                 "status": "success",
+                "message": message,
                 "receipt": {
                     "invoice_date": invoice_date,
                     "invoice_number": invoice_number,
@@ -1425,7 +1727,9 @@ def edit_receipt(receipt_id):
                     "balance": new_balance,
                     "category": category,
                     "account_owner": account_owner,
-                }
+                },
+                'download_url': url_for('download_receipt', filename=filename)
+
             })
 
         except Exception as e:
@@ -1435,7 +1739,7 @@ def edit_receipt(receipt_id):
             cur.close()
             conn.close()
 
-    # Fallback for GET (not used in modal AJAX)
+    # GET request handling remains the same
     cur.execute("SELECT * FROM receipts WHERE receipt_id = %s", (receipt_id,))
     receipt = cur.fetchone()
     cur.close()
