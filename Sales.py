@@ -1300,6 +1300,8 @@ def record_payment(sales_list_id):
 
         generate_receipt(receipt_data, filepath)
 
+        conn.commit()
+
         # Check if this is a sales account payment and create next due sale
         if sales_acc_invoice_no and frequency and payment_status == 'Paid':
             # Get the most recent invoice date for this sales account
@@ -1432,11 +1434,11 @@ def search_receipts():
 
             # Apply filters only if they are selected
             if start_date:
-                query += " AND invoice_date >= %s"
+                query += " AND paid_date >= %s"
                 params.append(start_date)
 
             if end_date:
-                query += " AND invoice_date <= %s"
+                query += " AND paid_date <= %s"
                 params.append(end_date)
 
             if account_owner:
@@ -1447,7 +1449,7 @@ def search_receipts():
                 query += " AND category = %s"
                 params.append(category)
 
-            query += " ORDER BY invoice_date DESC"
+            query += " ORDER BY paid_date DESC"
 
             cur.execute(query, tuple(params))
             receipts = cur.fetchall()
@@ -1746,6 +1748,84 @@ def edit_receipt(receipt_id):
     conn.close()
     return jsonify({"receipt": receipt})
 
+# Search and receive route
+@app.route('/search_customers')
+def search_customers():
+    search_term = request.args.get('term', '')
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        if search_term:
+            cur.execute("""
+                        SELECT DISTINCT customer_name
+                        FROM sales_list
+                        WHERE balance > 0
+                          AND customer_name ILIKE %s
+                        ORDER BY customer_name
+                            LIMIT 20
+                        """, (f'%{search_term}%',))
+        else:
+            # Return all customers with unpaid invoices when no search term
+            cur.execute("""
+                        SELECT DISTINCT customer_name
+                        FROM sales_list
+                        WHERE balance > 0
+                        ORDER BY customer_name LIMIT 100
+                        """)
+
+        customers = [row[0] for row in cur.fetchall()]
+        return jsonify(customers)
+    except Exception as e:
+        app.logger.error(f"Error searching customers: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+# Customer search route
+@app.route('/customer_search')
+def customer_search():
+    return render_template('customer_search.html')
+
+# Unpaid invoices route
+@app.route('/get_unpaid_invoices/<customer_name>')
+def get_unpaid_invoices(customer_name):
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+                    SELECT * FROM sales_list
+                    WHERE customer_name = %s
+                      AND balance > 0
+                    ORDER BY invoice_date DESC
+                    """, (customer_name,))
+
+        columns = [desc[0] for desc in cur.description]
+        unpaid_invoices = [dict(zip(columns, row)) for row in cur.fetchall()]
+
+        # Now each invoice dict will have 'id' which can be used as sales_list_id
+        for invoice in unpaid_invoices:
+            invoice['sales_list_id'] = invoice['id']  # Make it explicit
+
+        if not unpaid_invoices:
+            return jsonify({
+                "status": "empty",
+                "message": f"No unpaid invoices found for {customer_name}"
+            })
+
+        return jsonify({
+            "status": "success",
+            "invoices": unpaid_invoices,
+            "customer": customer_name
+        })
+    except Exception as e:
+        app.logger.error(f"Error getting unpaid invoices: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 # View sales route
 """@app.route('/invoice/<int:sales_id>')
 def view_sales(sales_id):
@@ -1769,17 +1849,34 @@ def view_sales(sales_id):
 # Manage users route
 @app.route('/manage_users')
 def manage_users():
-    if 'user_id' not in session or session.get('role') not in [1,2]:
+    if 'user_id' not in session:
         return redirect(url_for('login'))
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
-        SELECT u.user_id, u.username, r.role_name, u.status 
-        FROM users u 
-        JOIN roles r ON u.role = r.role_id
-        ORDER BY u.user_id ASC
-    """)
+
+    # If user has role 3, only fetch their own information
+    if session.get('role') == 3:
+        cur.execute("""
+            SELECT u.user_id, u.username, r.role_name, u.status
+            FROM users u
+                JOIN roles r ON u.role = r.role_id
+            WHERE u.user_id = %s
+        """, (session['user_id'],))
+    # For roles 1 and 2, fetch all users as before
+    elif session.get('role') in [1, 2]:
+        cur.execute("""
+            SELECT u.user_id, u.username, r.role_name, u.status
+            FROM users u
+                JOIN roles r ON u.role = r.role_id
+            ORDER BY u.user_id ASC
+        """)
+    # If role is not 1, 2, or 3, redirect (or handle as you prefer)
+    else:
+        cur.close()
+        conn.close()
+        return redirect(url_for('login'))  # or some other page
+
     users = cur.fetchall()
     cur.close()
     conn.close()
@@ -1790,8 +1887,12 @@ def manage_users():
 # Add users route
 @app.route('/add_user', methods=['GET', 'POST'])
 def add_user():
-    if 'user_id' not in session or session.get('role') not in [1, 2]:
+    if 'user_id' not in session:
         return redirect(url_for('login'))
+
+    if session.get('role') not in [1, 2]:
+        flash('Access denied', 'danger')
+        return redirect(url_for('manage_users'))
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -2002,7 +2103,7 @@ def edit_users(user_id):
 # Manage Clients
 @app.route('/manage_clients')
 def manage_clients():
-    if 'user_id' not in session or session.get('role') not in [1,2]:
+    if 'user_id' not in session:
         return redirect(url_for('login'))
     conn = get_db_connection()
     cur = conn.cursor()
@@ -2017,7 +2118,7 @@ def manage_clients():
 # Add new client route
 @app.route('/add_client', methods=['GET', 'POST'])
 def add_client():
-    if 'user_id' not in session or session.get('role') not in [1, 2]:
+    if 'user_id' not in session:
         return redirect(url_for('login'))
 
     conn = get_db_connection()

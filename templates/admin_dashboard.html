@@ -23,7 +23,7 @@
             margin: 10px 0;
             width: 100%;
         }
-        .superuser-text {
+        .admin-text {
             font-size: 1rem;
             color: #6c757d;
             margin-bottom: 1.5rem;
@@ -36,12 +36,14 @@
             <h1 class="display-4">BusyMan Pro</h1>
             <p class="lead">Manage your sales and invoices</p>
         </div>
-        <div class="superuser-text">Logged in as Admin</div>
-        <a href="{{ url_for('sales_menu') }}" class="btn btn-primary">Sales</a>
-        <a href="#" class="btn btn-secondary">Billing Account</a>
-        <a href="{{ url_for('manage_users') }}" class="btn btn-info">Manage Users</a>
-        <a href="{{ url_for('manage_clients') }}" class="btn btn-success">Manage Clients</a>
-        <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+        <div class="admin-text">Logged in as Admin</div>
+        <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-primary">Sales</a>
+        <a href="{{ url_for('payments_menu') }}" class="btn btn-outline-secondary">Payments</a>
+        <a href="{{ url_for('stores_menu') }}" class="btn btn-outline-info">Stores</a>
+        <a href="{{ url_for('receipts_menu') }}" class ="btn btn-outline-info">Receipts</a>
+        <a href="{{ url_for('manage_users') }}" class="btn btn-outline-info">Manage Users</a>
+        <a href="{{ url_for('manage_clients') }}" class="btn btn-outline-success">Manage Clients</a>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Logout</a>
     </div>
 </body>
 </html>

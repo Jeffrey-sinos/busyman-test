@@ -24,7 +24,7 @@
         <!-- Add new client -->
         <div class="d-flex justify-content-end mb-3">
             <a href="{{ url_for('add_client') }}" class="btn btn-primary">+ Add New Client</a>
-            <a href="{{ url_for('admin_dashboard') if session.get('role') == 2 else url_for('superuser_dashboard') }}" class="btn btn-secondary ml-3">Back to Main Menu</a>
+            <a href="{{ url_for('admin_dashboard') if session.get('role') == 2 else url_for('superuser_dashboard') if session.get('role') == 1 else url_for('user_dashboard') }}" class="btn btn-secondary ml-3">Back to Main Menu</a>
         </div>
         <table class="table">
             <thead>

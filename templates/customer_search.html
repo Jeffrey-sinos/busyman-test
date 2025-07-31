@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search and Receive - BusyMan Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .search-container {
+            max-width: 800px;
+            margin: 30px auto;
+        }
+        h1 {
+            text-align: center;
+        }
+        .customer-result:hover {
+            background-color: #f8f9fa;
+            cursor: pointer;
+        }
+        .suggestion-item:hover {
+            background-color: #f8f9fa;
+            cursor: pointer;
+        }
+        .invoice-table {
+            margin-top: 30px;
+        }
+        .highlight {
+            background-color: #fff3cd;
+        }
+        .loading-spinner {
+            display: none;
+        }
+        .paid-amount {
+            color: #198754;
+        }
+        .payment-btn {
+            min-width: 160px;
+        }
+        .receipt-info {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        input[readonly] {
+            background-color: #BCB8B1;
+            cursor: not-allowed;
+        }
+        .editable-field {
+            background-color: #90EE90;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-container">
+            <h1 class="mb-4">Search and Receive</h1>
+
+            <!-- Back button -->
+            <a href="{{ url_for('receipts_menu') }}" class="btn btn-secondary mb-3">
+                <i class="bi bi-arrow-left"></i> Back to Receipts Menu
+            </a>
+
+            <!-- Flash messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Search form -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="customerSearch" class="form-label">Search Customers</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="customerSearch"
+                                   placeholder="Start typing customer name...">
+                            <button class="btn btn-primary" id="searchBtn">
+                                <i class="bi bi-search"></i> Search
+                                <span class="loading-spinner spinner-border spinner-border-sm ms-2" role="status"></span>
+                            </button>
+                        </div>
+                        <div id="searchSuggestions" class="list-group mt-2" style="display:none;"></div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-secondary" id="showAllBtn">
+                            <i class="bi bi-people"></i> Show All Customers With Unpaid Invoices
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search results -->
+            <div id="searchResults">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Customer Results</h5>
+                    </div>
+                    <div class="list-group list-group-flush" id="customerResults">
+                        <div class="list-group-item text-muted text-center">
+                            <i class="bi bi-search"></i> Search for customers to see results
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Unpaid invoices section -->
+                <div id="unpaidInvoices" class="mt-4" style="display:none;">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Unpaid Invoices for <span id="selectedCustomer" class="text-primary"></span></h5>
+                            <small class="text-muted">Total: <span id="totalBalance" class="balance-amount"></span></small>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover" id="invoicesTable">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Invoice No</th>
+                                            <th>Date</th>
+                                            <th>Total Amount</th>
+                                            <th>Paid Amount</th>
+                                            <th>Balance</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ url_for('static', filename='js/search_customer.js') }}"></script>
+</body>
+</html>
