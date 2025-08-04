@@ -29,17 +29,39 @@
             background-color: #BCB8B1;
             cursor: not-allowed;
         }
-        .balance-preview {
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
+        .full-page-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            display: none; /* Hidden by default */
+        }
+        .loader-content {
+            text-align: center;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
 
 <body>
+    <!-- Full Page Loader -->
+    <div id="fullPageLoader" class="full-page-loader">
+        <div class="loader-content">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Loading, please wait...</p>
+        </div>
+    </div>
     <div class="container py-5">
         <h1 class="mb-4">Edit Receipts</h1>
 
@@ -219,7 +241,13 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            const today = new Date().toISOString().split('T')[0];
+            $('#modal_paid_date').attr('max', today);
+        });
+    </script>
     <script>
         // Handle form submission for the search form
         document.querySelector('form').addEventListener('submit', function () {

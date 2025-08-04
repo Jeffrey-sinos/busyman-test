@@ -1205,61 +1205,30 @@ def record_payment(sales_list_id):
             if frequency_result:
                 frequency = frequency_result[0]
 
-        # Check if receipt already exists for this invoice
+        # Always create a new receipt record (remove the update logic)
+        receipt_invoice_number = generate_next_invoice_number()
+
         cur.execute("""
-            SELECT receipt_id, receipt_invoice_number 
-            FROM receipts 
-            WHERE invoice_number = %s
-        """, (invoice_no,))
-        existing_receipt = cur.fetchone()
-
-        if existing_receipt:
-            # Update existing receipt
-            receipt_id = existing_receipt[0]
-            receipt_invoice_number = existing_receipt[1]
-
-            cur.execute("""
-                UPDATE receipts 
-                SET 
-                    paid_date = %s,
-                    invoice_date = %s,
-                    customer_name = %s,
-                    paid_amount = %s,
-                    balance = %s,
-                    category = %s,
-                    account_owner = %s
-                WHERE receipt_id = %s
-            """, (
-                datetime.now().date(), invoice_date, customer_name,
-                paid_amount, balance, category, account_owner, receipt_id
-            ))
-
-            message = f'Payment updated! Receipt #{receipt_invoice_number}'
-        else:
-            # Create new receipt record
-            receipt_invoice_number = generate_next_invoice_number()
-
-            cur.execute("""
-                INSERT INTO receipts (
-                    paid_date, invoice_number, invoice_date, customer_name,
-                    paid_amount, balance, receipt_invoice_number,
-                    category, account_owner
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING receipt_id
-            """, (
-                datetime.now().date(), invoice_no, invoice_date, customer_name,
+            INSERT INTO receipts (
+                paid_date, invoice_number, invoice_date, customer_name,
                 paid_amount, balance, receipt_invoice_number,
                 category, account_owner
-            ))
-            receipt_id = cur.fetchone()[0]
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING receipt_id
+        """, (
+            datetime.now().date(), invoice_no, invoice_date, customer_name,
+            paid_amount, balance, receipt_invoice_number,
+            category, account_owner
+        ))
+        receipt_id = cur.fetchone()[0]
 
-            cur.execute("""
-                INSERT INTO invoices (invoice_number, created_at)
-                    VALUES (%s, %s)
-                    ON CONFLICT (invoice_number) DO NOTHING
-            """, (receipt_invoice_number, datetime.now()))
+        cur.execute("""
+            INSERT INTO invoices (invoice_number, created_at)
+                VALUES (%s, %s)
+                ON CONFLICT (invoice_number) DO NOTHING
+        """, (receipt_invoice_number, datetime.now()))
 
-            message = f'Payment recorded! Receipt #{receipt_invoice_number}'
+        message = f'Payment recorded! Receipt #{receipt_invoice_number}'
 
         # Update sales_list table
         cur.execute("""

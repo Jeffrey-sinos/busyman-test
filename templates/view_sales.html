@@ -29,12 +29,42 @@
             background-color: #BCB8B1;
             cursor: not-allowed;
         }
+        .full-page-loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            display: none; /* Hidden by default */
+        }
+
+        .loader-content {
+            text-align: center;
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 
 <body>
+    <!-- Full Page Loader -->
+    <div id="fullPageLoader" class="full-page-loader">
+        <div class="loader-content">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3">Loading, please wait...</p>
+        </div>
+    </div>
     <div class="container py-5">
-        <h1 class="mb-4">View Sales</h1>
+        <h1 class="mb-4">View and Receive</h1>
 
         <!-- Flask flash messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -207,6 +237,15 @@
     </div>
 
     <script>
+        // Show loader when page is about to refresh
+        window.addEventListener('beforeunload', function() {
+            document.getElementById('fullPageLoader').style.display = 'flex';
+        });
+
+        // Hide loader once page is fully loaded
+        window.addEventListener('load', function() {
+            document.getElementById('fullPageLoader').style.display = 'none';
+        });
         // Handle form submission for the search form
         document.querySelector('form').addEventListener('submit', function () {
             const btn = document.getElementById('searchBtn');
@@ -216,6 +255,7 @@
             btn.disabled = true;
             text.textContent = 'Loading...';
             spinner.classList.remove('d-none');
+            document.getElementById('fullPageLoader').style.display = 'flex';
         });
 
         // Handle modal show event to populate data
@@ -248,6 +288,9 @@
                 minimumFractionDigits: 2
             });
             document.getElementById('modal_balance').value = balance.toFixed(2);
+            const statusField = document.getElementById('modal_status');
+            statusField.value = balance === 0 ? 'Paid' : 'Not Paid';
+
             const paidAmountInput = document.getElementById('modal_paid_amount');
             if (paidAmount > invoiceAmount) {
                 paidAmountInput.classList.add('is-invalid');
@@ -258,15 +301,13 @@
                 paidAmountError.style.display = 'none';
                 return true;
             }
-            // Update status based on balance
-            const statusField = document.getElementById('modal_status');
-            statusField.value = balance === 0 ? 'Paid' : 'Not Paid';
         });
 
         // Handle form submission for editing invoices
         document.getElementById('editForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
+            document.getElementById('fullPageLoader').style.display = 'flex';
             const btn = document.getElementById('saveChangesBtn');
             const text = document.getElementById('saveChangesText');
             const spinner = document.getElementById('saveChangesSpinner');
@@ -335,8 +376,9 @@
 
                     // Reload the page to see changes
                     setTimeout(() => {
+                        document.getElementById('fullPageLoader').style.display = 'flex';
                         window.location.reload();
-                    }, 3000); // Reload after 3 seconds to allow user to see the success message
+                    }, 5000); // Reload after 3 seconds to allow user to see the success message
                 } else {
                     showErrorAlert(data.message || 'An error occurred');
                 }
