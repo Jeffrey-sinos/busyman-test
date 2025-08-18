@@ -249,6 +249,15 @@
         });
     </script>
     <script>
+        // Show loader when page is about to refresh
+        window.addEventListener('beforeunload', function() {
+            document.getElementById('fullPageLoader').style.display = 'flex';
+        });
+
+        // Hide loader once page is fully loaded
+        window.addEventListener('load', function() {
+            document.getElementById('fullPageLoader').style.display = 'none';
+        });
         // Handle form submission for the search form
         document.querySelector('form').addEventListener('submit', function () {
             const btn = document.getElementById('searchBtn');
@@ -258,6 +267,7 @@
             btn.disabled = true;
             text.textContent = 'Loading...';
             spinner.classList.remove('d-none');
+            document.getElementById('fullPageLoader').style.display = 'flex';
         });
 
         // Handle modal show event to populate data
@@ -329,6 +339,7 @@
         document.getElementById('editForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
+            document.getElementById('fullPageLoader').style.display = 'flex';
             const btn = document.getElementById('saveChangesBtn');
             const text = document.getElementById('saveChangesText');
             const spinner = document.getElementById('saveChangesSpinner');
@@ -429,6 +440,7 @@
 
                     // Reload the page to see changes
                     setTimeout(() => {
+                        document.getElementById('fullPageLoader').style.display = 'flex';
                         window.location.reload();
                     }, 3000); // Reload after 3 seconds to allow user to see the success message
                 } else {

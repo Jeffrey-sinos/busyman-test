@@ -2380,6 +2380,8 @@ def create_invoice(invoice_data, filename):
     c.drawString(50, 180, "ACCOUNTANT")
     c.save()
 
+# Generate bill pdf route
+
 # Products route
 @app.route('/products', methods=['GET', 'POST'])
 def products():
@@ -2653,266 +2655,326 @@ def logout():
 def payments_menu():
     return render_template('payments_menu.html')
 
-
+# Search billing account route
 @app.route('/search_billing_account', methods=['GET', 'POST'])
 def search_billing_account():
-    if request.method == 'GET' and ('term' in request.args or 'all' in request.args):
-        search_term = request.args.get('term', '').strip()
-        show_all = request.args.get('all', 'false').lower() == 'true'
-        print(f"Search term received: {search_term}, Show all: {show_all}")
+    billing_accounts = []
+    categories = ['Licenses', 'Payroll', 'Utilities', 'Purchases', 'Rates', 'Subscriptions', 'Taxes', 'Insurance']
+    account_owners = read_account_owners()
 
-        try:
-            conn = get_db_connection()
-            cur = conn.cursor()
+    # Set default date range
+    today = datetime.today()
+    default_start_date = (today - timedelta(days=730)).strftime('%Y-%m-%d')
+    default_end_date = (today + timedelta(days=7)).strftime('%Y-%m-%d')
 
-            # Main query
-            query = sql.SQL("""
-                SELECT service_provider, account_name, account_number, category, paybill_number, ussd_number,
-                       frequency, billing_date, bill_amount, account_owner, created_date, invoice_number,
-                       status, bank_account
-                FROM billing_account
-                WHERE status != 'Not Active'
-            """)
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
 
-            # Add WHERE clause only if not showing all and search term exists
-            if not show_all and search_term:
-                query = sql.SQL("""
-                    {base_query}
-                    WHERE status != 'Not Active' AND (account_name ILIKE %s OR service_provider ILIKE %s)
-                """).format(base_query=query)
-                params = (f'%{search_term}%', f'%{search_term}%')
-            else:
-                params = ()
+        if request.method == 'POST':
+            start_date = request.form.get('start_date') or default_start_date
+            end_date = request.form.get('end_date') or default_end_date
+            account_owner = request.form.get('account_owner')
+            category = request.form.get('category')
 
-            # Add ordering and limit
-            query = sql.SQL("""
-                {base_query}
-                ORDER BY account_name
-                LIMIT 100
-            """).format(base_query=query)
+            # Start building query
+            query = """
+                       SELECT * FROM billing_account
+                       WHERE 1=1 AND status = 'Active'
+                   """
+            params = []
 
-            cur.execute(query, params)
-            rows = cur.fetchall()
-            cur.close()
-            conn.close()
+            # Apply filters only if they are selected
+            if start_date:
+                query += " AND billing_date >= %s"
+                params.append(start_date)
 
-            results = []
-            for idx, row in enumerate(rows):
-                print(f"Row {idx}: {row}")
-                # Safely handle billing_date formatting
-                billing_date = ''
-                try:
-                    billing_date = row[7].strftime('%Y-%m-%d') if hasattr(row[7], 'strftime') else str(row[7])
-                except Exception as e:
-                    print(f"Date formatting error: {e}")
-                    billing_date = str(row[7])
+            if end_date:
+                query += " AND billing_date <= %s"
+                params.append(end_date)
 
-                results.append({
-                    'label': f"{row[1]} ({row[0]})",
-                    'value': row[1],  # account_name
-                    'data': {
-                        'service_provider': row[0],
-                        'account_name': row[1],
-                        'account_number': row[2],
-                        'category': row[3],
-                        'paybill_number': row[4],
-                        'ussd_number': row[5],
-                        'frequency': row[6],
-                        'billing_date': billing_date,
-                        'bill_amount': row[8],
-                        'account_owner': row[9],
-                        'created_date': row[10],
-                        'invoice_number': row[11],
-                        'status': row[12],
-                        'bank_account': row[13]
-                    }
-                })
-            return jsonify(results)
-        except Exception as e:
-            print(f"Database error: {e}")
-            return jsonify([])
+            if account_owner:
+                query += " AND account_owner = %s"
+                params.append(account_owner)
 
-    elif request.method == 'POST':
-        form_type = request.form.get('form_type')
-        if form_type == 'edit':
-            try:
-                # Get all form data
-                invoice_number = request.form['invoice_number']
-                service_provider = request.form['service_provider']
-                account_name = request.form['account_name']
-                account_number = request.form['account_number']
-                category = request.form['category']
-                paybill_number = request.form['paybill_number']
-                ussd_number = request.form['ussd_number']
-                frequency = request.form['frequency']
-                billing_date = request.form['billing_date']
-                bill_amount = request.form['bill_amount']
-                account_owner = request.form['account_owner']
-                status = request.form.get('status', 'Active')  # Default to Active if not provided
-                bank_account = request.form['bank_account']
-                conn = get_db_connection()
-                cur = conn.cursor()
+            if category:
+                query += " AND category = %s"
+                params.append(category)
 
-                # Update query
+            query += " ORDER BY created_date DESC"
 
-                update_query = sql.SQL("""
+            cur.execute(query, tuple(params))
+            billing_accounts = cur.fetchall()
 
-                        UPDATE billing_account
-                        SET 
-                            service_provider = %s,
-                            account_name = %s,
-                            account_number = %s,
-                            category = %s,
-                            paybill_number = %s,
-                            ussd_number = %s,
-                            frequency = %s,
-                            billing_date = %s,
-                            bill_amount = %s,
-                            account_owner = %s,
-                            status = %s,
-                            bank_account = %s
-                        WHERE invoice_number = %s
-                        RETURNING *
-                    """)
+            if not billing_accounts:
+                flash('No billing accounts found matching the selected filters.', 'info')
 
-                cur.execute(update_query, (
-                    service_provider,
-                    account_name,
-                    account_number,
-                    category,
-                    paybill_number,
-                    ussd_number,
-                    frequency,
-                    billing_date,
-                    bill_amount,
-                    account_owner,
-                    status,
-                    bank_account,
-                    invoice_number
-                ))
+        cur.close()
+        conn.close()
 
-                # Get the updated record
-                updated_record = cur.fetchone()
-                conn.commit()
-                # Format the updated record for response
+    except Exception as e:
+        return render_template('billing-accounts/search-billing-account.html',
+                               error=f"Database error: {str(e)}",
+                               billing_accounts=billing_accounts,
+                               account_owners=account_owners,
+                               categories=categories,
+                               default_start_date=default_start_date,
+                               default_end_date=default_end_date)
 
-                billing_date = ''
-                try:
-                    billing_date = updated_record[7].strftime('%Y-%m-%d') if hasattr(updated_record[7],
-                                                                          'strftime') else str(
-                        updated_record[7])
-                except Exception as e:
-                    print(f"Date formatting error: {e}")
-                    billing_date = str(updated_record[7])
+    return render_template('billing-accounts/search-billing-account.html',
+                           billing_accounts=billing_accounts,
+                           account_owners=account_owners,
+                           categories=categories,
+                           default_start_date=default_start_date,
+                           default_end_date=default_end_date)
 
-                updated_data = {
+# Edit billing account route
+@app.route('/edit_billing_account/<int:billing_acc_id>', methods=['POST'])
+def edit_billing_account(billing_acc_id):
+    if 'user_id' not in session:
+        return redirect(url_for('search_billing_account'))
 
-                    'service_provider': updated_record[0],
-                    'account_name': updated_record[1],
-                    'account_number': updated_record[2],
-                    'category': updated_record[3],
-                    'paybill_number': updated_record[4],
-                    'ussd_number': updated_record[5],
-                    'frequency': updated_record[6],
-                    'billing_date': billing_date,
-                    'bill_amount': updated_record[8],
-                    'account_owner': updated_record[9],
-                    'created_date': updated_record[10],
-                    'invoice_number': updated_record[11],
-                    'status': updated_record[12],
-                    'bank_account': updated_record[13]
-                }
+    conn = get_db_connection()
+    cur = conn.cursor()
 
-                return jsonify({
+    # Only a superuser and an admin can edit
+    if session.get('role') not in [1, 2]:
+        cur.close()
+        conn.close()
+        flash("You don't have permission to edit billing accounts", "danger")
+        return redirect(url_for('search_billing_account'))
 
-                    'success': True,
-                    'message': 'Billing account updated successfully',
-                    'updated_data': updated_data
-                })
-            except Exception as e:
-                print(f"Error updating billing account: {e}")
-                return jsonify({
-                    'success': False,
-                    'message': f'Failed to update billing account: {str(e)}'
-                }), 400
-            finally:
-                cur.close()
-                conn.close()
+    try:
+        data = request.get_json()
+        invoice_number = data.get('invoice_number')
+        service_provider = data.get('service_provider')
+        account_name = data.get('account_name')
+        account_number = data.get('account_number')
+        category = data.get('category')
+        paybill_number = data.get('paybill_number')
+        ussd_number = data.get('ussd_number')
+        frequency = data.get('frequency')
+        billing_date = datetime.strptime(data.get('billing_date'), '%Y-%m-%d').date()
+        bill_amount = float(data.get('bill_amount'))
+        account_owner = data.get('account_owner')
+        bank_account = data.get('bank_account', '')
 
-        elif form_type == 'add':
-            try:
-                invoice_number = request.form['invoice_number']  # Get the invoice number from the form
-                service_provider = request.form['service_provider']
-                account_name = request.form['account_name']
-                account_number = request.form['account_number']
-                category = request.form['category']
-                paybill_number = request.form['paybill_number']
-                ussd_number = request.form['ussd_number']
-                frequency = request.form['frequency']
-                billing_date = request.form['billing_date']
-                bill_amount = request.form['bill_amount']
-                account_owner = request.form['account_owner']
-                status = request.form.get('status', 'Active')
-                bank_account = request.form['bank_account']
+        # Deactivate the old billing account
+        cur.execute("""
+                    UPDATE billing_account
+                    SET status = 'Not Active'
+                    WHERE invoice_number = %s RETURNING invoice_number
+                    """, (invoice_number,))
+        original_invoice_no = cur.fetchone()[0]
 
-                conn = get_db_connection()
-                cur = conn.cursor()
-                # Insert into billing_account table
-                insert_billing_query = sql.SQL("""
-                           INSERT INTO billing_account (
-                               service_provider, account_name, account_number, category, paybill_number, 
-                               ussd_number, frequency, billing_date, bill_amount, account_owner, 
-                               status, bank_account, invoice_number
-                           ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                           RETURNING created_date
-                       """)
-                cur.execute(insert_billing_query, (
-                    service_provider, account_name, account_number, category, paybill_number,
-                    ussd_number, frequency, billing_date, bill_amount, account_owner,
-                    status, bank_account, invoice_number
-                ))
-                created_date = cur.fetchone()[0]
+        # Generate a new invoice number
+        new_invoice_no = generate_next_invoice_number()
+
+        # Create a new billing account
+        cur.execute("""
+                    INSERT INTO billing_account (service_provider, account_name, account_number, category,
+                                                 paybill_number, ussd_number, frequency, billing_date, account_owner,
+                                                 invoice_number, status, bank_account, bill_amount)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active', %s, %s) RETURNING *
+                    """, (
+                        service_provider, account_name, account_number, category,
+                        paybill_number, ussd_number, frequency, billing_date,
+                        account_owner, new_invoice_no, bank_account, bill_amount
+                    ))
+
+        new_account = cur.fetchone()
+
+        # Insert the new invoice
+        cur.execute("""
+                    INSERT INTO invoices (invoice_number)
+                    VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
+                    """, (new_invoice_no,))
+
+        conn.commit()
+
+        # Initialize generated_bills list to store generated bills
+        generated_bills = []
+
+        # Frequency handling
+        today = datetime.today().date()
+
+        if frequency == 'Monthly':
+            delta = relativedelta(months=1)
+        elif frequency == 'Quarterly':
+            delta = relativedelta(months=3)
+        elif frequency == 'Annual':
+            delta = relativedelta(years=1)
+        else:
+            delta = None
+
+        if delta:
+            next_due_date = billing_date
+            while next_due_date <= today + delta:
+                bill_status = 'Active'
+                pay_status = 'Not Paid'
+                bill_invoice_number = generate_next_invoice_number()
+
+                # Insert into bills table
+                cur.execute("""
+                            INSERT INTO bills (service_provider, account_name, account_number, category,
+                                               paybill_number, ussd_number, billing_date, bill_amount,
+                                               account_owner, created_date, pay_status, bill_invoice_number,
+                                               invoice_number, status, bank_account)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            """, (
+                                service_provider, account_name, account_number, category,
+                                paybill_number, ussd_number, next_due_date, bill_amount,
+                                account_owner, datetime.now(), pay_status, bill_invoice_number,
+                                new_invoice_no, bill_status, bank_account
+                            ))
 
                 # Insert into invoices table
-                insert_invoice_query = sql.SQL("""
-                           INSERT INTO invoices (
-                               invoice_number
-                           ) VALUES (%s)
-                       """)
-                cur.execute(insert_invoice_query, (
-                    invoice_number))
-                result = cur.fetchone()
-                conn.commit()
+                cur.execute("""
+                            INSERT INTO invoices (invoice_number)
+                            VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
+                            """, (bill_invoice_number,))
 
-                return jsonify({
-                    'success': True,
-                    'message': 'Billing account added successfully',
-                    'invoice_number': invoice_number,  # Use the generated number
-                    'created_date': result[1].strftime('%Y-%m-%d')
+                generated_bills.append({
+                    'date': next_due_date.strftime('%d-%m-%Y'),
+                    'invoice_no': bill_invoice_number
                 })
-            except Exception as e:
-                print(f"Error adding billing account: {e}")
-                return jsonify({
-                    'success': False,
-                    'message': f'Failed to add billing account: {str(e)}'
-                }), 400
-            finally:
-                cur.close()
-                conn.close()
-        return jsonify({'success': False, 'message': 'Invalid form type'}), 400
-    return render_template('billing-accounts/search-billing-account.html')
+
+                conn.commit()
+                next_due_date += delta
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Billing account updated successfully',
+            'generated_bills': generated_bills
+        })
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 
-@app.route('/edit_billing_account')
-def edit_billing_account():
-    return render_template('billing-accounts/edit-billing-account.html')
-
-
-@app.route('/add_billing_account')
+# Add billing account route
+@app.route('/add_billing_account', methods=['POST'])
 def add_billing_account():
-    return render_template('billing-accounts/add-billing-account.html')
+    try:
+        # Get form data
+        invoice_number = request.form['invoice_number']
+        service_provider = request.form['service_provider']
+        account_name = request.form['account_name']
+        account_number = request.form['account_number']
+        category = request.form['category']
+        paybill_number = request.form['paybill_number']
+        ussd_number = request.form['ussd_number']
+        frequency = request.form['frequency']
+        billing_date_str = request.form['billing_date']
+        bill_amount = float(request.form['bill_amount'])
+        account_owner = request.form['account_owner']
+        status = request.form.get('status', 'Active')
+        bank_account = request.form.get('bank_account', '')
+
+        # Parse billing date
+        billing_date = datetime.strptime(billing_date_str, '%Y-%m-%d').date()
+        today = datetime.today().date()
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Insert into billing_account table
+        insert_billing_query = """
+            INSERT INTO billing_account (service_provider, account_name, account_number,
+                category, paybill_number, ussd_number, frequency, billing_date, \
+                bill_amount, account_owner, status, bank_account, invoice_number)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, \
+                    %s) RETURNING created_date, invoice_number \
+            """
+        cur.execute(insert_billing_query, (
+            service_provider, account_name, account_number, category, paybill_number,
+            ussd_number, frequency, billing_date, bill_amount, account_owner,
+            status, bank_account, invoice_number
+        ))
+        result = cur.fetchone()
+        created_date = result[0]
+        invoice_number = result[1]
+
+        # Insert into invoices table
+        cur.execute("""
+            INSERT INTO invoices (invoice_number)
+            VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
+        """, (invoice_number,))
+
+        conn.commit()
+
+        # Calculate time delta based on frequency
+        if frequency == 'Monthly':
+            delta = relativedelta(months=1)
+        elif frequency == 'Quarterly':
+            delta = relativedelta(months=3)
+        elif frequency == 'Annual':
+            delta = relativedelta(years=1)
+        else:  # Weekly
+            delta = relativedelta(weeks=1)
+
+        generated_bills = [] # List to store the generated bills
+        next_due_date = billing_date
+
+        while next_due_date <= today + delta:
+            bill_status = 'Active'
+            pay_status = 'Not Paid'
+            bill_invoice_number = generate_next_invoice_number()
+            cur.execute("""
+                INSERT INTO bills (service_provider, account_name, account_number, category,
+                                   paybill_number, ussd_number, billing_date, bill_amount,
+                                   account_owner, created_date, pay_status, bill_invoice_number,
+                                   invoice_number, status, bank_account)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    service_provider, account_name, account_number, category,
+                    paybill_number, ussd_number, next_due_date, bill_amount,
+                    account_owner, created_date, pay_status, bill_invoice_number,
+                    invoice_number, bill_status, bank_account
+                ))
+
+            cur.execute("""
+                INSERT INTO invoices (invoice_number)
+                VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
+                """, (bill_invoice_number,))
+
+            generated_bills.append({
+                'due_date': next_due_date.strftime('%d-%m-%Y'),
+                'invoice_no': bill_invoice_number
+            })
+
+            conn.commit()
+            next_due_date += delta
+
+        return jsonify({
+            'success': True,
+            'message': 'Billing account and bills added successfully',
+            'invoice_number': invoice_number,
+            'created_date': created_date.strftime('%Y-%m-%d'),
+            'generated_bills': generated_bills,
+            'total_bills_generated': len(generated_bills)
+        })
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Error adding billing account: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Failed to add billing account: {str(e)}'
+        }), 400
+
+    finally:
+        if 'cur' in locals():
+            cur.close()
+        if 'conn' in locals():
+            conn.close()
 
 
+# Delete billing account route
 @app.route('/delete_billing_account', methods=['POST'])
 def delete_billing_account():
     try:
@@ -2993,7 +3055,7 @@ def get_next_invoice_number():
     return {'invoice_number': invoice_number}
 
 
-@app.route('/search-bill')
+@app.route('/search-bill', methods=['GET'])
 def search_bill():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -3023,7 +3085,6 @@ def search_bills():
         data = request.get_json()
 
         # Parse dates with improved error handling
-        # Parse dates with improved error handling
         try:
             start_date = parse_date(data['start_date']).strftime('%Y-%m-%d')
             end_date = parse_date(data['end_date']).strftime('%Y-%m-%d')
@@ -3038,6 +3099,7 @@ def search_bills():
         # Base query
         query = """
             SELECT 
+                bill_id,
                 account_name,
                 account_number,
                 billing_date,
@@ -3077,6 +3139,234 @@ def search_bills():
         return jsonify(bills)
 
     except Exception as e:
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+
+@app.route('/edit-bill/<int:bill_id>', methods=['GET'])
+def edit_bill_page(bill_id):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Get bill details
+        cur.execute("""
+                    SELECT *
+                    FROM bills
+                    WHERE bill_id = %s
+                    """, (bill_id,))
+
+        columns = [desc[0] for desc in cur.description]
+        bill = dict(zip(columns, cur.fetchone()))
+
+        # Get account owners for dropdown
+        cur.execute("SELECT DISTINCT account_owner FROM bills WHERE status = 'Active'")
+        owners = [row[0] for row in cur.fetchall()]
+
+        return render_template('bills/edit-bills.html',
+                               bill=bill,
+                               owners=owners,
+                               )
+
+    except Exception as e:
+        flash(f'Error loading bill: {str(e)}', 'error')
+        return redirect(url_for('search_bill'))
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+
+@app.route('/update-bill/<int:bill_id>', methods=['POST'])
+def update_bill(bill_id):
+    try:
+        # Get form data
+        data = request.form
+
+        # Validate required fields
+        required_fields = ['account_name', 'account_number', 'billing_date', 'bill_amount']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field} is required'}), 400
+
+        # Parse date
+        try:
+            billing_date = datetime.strptime(data['billing_date'], '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format'}), 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Update bill
+        cur.execute("""
+                    UPDATE bills
+                    SET service_provider = %s,
+                        account_name     = %s,
+                        account_number   = %s,
+                        category         = %s,
+                        account_owner    = %s,
+                        bank_account     = %s,
+                        paybill_number   = %s,
+                        ussd_number      = %s,
+                        billing_date     = %s,
+                        bill_amount      = %s,
+                        updated_at       = NOW()
+                    WHERE bill_id = %s
+                    """, (
+                        data['service_provider'],
+                        data['account_name'],
+                        data['account_number'],
+                        data['category'],
+                        data['account_owner'],
+                        data['bank_account'],
+                        data['paybill_number'],
+                        data['ussd_number'],
+                        billing_date,
+                        float(data['bill_amount']),
+                        bill_id
+                    ))
+
+        conn.commit()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+
+@app.route('/delete-bill/<int:bill_id>', methods=['DELETE'])
+def delete_bill(bill_id):
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Check if bill exists
+        cur.execute("SELECT bill_id FROM bills WHERE bill_id = %s", (bill_id,))
+        if not cur.fetchone():
+            return jsonify({'error': 'Bill not found'}), 404
+
+        # Delete the bill (or mark as inactive)
+        cur.execute("UPDATE bills SET status = 'Not Active' WHERE bill_id = %s", (bill_id,))
+        # Or for hard delete: cur.execute("DELETE FROM bills WHERE bill_id = %s", (bill_id,))
+
+        conn.commit()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@app.route('/add-bill', methods=['GET'])
+def add_bill_page():
+    """Display the add bill form"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Get account owners for dropdown (if you want to populate it)
+        cur.execute("SELECT DISTINCT account_owner FROM account_owner ORDER BY account_owner")
+        owners = [row[0] for row in cur.fetchall()]
+
+        return render_template('bills/add-bills.html', owners=owners)
+
+    except Exception as e:
+        flash(f'Error loading add bill page: {str(e)}', 'error')
+        return redirect(url_for('search_bill'))
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+
+@app.route('/add-bills', methods=['POST'])
+def add_bills():
+    """Process the add bill form submission"""
+    try:
+        # Get form data
+        data = request.form if request.form else request.get_json()
+
+        # Validate required fields
+        required_fields = ['service_provider', 'account_name', 'account_number', 'category', 'billing_date', 'bill_amount']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field} is required'}), 400
+
+        # Parse and validate date
+        try:
+            billing_date = datetime.strptime(data['billing_date'], '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Invalid date format. Please use YYYY-MM-DD'}), 400
+
+        # Validate bill amount
+        try:
+            bill_amount = float(data['bill_amount'])
+            if bill_amount <= 0:
+                return jsonify({'error': 'Bill amount must be greater than 0'}), 400
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid bill amount'}), 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Insert new bill
+        cur.execute("""
+                    INSERT INTO bills (
+                        invoice_number,
+                        service_provider,
+                        account_name,
+                        account_number,
+                        category,
+                        account_owner,
+                        bank_account,
+                        paybill_number,
+                        ussd_number,
+                        billing_date,
+                        bill_amount,
+                        status,
+                        pay_status,
+                        created_at,
+                        updated_at
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW()
+                    )
+                    """, (
+                        data.get('invoice_number', ''),
+                        data['service_provider'],
+                        data['account_name'],
+                        data['account_number'],
+                        data['category'],
+                        data.get('account_owner', ''),
+                        data.get('bank_account', ''),
+                        data.get('paybill_number', ''),
+                        data.get('ussd_number', ''),
+                        billing_date,
+                        bill_amount,
+                        'Active',  # Default status
+                        'Unpaid'   # Default pay status
+                    ))
+
+        conn.commit()
+        bill_id = cur.lastrowid
+
+        return jsonify({
+            'success': True,
+            'message': 'Bill added successfully',
+            'bill_id': bill_id
+        })
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
     finally:
         if 'conn' in locals():
