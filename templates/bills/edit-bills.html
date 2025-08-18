@@ -1,67 +1,113 @@
-<form id="editBillForm" class="editable-form" method="POST" action="{{ url_for('search_bills') }}" style="display: none;">
-    <input type="hidden" name="form_type" value="edit">
-                    <table class="table table-bordered">
-                        <tbody>
-                            <tr>
-                                <th>Invoice Number</th>
-                                <td><input type="text" class="form-control" id="edit-invoice_number" name="invoice_number" readonly></td>
-                            </tr>
-                            <tr>
-                                <th>Service Provider</th>
-                                <td><input type="text" class="form-control" id="edit-service_provider" name="service_provider"></td>
-                            </tr>
-                            <tr>
-                                <th>Account Name</th>
-                                <td><input type="text" class="form-control" id="edit-account_name" name="account_name"></td>
-                            </tr>
-                            <tr>
-                                <th>Account No</th>
-                                <td><input type="text" class="form-control" id="edit-account_number" name="account_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Category</th>
-                                <td>
-                                    <select class="form-control" id="edit-category" name="category">
-                                        <option value="Licenses">Licenses</option>
-                                        <option value="Payroll">Payroll</option>
-                                        <option value="Utilities">Utilities</option>
-                                        <option value="Purchases">Purchases</option>
-                                        <option value="Rates">Rates</option>
-                                        <option value="Subscriptions">Subscriptions</option>
-                                        <option value="Taxes">Taxes</option>
-                                        <option value="Insurance">Insurance</option>
-                                    </select>
-                                </td>
-                            </tr>
-                            <tr>
-                                <th>Account Owner</th>
-                                <td><input type="text" class="form-control" id="edit-account_owner" name="account_owner"></td>
-                            </tr>
-                            <tr>
-                                <th>Bank Account</th>
-                                <td><input type="text" class="form-control" id="edit-bank_account" name="bank_account"></td>
-                            </tr>
-                            <tr>
-                                <th>Paybill Number</th>
-                                <td><input type="text" class="form-control" id="edit-paybill_number" name="paybill_number"></td>
-                            </tr>
-                            <tr>
-                                <th>USSD Number</th>
-                                <td><input type="text" class="form-control" id="edit-ussd_number" name="ussd_number"></td>
-                            </tr>
-                            <tr>
-                                <th>Billing Date</th>
-                                <td><input type="date" class="form-control" id="edit-billing_date" name="billing_date"></td>
-                            </tr>
-                            <tr>
-                                <th>Bill Amount</th>
-                                <td><input type="number" step="0.01" class="form-control" id="edit-bill_amount" name="bill_amount"></td>
-                            </tr>
 
-                        </tbody>
-                    </table>
-                    <div class="text-right mt-3">
-                        <button type="button" id="cancelEdit" class="btn btn-secondary mr-2">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
-                    </div>
-                </form>
+<div class="container">
+    <h2>Edit Bill</h2>
+
+    <form id="editBillForm" method="POST" action="{{ url_for('update_bill', bill_id=bill.bill_id) }}">
+        <table class="table table-bordered">
+            <tbody>
+                <tr>
+                    <th>Invoice Number</th>
+                    <td><input type="text" class="form-control" name="invoice_number"
+                              value="{{ bill.invoice_number }}" readonly></td>
+                </tr>
+                <tr>
+                    <th>Service Provider</th>
+                    <td><input type="text" class="form-control" name="service_provider"
+                              value="{{ bill.service_provider }}" required></td>
+                </tr>
+                <tr>
+                    <th>Account Name</th>
+                    <td><input type="text" class="form-control" name="account_name"
+                              value="{{ bill.account_name }}" required></td>
+                </tr>
+                <tr>
+                    <th>Account No</th>
+                    <td><input type="text" class="form-control" name="account_number"
+                              value="{{ bill.account_number }}" required></td>
+                </tr>
+                <tr>
+                    <th>Category</th>
+                    <td>
+                        <select class="form-control" name="category" required>
+                            {% for category in ['Licenses', 'Payroll', 'Utilities', 'Purchases',
+                                              'Rates', 'Subscriptions', 'Taxes', 'Insurance'] %}
+                            <option value="{{ category }}"
+                                   {% if bill.category == category %}selected{% endif %}>
+                                {{ category }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Account Owner</th>
+                    <td>
+                        <select class="form-control" name="account_owner" required>
+                            {% for owner in owners %}
+                            <option value="{{ owner }}"
+                                   {% if bill.account_owner == owner %}selected{% endif %}>
+                                {{ owner }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <th>Paybill Number</th>
+                    <td><input type="text" class="form-control" name="paybill_number"
+                              value="{{ bill.paybill_number }}"></td>
+                </tr>
+                <tr>
+                    <th>USSD Number</th>
+                    <td><input type="text" class="form-control" name="ussd_number"
+                              value="{{ bill.ussd_number }}"></td>
+                </tr>
+                <tr>
+                    <th>Billing Date</th>
+                    <td><input type="date" class="form-control" name="billing_date"
+                              value="{{ bill.billing_date.strftime('%Y-%m-%d') if bill.billing_date else '' }}" required></td>
+                </tr>
+                <tr>
+                    <th>Bill Amount</th>
+                    <td><input type="number" step="0.01" class="form-control" name="bill_amount"
+                              value="{{ bill.bill_amount }}" required></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="text-right mt-3">
+            <a href="{{ url_for('search_bill') }}" class="btn btn-secondary mr-2">Cancel</a>
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+    </form>
+</div>
+
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    $('#editBillForm').on('submit', function(e) {
+        e.preventDefault();
+
+        var formData = $(this).serialize();
+
+        $.ajax({
+            url: $(this).attr('action'),
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                if (response.error) {
+                    alert('Error: ' + response.error);
+                } else {
+                    alert('Bill updated successfully');
+                    window.location.href = "{{ url_for('search_bill') }}";
+                }
+            },
+            error: function(xhr) {
+                alert('Error: ' + (xhr.responseJSON?.error || 'Server error'));
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

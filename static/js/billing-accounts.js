@@ -3,6 +3,7 @@ $(function() {
         $("#accountDetails").addClass("hidden");
         $("#searchSection").removeClass("hidden");
         $("#search_account").val('').focus(); // Keeps search UX clean
+        $("#addAccountContainer").addClass("hidden");
     }
 
     let typingTimer;
@@ -40,32 +41,32 @@ $(function() {
     });
 
     function performSearch() {
-    const searchTerm = $("#search_account").val().trim();
-    const timestamp = new Date().getTime();
+        const searchTerm = $("#search_account").val().trim();
+        const timestamp = new Date().getTime();
 
-    $("#searchResultsContainer").html('<div class="text-center p-3"><div class="spinner-border text-primary"></div></div>');
-    $("#searchResultsPopup, #searchOverlay").show();
+        $("#searchResultsContainer").html('<div class="text-center p-3"><div class="spinner-border text-primary"></div></div>');
+        $("#searchResultsPopup, #searchOverlay").show();
 
-    $.ajax({
-        url: searchUrl + "?term=" + encodeURIComponent(searchTerm) +
-             "&all=" + (searchTerm === "") + "&_=" + timestamp,
-        dataType: "json",
-        cache: false,
-        beforeSend: function() {
-            $("#searchResultsPopup").css('opacity', '0.8');
-        },
-        success: function(data) {
-            if (!data || data.length === 0) {
-                showSearchResults([]);
-                return;
+        $.ajax({
+            url: searchUrl + "?term=" + encodeURIComponent(searchTerm) +
+                 "&all=" + (searchTerm === "") + "&_=" + timestamp,
+            dataType: "json",
+            cache: false,
+            beforeSend: function() {
+                $("#searchResultsPopup").css('opacity', '0.8');
+            },
+            success: function(data) {
+                if (!data || data.length === 0) {
+                    showSearchResults([]);
+                    return;
+                }
+                showSearchResults(data);
+            },
+            complete: function() {
+                $("#searchResultsPopup").css('opacity', '1');
             }
-            showSearchResults(data);
-        },
-        complete: function() {
-            $("#searchResultsPopup").css('opacity', '1');
-        }
-    });
-}
+        });
+    }
 
     function showSearchResults(results) {
         const container = $("#searchResultsContainer");
@@ -84,7 +85,7 @@ $(function() {
                     </div>
                 `);
 
-            // Attach click handler directly to this element
+                // Attach click handler directly to this element
                 resultItem.on("click", function() {
                     const accountData = JSON.parse($(this).attr("data-account").replace(/&apos;/g, "'"));
                     updateFormFields(accountData);
@@ -95,25 +96,26 @@ $(function() {
 
                 container.append(resultItem);
             });
+        }
+
+        $("#searchResultsPopup, #searchOverlay").show();
     }
 
-    $("#searchResultsPopup, #searchOverlay").show();
-
     function searchAccount(term) {
-    if (term.trim() === "") return;
+        if (term.trim() === "") return;
 
-    $.ajax({
-        url: searchUrl,  // Use the variable here
-        dataType: "json",
-        data: { term: term },
-        success: function(data) {
-            $("#search_account").autocomplete("option", "source", data);
-        },
-        error: function(xhr, status, error) {
-            console.error("AJAX error:", error);
-        }
-    });
-}
+        $.ajax({
+            url: searchUrl,  // Use the variable here
+            dataType: "json",
+            data: { term: term },
+            success: function(data) {
+                $("#search_account").autocomplete("option", "source", data);
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX error:", error);
+            }
+        });
+    }
 
     function updateFormFields(data) {
         // Update hidden fields
@@ -148,6 +150,7 @@ $(function() {
     function showAccountDetails(data) {
         $("#searchSection").addClass("hidden");
         $("#accountDetails").removeClass("hidden");
+        $("#addAccountContainer").addClass("hidden");
 
         $("#view-service_provider").text(data.service_provider);
         $("#view-account_name").text(data.account_name);
@@ -218,7 +221,6 @@ $(function() {
         });
     });
 
-
     // Edit button handler
     $("#editAccountBtn").on("click", function() {
         // Hide read-only view, show edit form
@@ -252,87 +254,129 @@ $(function() {
         $("#accountDetailsTitle").text("Account Details");
     });
 
-    // Form submission handler remains the same
+    // Enhanced Form submission handler with improved success display
     $("#editAccountForm").on("submit", function(e) {
         e.preventDefault();
 
-        // Show loading indicator
-        const submitBtn = $(this).find('button[type="submit"]');
+        const form = $(this);
+        const submitBtn = form.find('button[type="submit"]');
         const originalBtnText = submitBtn.html();
-        submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
 
-        // Collect form data
-        const formData = $(this).serialize();
+        if (submitBtn.prop('disabled')) {
+            return false;
+        }
+
+        // Show loading state
+        submitBtn.prop('disabled', true).html(`
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...
+        `);
+
+        // Clear any existing alerts
+        form.find('.alert').remove();
 
         $.ajax({
-            url: $(this).attr('action'),
+            url: form.attr('action'),
             type: 'POST',
-            data: formData,
+            data: form.serialize(),
+            dataType: 'json',
+            timeout: 30000,
             success: function(response) {
-                // Show success message
-                submitBtn.html('<i class="fas fa-check"></i> Saved!').removeClass('btn-primary').addClass('btn-success');
+                if (response.success) {
+                    // Show success message with bill details similar to add form
+                    let billsHtml = '';
+                    if (response.generated_bills && response.generated_bills.length > 0) {
+                        billsHtml = `
+                            <div class="mt-3">
+                                <h5>Generated Bills (${response.generated_bills.length}):</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead class="thead-dark">
+                                            <tr>
+                                                <th>Due Date</th>
+                                                <th>Amount</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${response.generated_bills.map(bill => `
+                                                <tr>
+                                                    <td>${bill.due_date}</td>
+                                                    <td>${bill.amount}</td>
+                                                    <td><span class="badge badge-primary">${bill.status}</span></td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                    }
 
-                // Create a temporary success message
-                const successAlert = $(`
-                    <div class="alert alert-success alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 1000;">
-                        <strong>Success!</strong> Changes saved successfully.
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                `);
+                    // Replace the account details section with success message
+                    $("#accountDetails").html(`
+                        <div class="container-fluid">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4>Account Updated Successfully</h4>
+                                <button class="btn btn-secondary" id="backToEditSearch">
+                                    <i class="fas fa-arrow-left"></i> Back to Search
+                                </button>
+                            </div>
+                            <div class="alert alert-success">
+                                <h5><i class="fas fa-check-circle"></i> Billing Account Updated Successfully!</h5>
+                                </div>
+                                ${billsHtml}
+                            </div>
+                        </div>
+                    `);
 
-                // Add to body and auto-dismiss after 3 seconds
-                $('body').append(successAlert);
-                setTimeout(() => {
-                    successAlert.alert('close');
-                }, 3000);
+                    // Set up the back to search button
+                    $("#backToEditSearch").on("click", function() {
+                        showSearchSection();
+                    });
 
-                // Update the view with new data
-                const updatedData = {
-                    service_provider: $("#edit-service_provider").val(),
-                    account_name: $("#edit-account_name").val(),
-                    account_number: $("#edit-account_number").val(),
-                    category: $("#edit-category").val(),
-                    paybill_number: $("#edit-paybill_number").val(),
-                    ussd_number: $("#edit-ussd_number").val(),
-                    frequency: $("#edit-frequency").val(),
-                    billing_date: $("#edit-billing_date").val(),
-                    bill_amount: $("#edit-bill_amount").val(),
-                    account_owner: $("#edit-account_owner").val(),
-                    invoice_number: $("#edit-invoice_number").val(),
-                    bank_account: $("#edit-bank_account").val()
-                };
-
-                showAccountDetails(updatedData);
-
-                // Reset button after 2 seconds
-                setTimeout(() => {
-                    submitBtn.html(originalBtnText).removeClass('btn-success').addClass('btn-primary').prop('disabled', false);
-                    $("#viewAccountDetails").show();
-                    $("#editAccountForm").hide();
-                }, 2000);
+                } else {
+                    showErrorAlert(response.message || 'Update failed');
+                }
             },
-            error: function(xhr) {
-                // Handle error
-                submitBtn.html(originalBtnText).removeClass('btn-success').addClass('btn-primary').prop('disabled', false);
+            error: function(xhr, textStatus, errorThrown) {
+                let errorMsg = 'Failed to update account';
 
-                const errorAlert = $(`
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <strong>Error!</strong> Failed to save changes. Please try again.
-                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                `);
-
-                $('body').append(errorAlert);
-                setTimeout(() => {
-                    errorAlert.alert('close');
-                }, 3000);
+                if (textStatus === 'timeout') {
+                    errorMsg = 'Request timed out. Please try again.';
+                } else {
+                    try {
+                        const errorResponse = JSON.parse(xhr.responseText);
+                        errorMsg = errorResponse.message || errorMsg;
+                    } catch (e) {
+                        console.error('Error parsing response:', e);
+                        if (xhr.status === 500) {
+                            errorMsg = 'Server error occurred. Please check with administrator.';
+                        } else if (xhr.status === 400) {
+                            errorMsg = 'Invalid request. Please check your input data.';
+                        }
+                    }
+                }
+                showErrorAlert(errorMsg);
+            },
+            complete: function() {
+                // Always re-enable the button
+                submitBtn.html(originalBtnText).prop('disabled', false);
             }
         });
     });
+
+    function showErrorAlert(message) {
+        const alert = $(`
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-triangle"></i> ${message}
+                <button type="button" class="close" data-dismiss="alert">
+                    <span>&times;</span>
+                </button>
+            </div>
+        `);
+        $('#editAccountForm').prepend(alert);
+        setTimeout(() => alert.alert('close'), 5000);
+    }
 
     // When a result is clicked
     function loadEditForm(accountData) {
@@ -371,79 +415,78 @@ $(function() {
     });
 
     function getNextInvoiceNumber(callback) {
-    $.ajax({
-        url: '/get_next_invoice_number',
-        type: 'GET',
-        dataType: 'json',
-        success: function(response) {
-            if (response.invoice_number) {
-                callback(response.invoice_number);
-            } else {
-                console.error('Failed to get invoice number');
+        $.ajax({
+            url: '/get_next_invoice_number',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.invoice_number) {
+                    callback(response.invoice_number);
+                } else {
+                    console.error('Failed to get invoice number');
+                    callback('INV-ERROR'); // Fallback value
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error fetching invoice number:', error);
                 callback('INV-ERROR'); // Fallback value
             }
-        },
-        error: function(xhr, status, error) {
-            console.error('Error fetching invoice number:', error);
-            callback('INV-ERROR'); // Fallback value
-        }
-    });
-}
+        });
+    }
 
     function loadAddAccountForm() {
-    // Hide popup and search section
-    $("#searchResultsPopup, #searchOverlay").hide();
-    $("#searchSection").addClass("hidden");
+        // Hide popup and search section
+        $("#searchResultsPopup, #searchOverlay").hide();
+        $("#searchSection").addClass("hidden");
 
-    // Show loading state
-    $("#accountDetails").empty().removeClass("hidden").html(`
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4>Add New Billing Account</h4>
-            <button class="btn btn-secondary" id="backToAddSearch">
-                <i class="fas fa-arrow-left"></i> Back to Search
-            </button>
-        </div>
-        <div class="text-center p-3">
-            <div class="spinner-border text-primary"></div>
-            <p>Loading form...</p>
-        </div>
-    `);
+        // Show loading state
+        $("#addAccountContainer").empty().removeClass("hidden").html(`
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Add New Billing Account</h4>
+                <button class="btn btn-secondary" id="backToAddSearch">
+                    <i class="fas fa-arrow-left"></i> Back to Search
+                </button>
+            </div>
+            <div class="text-center p-3">
+                <div class="spinner-border text-primary"></div>
+                <p>Loading form...</p>
+            </div>
+        `);
 
-    // Set up back button
-    $("#backToAddSearch").on("click", showSearchSection);
+        // Set up back button
+        $("#backToAddSearch").on("click", showSearchSection);
 
-    // Just load the form directly
-    $.ajax({
-        url: "/add_billing_account",
-        type: "GET",
-        success: function(data) {
-            $("#accountDetails").html(data);
+        // Just load the form directly
+        $.ajax({
+            url: "/add_billing_account",
+            type: "GET",
+            success: function(data) {
+                $("#addAccountContainer").html(data);
 
-            //Generate and populate invoice number field
-            getNextInvoiceNumber(function(invoiceNumber) {
-                $("#add-invoice_number").val(invoiceNumber);
-            });
+                //Generate and populate invoice number field
+                getNextInvoiceNumber(function(invoiceNumber) {
+                    $("#add-invoice_number").val(invoiceNumber);
+                });
 
-            setupAddFormHandlers();
-        },
-        error: function(xhr) {
-            let errorMsg = "Failed to load form";
-            if (xhr.status === 404) {
-                errorMsg = "Form template not found";
+                setupAddFormHandlers();
+            },
+            error: function(xhr) {
+                let errorMsg = "Failed to load form";
+                if (xhr.status === 404) {
+                    errorMsg = "Form template not found";
+                }
+                $("#addAccountContainer").html(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> ${errorMsg}
+                        <button class="btn btn-secondary mt-2" id="backToAddSearch">
+                            <i class="fas fa-arrow-left"></i> Back to Search
+                        </button>
+                    </div>
+                `);
+                $("#backToAddSearch").on("click", showSearchSection);
             }
-            $("#accountDetails").html(`
-                <div class="alert alert-danger">
-                    ${errorMsg}
-                    <button class="btn btn-secondary mt-2" id="backToAddSearch">
-                        Back to Search
-                    </button>
-                </div>
-            `);
-            $("#backToAddSearch").on("click", showSearchSection);
-        }
-    });
-
-}
+        });
+    }
 
     function setupAddFormHandlers() {
         // Cancel/back button
@@ -456,38 +499,143 @@ $(function() {
         });
     }
 
-function saveNewAccount() {
-    const formData = $("#addAccountForm").serialize();
+    function saveNewAccount() {
+        const form = $("#addAccountForm");
+        const submitBtn = form.find('button[type="submit"]');
+        const originalBtnText = submitBtn.html();
 
-    $.ajax({
-        url: "/search_billing_account",  // Make sure this is your correct endpoint
-        type: "POST",
-        data: formData,
-        success: function(response) {
-            if (response.success) {
-                $("#accountDetails").html(`
-                    <div class="alert alert-success">
-                        ${response.message}<br>
-                        <strong>Invoice #:</strong> ${response.invoice_number}<br>
-                        <strong>Created on:</strong> ${response.created_date}
-                    </div>
-                    <button class="btn btn-secondary mt-3" id="backToAddSearch">Back to Search</button>
-                `);
-                $("#backToAddSearch").on("click", showSearchSection);
-            } else {
-                $("#accountDetails").prepend(`
-                    <div class="alert alert-danger">${response.message}</div>
-                `);
+        // Prevent multiple submissions
+        if (submitBtn.prop('disabled')) {
+            return false;
+        }
+
+        // Basic validation
+        const requiredFields = ['service_provider', 'account_name', 'account_number', 'billing_date'];
+        let hasErrors = false;
+
+        form.find('.alert').remove(); // Clear existing alerts
+
+        requiredFields.forEach(field => {
+            const value = form.find(`[name="${field}"]`).val();
+            if (!value || value.trim() === '') {
+                hasErrors = true;
             }
-        },
-        error: function(xhr) {
-            $("#accountDetails").prepend(`
+        });
+
+        if (hasErrors) {
+            form.prepend(`
                 <div class="alert alert-danger">
-                    Server error: ${xhr.responseText}
+                    <i class="fas fa-exclamation-triangle"></i> Please fill in all required fields
                 </div>
             `);
+            return false;
         }
-    });
-}
-}
-}); // This closes the main jQuery function
+
+        // Show loading state
+        submitBtn.prop('disabled', true).html(`
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...
+        `);
+
+        // Get form data
+        const formData = form.serialize();
+
+        $.ajax({
+            url: "/search_billing_account",
+            type: "POST",
+            data: formData,
+            dataType: 'json', // Explicitly expect JSON response
+            timeout: 30000,
+            success: function(response) {
+                if (response.success) {
+                    // Show success message with bill details
+                    let billsHtml = '';
+                    if (response.generated_bills && response.generated_bills.length > 0) {
+                        billsHtml = `
+                            <div class="mt-3">
+                                <h5>Generated Bills (${response.generated_bills.length}):</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead class="thead-dark">
+                                            <tr>
+                                                <th>Due Date</th>
+                                                <th>Amount</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${response.generated_bills.map(bill => `
+                                                <tr>
+                                                    <td>${bill.due_date}</td>
+                                                    <td>${bill.amount}</td>
+                                                    <td><span class="badge badge-primary">${bill.status}</span></td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    $("#addAccountContainer").html(`
+                        <div class="container-fluid">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4>Account Created Successfully</h4>
+                                <button class="btn btn-secondary" id="backToAddSearch">
+                                    <i class="fas fa-arrow-left"></i> Back to Search
+                                </button>
+                            </div>
+                            <div class="alert alert-success">
+                                <h5><i class="fas fa-check-circle"></i> Billing Account Created Successfully!</h5>
+                                <p><strong>Invoice Number:</strong> ${response.invoice_number}</p>
+                                <p><strong>Created on:</strong> ${response.created_date}</p>
+                                ${billsHtml}
+                            </div>
+                        </div>
+                    `);
+
+                    $("#backToAddSearch").on("click", showSearchSection);
+                } else {
+                    // Show error message
+                    $("#addAccountContainer").prepend(`
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle"></i> ${response.message}
+                        </div>
+                    `);
+                    submitBtn.html(originalBtnText).prop('disabled', false);
+                }
+            },
+            error: function(xhr, textStatus, errorThrown) {
+                console.error('AJAX Error:', xhr.status, xhr.statusText, textStatus);
+                console.error('Response:', xhr.responseText);
+
+                let errorMessage = "An error occurred while saving the account";
+
+                if (textStatus === 'timeout') {
+                    errorMessage = "Request timed out. The account may have been created. Please check and try again if needed.";
+                } else {
+                    try {
+                        const errorResponse = JSON.parse(xhr.responseText);
+                        if (errorResponse.message) {
+                            errorMessage = errorResponse.message;
+                        }
+                    } catch (e) {
+                        // If response is not JSON, use default message
+                        if (xhr.status === 500) {
+                            errorMessage = "Server error occurred. Please check the server logs.";
+                        } else if (xhr.status === 400) {
+                            errorMessage = "Invalid request. Please check your input data.";
+                        }
+                    }
+                }
+
+                $("#addAccountContainer").prepend(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> ${errorMessage}
+                    </div>
+                `);
+                submitBtn.html(originalBtnText).prop('disabled', false);
+            }
+        });
+    }
+});
