@@ -1,101 +1,517 @@
-{% extends 'bills/main-template.html' %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Bills - Busyman Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .date-range-container, .filters-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            flex: 1;
+        }
+        .invoice-table {
+            margin-top: 30px;
+        }
+        .error-message {
+            color: #dc3545;
+            margin-bottom: 15px;
+        }
+        .editable-field {
+            background-color: #90EE90;
+        }
+        input[readonly] {
+            background-color: #BCB8B1;
+            cursor: not-allowed;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+    </style>
+</head>
 
-{% block title %}Search Bills{% endblock %}
+<body>
+    <div class="container py-5">
+        <h1 class="mb-4">Search Bills</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
 
-{% block extra_css %}
-
-{% endblock %}
-
-{% block content %}
-<!--<h2>Search Bills</h2>-->
-
-<div class="form-container">
-    <h2>Search Bills</h2>
-    {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-    <form id="filter-form" class="mb-4">
-        <div class="form-row justify-content-end">
-            <div class="form-group col-md-2">
-                <button class="btn btn-info btn-block add-btn">Add bill</button>
+        <form method="POST" action="{{ url_for('search_bills') }}">
+            <!-- Date Range Filter -->
+            <div class="date-range-container">
+                <div class="form-group">
+                    <label for="start_date" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" value="{{ default_start_date }}">
+                </div>
+                <div class="form-group">
+                    <label for="end_date" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" value="{{ default_end_date }}">
+                </div>
             </div>
-            <div class="form-group col-md-2">
-                <button type="submit" class="btn btn-success btn-block">Search</button>
+
+            <!-- Additional Filters -->
+            <div class="filters-container">
+                <div class="form-group">
+                    <label for="account_owner" class="form-label">Account Owner</label>
+                    <select class="form-control" id="account_owner" name="account_owner">
+                        <option value="">All Account Owners</option>
+                        {% for account_owner in account_owners %}
+                        <option value="{{ account_owner }}">{{ account_owner }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-control" id="category" name="category">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                        <option value="{{ category }}">{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div class="form-group col-md-2">
-                <a href="{{ url_for('payments_menu') }}" class="btn btn-secondary">Back To Menu</a>
+
+            <button type="submit" class="btn btn-primary" id="searchBtn">
+                <span id="searchText">Search</span>
+                <span id="searchSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+            </button>
+            <a href="{{ url_for('payments_menu') }}" class="btn btn-secondary">Exit</a>
+        </form>
+
+        {% if bills %}
+        <div class="invoice-table">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2>Search Results</h2>
+                    <p>Found {{ bills|length }} bills</p>
+                </div>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addModal">
+                    Add Bill
+                </button>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Created Date</th>
+                            <th>Bill Invoice Number</th>
+                            <th>Service Provider</th>
+                            <th>Account Name</th>
+                            <th>Account Number</th>
+                            <th>Category</th>
+                            <th>Bill Amount</th>
+                            <th>Account Owner</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for bill in bills %}
+                        <tr>
+                            <td>{{ bill[10].strftime('%d-%m-%Y') }}</td>
+                            <td>{{ bill[12] }}</td>
+                            <td>{{ bill[1] }}</td>
+                            <td>{{ bill[2] }}</td>
+                            <td>{{ bill[3] }}</td>
+                            <td>{{ bill[4] }}</td>
+                            <td>{{ "Ksh {:,.2f}".format(bill[8])}}</td>
+                            <td>{{ bill[9] }}</td>
+                            <td>
+                                <div class="action-buttons">
+                                <button type="button" class="btn btn-sm btn-warning edit-btn" data-bs-toggle="modal" data-bs-target="#editModal"
+                                    data-bill-id="{{ bill[0] }}"
+                                    data-billing-date="{{ bill[7].strftime('%Y-%m-%d') }}"
+                                    data-bill-invoice-number="{{ bill[12] }}"
+                                    data-invoice-number="{{ bill[13] }}"
+                                    data-service-provider="{{ bill[1] }}"
+                                    data-account-name="{{ bill[2] }}"
+                                    data-account-number="{{ bill[3] }}"
+                                    data-category="{{ bill[4] }}"
+                                    data-paybill-number="{{ bill[5] }}"
+                                    data-ussd-number="{{ bill[6] }}"
+                                    data-bill-amount="{{ bill[8] }}"
+                                    data-account-owner="{{ bill[9] }}"
+                                    data-bank-account="{{ bill[15] }}">
+                                    Edit
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger delete-btn"
+                                        data-bill-invoice-number="{{ bill[12] }}"
+                                        data-account-name="{{ bill[2] }}"
+                                        onclick="deleteBill(this)">
+                                        Delete
+                                </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
-        <div class="form-row align-items-end">
-
-            <!-- Category -->
-            <div class="form-group col-md-3">
-                <label for="category">Category:</label>
-                <select id="category" name="category" class="form-control">
-                    <option value="">All Categories</option>
-                    <option value="Utilities">Utilities</option>
-                    <option value="Subscription">Subscription</option>
-                    <option value="Loan">Loan</option>
-                    <option value="Rent">Rent</option>
-                </select>
-            </div>
-
-            <!-- Account Owner -->
-            <div class="form-group col-md-3">
-            <label for="account_owner">Account Owner:</label>
-            <select id="account_owner" name="account_owner" class="form-control">
-                <option value="">All Owners</option>
-                {% for owner in owners %}
-                <option value="{{ owner }}">{{ owner }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-            <!-- Start Date -->
-            <div class="form-group col-md-2">
-                <label for="start_date">Start Date:</label>
-                <input type="text" id="start_date" name="start_date" class="form-control" autocomplete="off">
-            </div>
-
-            <!-- End Date -->
-            <div class="form-group col-md-2">
-                <label for="end_date">End Date:</label>
-                <input type="text" id="end_date" name="end_date" class="form-control" autocomplete="off">
-            </div>
-
-        </div>
-    </form>
-    <div id="loader-container">
-        <div class="loader"></div>
+        {% endif %}
     </div>
-   <!-- Results Table -->
-    <div id="results-container" style="margin-top: 20px;">
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Account Name</th>
-                    <th>Account Number</th>
-                    <th>Due Date</th>
-                    <th>Bill Amount</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="results-body">
-                <!-- Results will be inserted here by JavaScript -->
-            </tbody>
-        </table>
+    <!-- Add Bill Modal -->
+    <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Bill</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="addForm">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Billing Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="billing_date" id="add_billing_date" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Bill Invoice Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="bill_invoice_number" id="add_bill_invoice_number" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Service Provider <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="service_provider" id="add_service_provider" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Account Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="account_name" id="add_account_name" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Account Number</label>
+                                <input type="text" class="form-control" name="account_number" id="add_account_number">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Category <span class="text-danger">*</span></label>
+                                <select class="form-control" name="category" id="add_category" required>
+                                    <option value="">Select Category</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category }}">{{ category }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Account Owner <span class="text-danger">*</span></label>
+                                <select class="form-control" name="account_owner" id="add_account_owner" required>
+                                    <option value="">Select Account Owner</option>
+                                    {% for account_owner in account_owners %}
+                                    <option value="{{ account_owner }}">{{ account_owner }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Paybill Number</label>
+                                <input type="text" class="form-control" name="paybill_number" id="add_paybill_number">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">USSD Number</label>
+                                <input type="text" class="form-control" name="ussd_number" id="add_ussd_number">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Bill Amount <span class="text-danger">*</span></label>
+                                <input type="number" step="0.01" min="0" class="form-control" name="bill_amount" id="add_bill_amount" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Bank Account</label>
+                                <input type="text" class="form-control" name="bank_account" id="add_bank_account">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-success" id="addAccountBtn">
+                            <span id="addAccountText">Add Account</span>
+                            <span id="addAccountSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Bill Edit Modal -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Bill</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="editForm">
+                    <div class="modal-body">
+                    <input type="hidden" id="modalBillId">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Billing Date</label>
+                            <input type="date" class="form-control editable-field" name="billing_date" id="modal_billing_date">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Bill Invoice Number</label>
+                            <input type="text" class="form-control" name="bill_invoice_number" id="modal_bill_invoice_number" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Service Provider</label>
+                            <input type="text" class="form-control editable-field" name="service_provider" id="modal_service_provider">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Account Name</label>
+                            <input type="text" class="form-control editable-field" name="account_name" id="modal_account_name">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Account Number</label>
+                            <input type="text" class="form-control editable-field" name="account_number" id="modal_account_number">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Paybill Number</label>
+                            <input type="text" class="form-control editable-field" name="paybill_number" id="modal_paybill_number">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">USSD Number</label>
+                            <input type="text" class="form-control editable-field" name="ussd_number" id="modal_ussd_number">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Bill Amount</label>
+                            <input type="number" step="0.01" class="form-control editable-field" name="bill_amount" id="modal_bill_amount">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Category</label>
+                            <input type="text" class="form-control" name="category" id="modal_category" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Account Owner</label>
+                            <input type="text" class="form-control" name="account_owner" id="modal_account_owner" readonly>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary" id="saveChangesBtn">
+                        <span id="saveChangesText">Save Changes</span>
+                        <span id="saveChangesSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
-{% endblock %}
+    <script>
+    document.querySelector('form').addEventListener('submit', function () {
+        const btn = document.getElementById('searchBtn');
+        const text = document.getElementById('searchText');
+        const spinner = document.getElementById('searchSpinner');
 
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/bills.js') }}"></script>
-{% endblock %}
+        btn.disabled = true;
+        text.textContent = 'Loading...';
+        spinner.classList.remove('d-none');
+    });
+    </script>
+    <script>
+    // Handle modal show event to populate data
+    document.getElementById('editModal').addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget; // Button that triggered the modal
+        const modal = this;
+
+        // Extract data from button attributes
+        modal.querySelector('#modalBillId').value = button.getAttribute('data-bill-id');
+        modal.querySelector('#modal_billing_date').value = button.getAttribute('data-billing-date');
+        modal.querySelector('#modal_bill_invoice_number').value = button.getAttribute('data-bill-invoice-number');
+        modal.querySelector('#modal_service_provider').value = button.getAttribute('data-service-provider');
+        modal.querySelector('#modal_account_name').value = button.getAttribute('data-account-name');
+        modal.querySelector('#modal_account_number').value = button.getAttribute('data-account-number');
+        modal.querySelector('#modal_paybill_number').value = button.getAttribute('data-paybill-number');
+        modal.querySelector('#modal_ussd_number').value = button.getAttribute('data-ussd-number');
+        modal.querySelector('#modal_category').value = button.getAttribute('data-category');
+        modal.querySelector('#modal_account_owner').value = button.getAttribute('data-account-owner');
+        modal.querySelector('#modal_bill_amount').value = button.getAttribute('data-bill-amount');
+    });
+
+    document.getElementById('editForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const saveBtn = document.getElementById('saveChangesBtn');
+        const saveText = document.getElementById('saveChangesText');
+        const spinner = document.getElementById('saveChangesSpinner');
+
+        // Show loading state
+        saveBtn.disabled = true;
+        saveText.textContent = 'Saving...';
+        spinner.classList.remove('d-none');
+
+        const billId = document.getElementById('modalBillId').value;
+        const formData = new FormData(this);
+        const payload = Object.fromEntries(formData.entries());
+
+        // Add sales_id to the payload
+        payload.bill_id = billId;
+
+        fetch(`/edit_bill/${billId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(res => {
+            if (!res.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.status === "success") {
+                alert("Bill updated successfully!");
+                // Close the modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+                modal.hide();
+                // Optionally, refresh the page or update the table row
+                location.reload();
+            } else {
+                alert("Error: " + (data.message || 'Unknown error occurred'));
+            }
+        })
+        .catch(error => {
+            console.error('Error updating bill:', error);
+            alert('Error updating bill');
+        })
+        .finally(() => {
+            // Reset button state whether success or failure
+            saveBtn.disabled = false;
+            saveText.textContent = 'Save Changes';
+            spinner.classList.add('d-none');
+        });
+    });
+
+        // Delete bill function
+        async function deleteBill(button) {
+            const billInvoiceNumber = button.getAttribute('data-bill-invoice-number');
+            const accountName = button.getAttribute('data-account-name');
+
+            // Confirm deletion
+            const confirmDelete = confirm(`Are you sure you want to delete the bill "${accountName}" with invoice number "${billInvoiceNumber}"?`);
+
+            if (!confirmDelete) {
+                return; // User cancelled
+            }
+
+            // Disable button and show loading state
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Deleting...';
+
+            try {
+                // Create form data
+                const formData = new FormData();
+                formData.append('bill_invoice_number', billInvoiceNumber);
+
+                const response = await fetch('/delete_bill', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert(data.message);
+                    // Reload the page to refresh the table
+                    location.reload();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error: ${error.message}`);
+            } finally {
+                // Reset button state
+                button.disabled = false;
+                button.textContent = originalText;
+            }
+        }
+
+        document.getElementById('addModal').addEventListener('show.bs.modal', function(event) {
+        // Generate bill invoice number
+        fetch('/get_next_invoice_number')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('add_bill_invoice_number').value = data.invoice_number;
+            });
+        });
+
+        // Handle add bill form submission
+        document.getElementById('addForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const addBtn = document.getElementById('addAccountBtn');
+            const addText = document.getElementById('addAccountText');
+            const spinner = document.getElementById('addAccountSpinner');
+            const modal = document.getElementById('addModal');
+
+            // Show loading state
+            addBtn.disabled = true;
+            addText.textContent = 'Adding...';
+            spinner.classList.remove('d-none');
+
+            try {
+                // Use FormData for proper form submission
+                const formData = new FormData(document.getElementById('addForm'));
+
+                // Validate required fields
+                const requiredFields = ['billing_date', 'service_provider', 'account_name',
+                              'category', 'account_owner', 'bill_amount', 'bill_invoice_number'];
+
+                for (const field of requiredFields) {
+                    if (!formData.get(field)) {
+                        throw new Error(`Please fill in the ${field.replace('_', ' ')} field`);
+                    }
+                }
+
+                const response = await fetch('/add_bill', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to add bill');
+                }
+
+                if (data.success) {
+                    alert(`Bill added successfully!\nBill Invoice: ${data.bill_invoice_number}\nDate: ${data.billing_date}`);
+
+                    // Close modal and refresh
+                    bootstrap.Modal.getInstance(modal).hide();
+                    location.reload();
+                } else {
+                    throw new Error(data.message || 'Unknown error occurred');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error: ${error.message}`);
+            } finally {
+                addBtn.disabled = false;
+                addText.textContent = 'Add Bill';
+                spinner.classList.add('d-none');
+            }
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Bootstrap JS for dismissible alert -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+</body>
+</html>
