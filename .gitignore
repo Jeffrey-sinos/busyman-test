@@ -177,9 +177,6 @@ cython_debug/
 # Receipts folder
 /receipts/
 
-# Payments folder
-/payments/
-
 # PyPI configuration file
 .pypirc
 /.idea/busyman-pro-test.iml
@@ -191,3 +188,5 @@ cython_debug/
 /.idea/Sales-demo.iml
 /.idea/busyman-pro-demo.iml
 /.idea
+
+/payments/
