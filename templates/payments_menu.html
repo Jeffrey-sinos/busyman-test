@@ -62,8 +62,8 @@
     <div class="d-flex flex-column">
         <a href="{{ url_for('search_billing_account') }}" class="btn btn-block mb-2">Billing Accounts</a>
         <a href="{{ url_for('search_bills') }}" class="btn btn-block mb-2">Bills</a>
-        <button class="btn btn-block mb-2" id="pay-bill">Pay</button>
-        <button class="btn btn-block mb-2" id="edit-pay">Edit Payments</button>
+        <a href="{{ url_for('view_bills') }}" class="btn btn-block mb-2">Pay</a>
+        <a href="{{ url_for('view_payments') }}" class="btn btn-block mb-2">Edit payments</a>
         <button class="btn btn-block mb-2" id="reports">Reports</button>
         <a href="{{ url_for('admin_dashboard') if session.get('role') == 2 else url_for('superuser_dashboard') }}" class="btn btn-block mt-3">Back to Menu</a>
     </div>

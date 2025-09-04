@@ -31,6 +31,10 @@ app.secret_key = 'your_secret_key'
 app.config['UPLOAD_FOLDER'] = 'invoices'
 # Create receipts folder to store downloaded receipts
 app.config['RECEIPT_FOLDER'] = 'receipts'
+
+# Create payments folder to store downloaded payments
+app.config['PAYMENTS_FOLDER'] = 'payments'
+
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
 
 
@@ -674,6 +678,15 @@ def download_receipt(filename):
         as_attachment=True
     )
 
+# Download payment route
+@app.route('/payments/<filename>')
+def download_payment(filename):
+    return send_from_directory(
+        app.config['PAYMENTS_FOLDER'],
+        filename,
+        as_attachment=True
+    )
+
 # Search Invoices Menu
 @app.route('/search_menu', methods=['GET', 'POST'])
 def search_menu():
@@ -1204,8 +1217,6 @@ def record_payment(sales_list_id):
             frequency_result = cur.fetchone()
             if frequency_result:
                 frequency = frequency_result[0]
-
-        # Always create a new receipt record (remove the update logic)
         receipt_invoice_number = generate_next_invoice_number()
 
         cur.execute("""
@@ -2380,8 +2391,6 @@ def create_invoice(invoice_data, filename):
     c.drawString(50, 180, "ACCOUNTANT")
     c.save()
 
-# Generate bill pdf route
-
 # Products route
 @app.route('/products', methods=['GET', 'POST'])
 def products():
@@ -2914,8 +2923,8 @@ def add_billing_account():
             delta = relativedelta(months=3)
         elif frequency == 'Annual':
             delta = relativedelta(years=1)
-        else:  # Weekly
-            delta = relativedelta(weeks=1)
+        else:
+            delta = None
 
         generated_bills = [] # List to store the generated bills
         next_due_date = billing_date
@@ -3342,9 +3351,704 @@ def add_bill():
             conn.close()
 
 
+@app.route('/view_bills', methods=['GET', 'POST'])
+def view_bills():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Get filter options
+        account_owners = read_account_owners()
+        categories = ['Licenses', 'Payroll', 'Utilities', 'Purchases', 'Rates', 'Subscriptions', 'Taxes', 'Insurance']
+
+        # Set default date range (e.g., current month)
+        today = datetime.today()
+        default_start_date = (today - timedelta(days=730)).strftime('%Y-%m-%d')
+        default_end_date = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+
+        bills = []
+
+        if request.method == 'POST':
+            # Get form data
+            start_date = request.form.get('start_date', default_start_date)
+            end_date = request.form.get('end_date', default_end_date)
+            account_owner = request.form.get('account_owner', '')
+            category = request.form.get('category', '')
+
+            # Build the query with filters
+            query = """
+                    SELECT b.*,
+                           COALESCE(SUM(p.paid_amount), 0) as total_paid,
+                           (b.bill_amount - COALESCE(SUM(p.paid_amount), 0)) as actual_balance
+                    FROM bills b
+                             LEFT JOIN payments p ON b.bill_invoice_number = p.invoice_number
+                    WHERE b.billing_date BETWEEN %s AND %s \
+                    """
+            params = [start_date, end_date]
+
+            if account_owner:
+                query += " AND b.account_owner = %s"
+                params.append(account_owner)
+
+            if category:
+                query += " AND b.category = %s"
+                params.append(category)
+
+            query += " GROUP BY b.bill_id ORDER BY b.billing_date DESC"
+
+            cur.execute(query, params)
+            bills_raw = cur.fetchall()
+
+            # Process the bills to include calculated balance
+            bills = []
+            for bill in bills_raw:
+                # bill now includes total_paid and actual_balance at the end
+                bill_list = list(bill[:-2])  # Remove the calculated fields
+                total_paid = bill[-2]
+                actual_balance = bill[-1]
+
+                # Add the calculated values to the bill data
+                bill_list.extend([total_paid, actual_balance])
+                bills.append(bill_list)
+
+        cur.close()
+        conn.close()
+
+        return render_template('bills/view-bills.html',
+                               bills=bills,
+                               account_owners=account_owners,
+                               categories=categories,
+                               default_start_date=default_start_date,
+                               default_end_date=default_end_date)
+
+    except Exception as e:
+        flash(f'Error loading bills: {str(e)}', 'danger')
+        return render_template('bills/view-bills.html',
+                               bills=bills,
+                               account_owners=account_owners,
+                               categories=categories,
+                               default_start_date=default_start_date,
+                               default_end_date=default_end_date)
+
+# Generate payment pdf route
+def create_payment(payment_data, filename):
+
+        # Create a canvas
+        c = canvas.Canvas(filename, pagesize=letter)
+
+        # Set up styles
+        styles = getSampleStyleSheet()
+        style_normal = styles["Normal"]
+
+        # Add company logo as the letterhead
+        #logo_path = 'teknobyte-tagline.jpg'
+        #logo_width = 2 * inch
+        #logo_height = 0.5 * inch
+        #logo_x = 430
+        #logo_y = 750
+        #c.drawImage(logo_path, logo_x, logo_y, width=logo_width, height=logo_height)
+
+        # # Add company information
+        address = "Brightwoods Apartment, Chania Ave "
+        city_state_zip = "PO. Box 74080-00200, Nairobi, KENYA "
+        phone = "Phone: +254-705917383"
+        email = "Email: info@teknobyte.ltd"
+        kra_pin = "PIN: P051155522R"
+        c.setFont("Helvetica", 8)
+        c.drawString(430, 740, "")
+        c.drawString(430, 730, address)
+        c.drawString(430, 720, city_state_zip)
+        c.drawString(430, 710, phone)
+        c.drawString(430, 700, email)
+        c.drawString(430, 690, kra_pin)
+        c.drawString(430, 660, "")
+        # Add invoice details
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(280, 640, "Payment")
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, 620, "")
+
+        c.drawString(50, 600, f"Date:               {payment_data['payment_date']}")
+        invoice_label = "Payment No:"
+        invoice_number = payment_data['invoice_number']
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, 580, invoice_label)
+        label_width = c.stringWidth(invoice_label, "Helvetica-Bold", 12)
+
+        # Draw the client name in regular font next to the label
+        c.setFont("Helvetica", 12)
+        c.drawString(50 + label_width + 5, 580, invoice_number)
+
+        # c.drawString(50, 610, f"Invoice Number: {invoice_data['invoice_number']}")
+        c.drawString(50, 560, "")
+        client_label = "Account:"
+        account_name = payment_data['account_name']
+
+        # Draw the bold label
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, 540, client_label)
+
+        # Calculate the width of the label text to position the client name
+        label_width = c.stringWidth(client_label, "Helvetica-Bold", 12)
+
+        # Draw the client name in regular font next to the label
+        c.setFont("Helvetica", 12)
+        c.drawString(50 + label_width + 5, 540, account_name)
+
+        # Add line items table
+        data = [['Service Provider', 'Account Name', 'Account No', 'Bill Amt']]
+        for item in payment_data['items']:
+            data.append([item['description'], item['quantity'], item['unit-price'], item['total']])
+
+        # Set the width of each column
+        col_widths = [1.5 * inch, 2 * inch, 1.5 * inch, 2 * inch]  # Adjust widths as needed
+        t = Table(data, colWidths=col_widths)
+        t.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.gray),
+                               ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                               ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                               ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                               ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                               ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                               ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+
+        table_height = len(data) * 20
+        t.wrapOn(c, 0, 0)
+        t.drawOn(c, 50, 500 - table_height)
+
+        # Add total amount
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(400, 480 - table_height, f"Total Paid: {payment_data['total_amount']}")
+        c.drawString(400, 460 - table_height, f"Balance:    {payment_data['balance']}")
+
+        c.setFont("Helvetica", 12)
+        c.drawString(50, 200, "John Kungu")
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(50, 180, "ACCOUNTANT")
+
+        # Save the PDF
+        c.save()
+
+# Pay bill route
+@app.route('/pay_bill/<int:bill_id>', methods=['POST'])
+def pay_bill(bill_id):
+    try:
+        data = request.get_json()
+        paid_amount = float(data.get('paid_amount', 0))
+        bank_account = data.get('bank_account', '')
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Get bill details
+        cur.execute("SELECT * FROM bills WHERE bill_id = %s", (bill_id,))
+        bill = cur.fetchone()
+
+        if not bill:
+            cur.close()
+            conn.close()
+            return jsonify({'success': False, 'message': 'Bill not found'})
+
+        # Get current balance (original amount minus any existing payments)
+        cur.execute("""
+                    SELECT COALESCE(SUM(paid_amount), 0) as total_paid
+                    FROM payments
+                    WHERE invoice_number = %s
+                    """, (bill[12],))  # bill[12] is invoice_number
+
+        result = cur.fetchone()
+        total_paid = float(result[0]) if result else 0
+        bill_amount = float(bill[8])  # Original bill amount
+        current_balance = bill_amount - total_paid
+
+        # Validate payment amount
+        if paid_amount <= 0:
+            cur.close()
+            conn.close()
+            return jsonify({'success': False, 'message': 'Payment amount must be greater than zero'})
+
+        if paid_amount > current_balance:
+            cur.close()
+            conn.close()
+            return jsonify(
+                {'success': False,
+                 'message': f'Payment amount cannot exceed current balance of Ksh {current_balance:,.2f}'})
+
+        # Calculate new balance after this payment
+        new_balance = current_balance - paid_amount
+
+        # Generate payment reference number
+        payment_reference_no = generate_next_invoice_number()
+
+        # Record payment
+        cur.execute("""
+                    INSERT INTO payments (service_provider, account_name, account_number, category,
+                                          paybill_number, ussd_number, due_date, bill_amount,
+                                          balance, paid_amount, invoice_number, payment_reference_number,
+                                          account_owner, paid_date, bank_account)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING payment_id
+                    """, (
+            bill[1],  # service_provider
+            bill[2],  # account_name
+            bill[3],  # account_number
+            bill[4],  # category
+            bill[5],  # paybill_number
+            bill[6],  # ussd_number
+            bill[10],  # due_date (billing_date)
+            bill_amount,  # original bill_amount
+            new_balance,  # new balance after this payment
+            paid_amount,  # paid_amount
+            bill[12],  # invoice_number
+            payment_reference_no,  # payment_reference_no
+            bill[9],  # account_owner
+            datetime.today().strftime('%Y-%m-%d'),  # paid_date
+            bank_account  # bank_account
+        ))
+
+        payment_result = cur.fetchone()
+        if not payment_result:
+            cur.close()
+            conn.close()
+            return jsonify({'success': False, 'message': 'Failed to create payment record'})
+
+        payment_id = payment_result[0]
+        cur.execute("""
+                    INSERT INTO invoices (invoice_number)
+                    VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
+                    """, (payment_reference_no,))
+
+        conn.commit()
+
+        # Update bill status if fully paid
+        billing_account = None
+        next_due_date = None
+        should_generate_next_bill = False
+
+        if new_balance <= 0:
+            cur.execute("UPDATE bills SET pay_status = 'Paid' WHERE bill_id = %s", (bill_id,))
+
+            # Check if this bill has a corresponding billing account
+            cur.execute("""
+                        SELECT *
+                        FROM billing_account
+                        WHERE invoice_number = %s
+                        """, (bill[13],))
+
+            billing_account = cur.fetchone()
+
+            if billing_account:
+                # CHECK IF THIS IS THE MOST RECENT BILL FOR THIS BILLING ACCOUNT
+                cur.execute("""
+                            SELECT MAX(billing_date) as latest_bill_date
+                            FROM bills 
+                            WHERE invoice_number = %s
+                            """, (bill[13],))
+
+                latest_bill_result = cur.fetchone()
+                latest_bill_date = latest_bill_result[0] if latest_bill_result else None
+
+                # Only generate next bill if this is the most recent bill
+                if latest_bill_date and bill[7] == latest_bill_date:  # bill[7] is billing_date
+                    should_generate_next_bill = True
+
+                    # Generate next bill based on frequency
+                    frequency = billing_account[7]
+                    last_bill_date = bill[7]  # billing_date (should be a date object)
+
+                    if isinstance(last_bill_date, str):
+                        last_bill_date = datetime.strptime(last_bill_date, '%Y-%m-%d')
+
+                    if frequency == 'Monthly':
+                        next_due_date = last_bill_date + relativedelta(months=1)
+                    elif frequency == 'Quarterly':
+                        next_due_date = last_bill_date + relativedelta(months=3)
+                    elif frequency == 'Annual':
+                        next_due_date = last_bill_date + relativedelta(years=1)
+                    else:
+                        next_due_date = last_bill_date
+
+                    # Generate next invoice number
+                    next_invoice_number = generate_next_invoice_number()
+
+                    # Create the next bill
+                    cur.execute("""
+                                INSERT INTO bills (service_provider, account_name, account_number, category,
+                                                   paybill_number, ussd_number, billing_date, bill_amount,
+                                                   account_owner, bill_invoice_number, invoice_number)
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                """, (
+                        billing_account[1],  # service_provider
+                        billing_account[2],  # account_name
+                        billing_account[3],  # account_number
+                        billing_account[4],  # category
+                        billing_account[5],  # paybill_number
+                        billing_account[6],  # ussd_number
+                        next_due_date.strftime('%Y-%m-%d'),  # billing_date
+                        billing_account[14],  # bill_amount
+                        billing_account[9],  # account_owner
+                        next_invoice_number,  # bill_invoice_number
+                        billing_account[11]  # billing account invoice number
+                    ))
+                    cur.execute("""
+                                INSERT INTO invoices (invoice_number)
+                                VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
+                                """, (next_invoice_number,))
+
+        else:
+            cur.execute("UPDATE bills SET pay_status = 'Not Paid' WHERE bill_id = %s", (bill_id,))
+
+        conn.commit()
+
+        # Get the complete payment details for PDF generation
+        cur.execute("""
+                    SELECT *
+                    FROM payments p
+                    WHERE p.payment_id = %s
+                    """, (payment_id,))
+        payment_details = cur.fetchone()
+
+        cur.close()
+        conn.close()
+
+        payment_data = {
+            'payment_date': payment_details[15].strftime('%d-%m-%Y') if payment_details[
+                15] else datetime.today().strftime('%Y-%m-%d'),
+            'invoice_number': payment_details[12],  # payment_reference_number
+            'account_name': payment_details[2],  # account_name
+            'items': [{
+                'description': payment_details[1],  # service_provider
+                'quantity': payment_details[2],
+                'unit-price': payment_details[3],
+                'total': float(bill_amount)  # Original bill amount
+            }],
+            'total_amount': f"Ksh {paid_amount:,.2f}",  # Current payment amount
+            'balance': f"Ksh {new_balance:,.2f}"  # Remaining balance
+        }
+
+        # Generate PDF receipt
+        sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', payment_reference_no)
+        filename = f"payment_receipt_{sanitized_invoice_no}.pdf"
+        filepath = os.path.join(app.config['PAYMENTS_FOLDER'], filename)
+
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        create_payment(payment_data, filepath)
+
+        # Determine message based on payment status
+        if new_balance <= 0:
+            message = f'Payment of Ksh {paid_amount:,.2f} processed successfully. Bill is now fully paid!'
+            if billing_account and should_generate_next_bill and next_due_date:
+                message += f' Next bill due on {next_due_date.strftime("%d-%m-%Y")} has been generated.'
+        else:
+            message = f'Partial payment of Ksh {paid_amount:,.2f} processed successfully. Remaining balance: Ksh {new_balance:,.2f}'
+
+        return jsonify({
+            'success': True,
+            'message': message,
+            'new_balance': new_balance,
+            'is_fully_paid': new_balance <= 0,
+            'receipt_url': url_for('download_payment', filename=filename)
+        })
+
+    except Exception as e:
+        # Make sure to close connections in case of error
+        try:
+            if 'cur' in locals():
+                cur.close()
+            if 'conn' in locals():
+                conn.close()
+        except:
+            pass
+        return jsonify({'success': False, 'message': f'Error processing payment: {str(e)}'})
 
 
+# View Payments route
+@app.route('/view_payments', methods=['GET', 'POST'])
+def view_payments():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Get filter options
+        account_owners = read_account_owners()
+        categories = ['Licenses', 'Payroll', 'Utilities', 'Purchases', 'Rates', 'Subscriptions', 'Taxes', 'Insurance']
+
+        # Set default date range
+        today = datetime.today()
+        default_start_date = (today - timedelta(days=730)).strftime('%Y-%m-%d')
+        default_end_date = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+
+        payments = []
+
+        if request.method == 'POST':
+            # Get form data
+            start_date = request.form.get('start_date', default_start_date)
+            end_date = request.form.get('end_date', default_end_date)
+            account_owner = request.form.get('account_owner', '')
+            category = request.form.get('category', '')
+
+            # Build the query with filters
+            query = """
+                    SELECT * FROM payments
+                    """
+            params = [start_date, end_date]
+
+            if account_owner:
+                query += " AND account_owner = %s"
+                params.append(account_owner)
+
+            if category:
+                query += " AND category = %s"
+                params.append(category)
+
+            query += " ORDER BY created_date DESC, paid_date DESC"
+
+            cur.execute(query, params)
+            payments = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+        return render_template('bills/view-payments.html',
+                               payments=payments,
+                               account_owners=account_owners,
+                               categories=categories,
+                               default_start_date=default_start_date,
+                               default_end_date=default_end_date)
+
+    except Exception as e:
+        flash(f'Error loading payments: {str(e)}', 'danger')
+        return render_template('bills/view-payments.html',
+                               payments=payments,
+                               account_owners=account_owners,
+                               categories=categories,
+                               default_start_date=default_start_date,
+                               default_end_date=default_end_date)
+
+# Edit payments route
+@app.route('/update_payment/<int:payment_id>', methods=['POST'])
+def update_payment(payment_id):
+    try:
+        data = request.get_json()
+        paid_amount = float(data.get('paid_amount', 0))
+        payment_date = data.get('payment_date')
+        bank_account = data.get('bank_account', '')
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Get current payment details and associated bill information
+        cur.execute("""
+                    SELECT p.*, b.bill_id, b.bill_amount, b.billing_date, b.invoice_number as billing_account_ref,
+                           COALESCE(SUM(p2.paid_amount), 0) as total_paid_excluding_current
+                    FROM payments p
+                    JOIN bills b ON p.invoice_number = b.bill_invoice_number
+                    LEFT JOIN payments p2 ON p.invoice_number = p2.invoice_number AND p2.payment_id != p.payment_id
+                    WHERE p.payment_id = %s
+                    GROUP BY p.payment_id, b.bill_id
+                    """, (payment_id,))
+
+        payment_info = cur.fetchone()
+
+        if not payment_info:
+            cur.close()
+            conn.close()
+            return jsonify({'success': False, 'message': 'Payment not found'})
+
+        print("=== PAYMENT_INFO DEBUG ===")
+        print(f"Number of columns: {len(payment_info)}")
+        for i, value in enumerate(payment_info):
+            print(f"Index {i}: {value} (type: {type(value)})")
+        print("==========================")
+
+        # Calculate new total paid amount and balance
+        total_paid_excluding = float(payment_info[-1] if payment_info[-1] else 0)  # total_paid_excluding_current
+        new_total_paid = total_paid_excluding + paid_amount
+        bill_amount = float(payment_info[8] if payment_info[8] else 0)  # bill_amount from bills table
+        new_balance = bill_amount - new_total_paid
+
+        print("=== BALANCE CALCULATION DEBUG ===")
+        print(f"Bill amount: {bill_amount}")
+        print(f"Total paid excluding current: {total_paid_excluding}")
+        print(f"New paid amount: {paid_amount}")
+        print(f"New total paid: {new_total_paid}")
+        print(f"New balance: {new_balance}")
+        print("=================================")
+
+        # Update payment with the calculated balance
+        cur.execute("""
+                    UPDATE payments 
+                    SET paid_amount = %s, paid_date = %s, bank_account = %s, balance = %s
+                    WHERE payment_id = %s
+                    """, (paid_amount, payment_date, bank_account, new_balance, payment_id))
+
+        # Update bill status based on new balance
+        bill_id = payment_info[17]  # bill_id
+        if new_balance <= 0:
+            cur.execute("UPDATE bills SET pay_status = 'Paid' WHERE bill_id = %s", (bill_id,))
+        else:
+            cur.execute("UPDATE bills SET pay_status = 'Not Paid' WHERE bill_id = %s", (bill_id,))
+
+        billing_account = None
+        next_due_date = None
+        should_generate_next_bill = False
+        message = ""
+
+        # Check if payment completes the balance and should generate next bill
+        if new_balance <= 0:
+            billing_account_ref = payment_info[20]  # billing_account_ref
+
+            # Check if this bill has a corresponding billing account
+            cur.execute("""
+                        SELECT *
+                        FROM billing_account
+                        WHERE invoice_number = %s
+                        """, (billing_account_ref,))
+
+            billing_account = cur.fetchone()
+
+            if billing_account:
+                # CHECK IF THIS IS THE MOST RECENT BILL FOR THIS BILLING ACCOUNT
+                cur.execute("""
+                            SELECT MAX(billing_date) as latest_bill_date
+                            FROM bills 
+                            WHERE invoice_number = %s
+                            """, (billing_account_ref,))
+
+                latest_bill_result = cur.fetchone()
+                latest_bill_date = latest_bill_result[0] if latest_bill_result else None
+
+                # Get the billing date of the current bill
+                current_bill_date = payment_info[19]  # billing_date from bills table
+
+                # Only generate next bill if this is the most recent bill
+                if latest_bill_date and current_bill_date == latest_bill_date:
+                    # Generate next bill date based on frequency
+                    frequency = billing_account[7]
+                    last_bill_date = current_bill_date
+
+                    if isinstance(last_bill_date, str):
+                        last_bill_date = datetime.strptime(last_bill_date, '%Y-%m-%d')
+
+                    if frequency == 'Monthly':
+                        next_due_date = last_bill_date + relativedelta(months=1)
+                    elif frequency == 'Quarterly':
+                        next_due_date = last_bill_date + relativedelta(months=3)
+                    elif frequency == 'Annual':
+                        next_due_date = last_bill_date + relativedelta(years=1)
+                    else:
+                        next_due_date = last_bill_date
+
+                    # CHECK IF A BILL WITH THE SAME BILLING DATE ALREADY EXISTS
+                    cur.execute("""
+                                SELECT COUNT(*) as bill_count
+                                FROM bills 
+                                WHERE invoice_number = %s AND billing_date = %s
+                                """, (billing_account_ref, next_due_date.strftime('%Y-%m-%d')))
+
+                    existing_bill_count = cur.fetchone()[0]
+
+                    if existing_bill_count == 0:
+                        # No bill exists for this date, safe to generate
+                        should_generate_next_bill = True
+
+                        # Generate next invoice number
+                        next_invoice_number = generate_next_invoice_number()
+
+                        # Create the next bill
+                        cur.execute("""
+                                    INSERT INTO bills (service_provider, account_name, account_number, category,
+                                                       paybill_number, ussd_number, billing_date, bill_amount,
+                                                       account_owner, bill_invoice_number, invoice_number)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                    """, (
+                            billing_account[1],  # service_provider
+                            billing_account[2],  # account_name
+                            billing_account[3],  # account_number
+                            billing_account[4],  # category
+                            billing_account[5],  # paybill_number
+                            billing_account[6],  # ussd_number
+                            next_due_date.strftime('%Y-%m-%d'),  # billing_date
+                            billing_account[14],  # bill_amount
+                            billing_account[9],  # account_owner
+                            next_invoice_number,  # bill_invoice_number
+                            billing_account[11]  # billing account invoice number
+                        ))
+
+                        cur.execute("""
+                                    INSERT INTO invoices (invoice_number)
+                                    VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
+                                    """, (next_invoice_number,))
+
+                        print(f"=== NEXT BILL GENERATED ===")
+                        print(f"Next bill date: {next_due_date.strftime('%Y-%m-%d')}")
+                        print(f"New invoice number: {next_invoice_number}")
+                        print("===========================")
+                    else:
+                        print(f"=== NEXT BILL ALREADY EXISTS ===")
+                        print(f"Found {existing_bill_count} bill(s) for date: {next_due_date.strftime('%Y-%m-%d')}")
+                        print(f"Skipping bill generation")
+                        print("================================")
+
+        conn.commit()
+
+        payment_data = {
+            'payment_date': datetime.strptime(payment_date, '%Y-%m-%d').strftime('%d-%m-%Y'),
+            'invoice_number': payment_info[13],  # Reference/invoice number
+            'account_name': payment_info[2],  # Account name + owner
+            'items': [{
+                'description': payment_info[1],  # Service provider
+                'quantity': payment_info[2],  # Account name
+                'unit-price': payment_info[3],  # Account number
+                'total': f"Ksh {bill_amount:,.2f}"  # Bill amount
+            }],
+            'total_amount': f"Ksh {paid_amount:,.2f}",
+            'balance': f"Ksh {new_balance:,.2f}"
+        }
+
+        sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', payment_info[12])
+        filename = f"payment_receipt_{sanitized_invoice_no}.pdf"
+        filepath = os.path.join(app.config['PAYMENTS_FOLDER'], filename)
+
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        create_payment(payment_data, filepath)
+
+        # Prepare response message
+        if new_balance <= 0:
+            message = f'Payment updated successfully. Bill is now fully paid!'
+            if billing_account and should_generate_next_bill and next_due_date:
+                message += f' Next bill due on {next_due_date.strftime("%d-%m-%Y")} has been generated.'
+            elif billing_account and next_due_date and not should_generate_next_bill:
+                message += f' Next bill for {next_due_date.strftime("%d-%m-%Y")} already exists.'
+        else:
+            message = f'Payment updated successfully. Remaining balance: Ksh {new_balance:,.2f}'
+
+        cur.close()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'message': message,
+            'new_balance': new_balance,
+            'is_fully_paid': new_balance <= 0,
+            'receipt_url': url_for('download_payment', filename=filename)
+        })
+
+    except Exception as e:
+        # Make sure to close connections in case of error
+        try:
+            if 'cur' in locals():
+                cur.close()
+            if 'conn' in locals():
+                conn.close()
+        except:
+            pass
+        return jsonify({'success': False, 'message': f'Error updating payment: {str(e)}'})
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
+    os.makedirs(app.config['PAYMENTS_FOLDER'], exist_ok=True)
     app.run(host='0.0.0.0', port=5000, debug=True)
