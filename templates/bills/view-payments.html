@@ -58,7 +58,7 @@
             <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <p class="mt-3 mb-0">Loading payments data, please wait...</p>
+            <p class="mt-3 mb-0">Loading, please wait...</p>
         </div>
     </div>
 
@@ -239,171 +239,181 @@
     </div>
 
     <script>
-    // Show full page loader on page load if searching
-    document.addEventListener('DOMContentLoaded', function() {
-        // Check if we came from a search
-        if (window.location.search.includes('start_date') || window.location.search.includes('end_date')) {
+        // Show loader when page is about to refresh
+        window.addEventListener('beforeunload', function() {
+            document.getElementById('fullPageLoader').style.display = 'flex';
+        });
+
+        // Hide loader once page is fully loaded
+        window.addEventListener('load', function() {
             document.getElementById('fullPageLoader').style.display = 'none';
-        }
 
-        // Set select values from previous form submission
-        const urlParams = new URLSearchParams(window.location.search);
-        const accountOwner = urlParams.get('account_owner');
-        const category = urlParams.get('category');
-
-        if (accountOwner) {
-            document.getElementById('account_owner').value = accountOwner;
-        }
-        if (category) {
-            document.getElementById('category').value = category;
-        }
-    });
-
-    // Handle search form submission with loader
-    document.getElementById('searchForm').addEventListener('submit', function(e) {
-        const btn = document.getElementById('searchBtn');
-        const text = document.getElementById('searchText');
-        const spinner = document.getElementById('searchSpinner');
-        const fullPageLoader = document.getElementById('fullPageLoader');
-
-        // Show button loader
-        btn.disabled = true;
-        text.textContent = 'Searching...';
-        spinner.classList.remove('d-none');
-
-        // Show full page loader
-        fullPageLoader.style.display = 'flex';
-    });
-
-    // Handle modal show event to populate data
-    document.getElementById('editPaymentModal').addEventListener('show.bs.modal', function (event) {
-        const button = event.relatedTarget;
-        const modal = this;
-
-        modal.querySelector('#modalPaymentId').value = button.getAttribute('data-payment-id');
-        modal.querySelector('#modalServiceProvider').value = button.getAttribute('data-service-provider');
-        modal.querySelector('#modalAccountName').value = button.getAttribute('data-account-name');
-        modal.querySelector('#modalAccountNumber').value = button.getAttribute('data-account-number');
-        modal.querySelector('#modalCategory').value = button.getAttribute('data-category');
-        modal.querySelector('#modalReferenceNumber').value = button.getAttribute('data-reference-number');
-        modal.querySelector('#modalAccountOwner').value = button.getAttribute('data-account-owner');
-
-        // Editable fields
-        modal.querySelector('#modalPaidAmount').value = button.getAttribute('data-paid-amount');
-        modal.querySelector('#modalPaymentDate').value = button.getAttribute('data-payment-date');
-        // modal.querySelector('#modalBankAccount').value = button.getAttribute('data-bank-account');
-    });
-
-    // Handle form submission for editing payments
-    document.getElementById('editPaymentForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        const btn = document.getElementById('savePaymentChangesBtn');
-        const text = document.getElementById('savePaymentChangesText');
-        const spinner = document.getElementById('savePaymentChangesSpinner');
-
-        btn.disabled = true;
-        text.textContent = 'Saving...';
-        spinner.classList.remove('d-none');
-
-        const formData = {
-            paid_amount: document.getElementById('modalPaidAmount').value,
-            payment_date: document.getElementById('modalPaymentDate').value,
-            //bank_account: document.getElementById('modalBankAccount').value
-        };
-
-        const paymentId = document.getElementById('modalPaymentId').value;
-
-        fetch(`/update_payment/${paymentId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Build success message with receipt download option
-                let alertContent = `
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        ${data.message}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-
-                // Add receipt download section if receipt URL is available
-                if (data.receipt_url) {
-                    alertContent += `
-                        <div class="receipt-download-section mt-2">
-                            <strong>Payment Receipt:</strong>
-                            <div class="mt-2">
-                                <a href="${data.receipt_url}" class="btn btn-sm btn-outline-primary" target="_blank">
-                                    <i class="bi bi-download"></i> Download Receipt
-                                </a>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                alertContent += `</div>`;
-
-                // Create and insert the alert
-                const alertDiv = document.createElement('div');
-                alertDiv.innerHTML = alertContent;
-
-                const container = document.querySelector('.container.py-5');
-                container.insertBefore(alertDiv, container.children[1]);
-
-                // Close the modal
-                const modal = bootstrap.Modal.getInstance(document.getElementById('editPaymentModal'));
-                modal.hide();
-
-                // Don't show full page loader - let user see the success message
-                // Refresh the page after 5 seconds to give user time to download receipt
-                setTimeout(() => {
-                    // Show loader just before refresh
-                    document.getElementById('fullPageLoader').style.display = 'flex';
-
-                    // Small delay before actual refresh to show the loader
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 500);
-                }, 5000);
-            } else {
-                // Show error alert
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-                alertDiv.role = 'alert';
-                alertDiv.innerHTML = `
-                    Error: ${data.message || 'Failed to update payment'}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
-
-                const modalBody = document.querySelector('#editPaymentModal .modal-body');
-                modalBody.insertBefore(alertDiv, modalBody.firstChild);
+            // Check if we came from a search
+            if (window.location.search.includes('start_date') || window.location.search.includes('end_date')) {
+                document.getElementById('fullPageLoader').style.display = 'none';
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            // Show error alert
+
+            // Set select values from previous form submission
+            //const urlParams = new URLSearchParams(window.location.search);
+            //const accountOwner = urlParams.get('account_owner');
+            //const category = urlParams.get('category');
+
+            //if (accountOwner) {
+                //document.getElementById('account_owner').value = accountOwner;
+            //}
+            //if (category) {
+            //    document.getElementById('category').value = category;
+            //}
+        });
+
+        // Handle search form submission with loader
+        document.getElementById('searchForm').addEventListener('submit', function(e) {
+            const btn = document.getElementById('searchBtn');
+            const text = document.getElementById('searchText');
+            const spinner = document.getElementById('searchSpinner');
+
+            // Show button loader
+            btn.disabled = true;
+            text.textContent = 'Searching...';
+            spinner.classList.remove('d-none');
+
+            // Show full page loader
+            document.getElementById('fullPageLoader').style.display = 'flex';
+        });
+
+        // Handle modal show event to populate data
+        document.getElementById('editPaymentModal').addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const modal = this;
+
+            modal.querySelector('#modalPaymentId').value = button.getAttribute('data-payment-id');
+            modal.querySelector('#modalServiceProvider').value = button.getAttribute('data-service-provider');
+            modal.querySelector('#modalAccountName').value = button.getAttribute('data-account-name');
+            modal.querySelector('#modalAccountNumber').value = button.getAttribute('data-account-number');
+            modal.querySelector('#modalCategory').value = button.getAttribute('data-category');
+            modal.querySelector('#modalReferenceNumber').value = button.getAttribute('data-reference-number');
+            modal.querySelector('#modalAccountOwner').value = button.getAttribute('data-account-owner');
+
+            // Editable fields
+            modal.querySelector('#modalPaidAmount').value = button.getAttribute('data-paid-amount');
+            modal.querySelector('#modalPaymentDate').value = button.getAttribute('data-payment-date');
+            // modal.querySelector('#modalBankAccount').value = button.getAttribute('data-bank-account');
+
+            // Clear any previous alerts in the modal
+            const existingAlerts = modal.querySelectorAll('.alert');
+            existingAlerts.forEach(alert => alert.remove());
+        });
+
+        // Handle form submission for editing payments
+        document.getElementById('editPaymentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            document.getElementById('fullPageLoader').style.display = 'flex';
+            const btn = document.getElementById('savePaymentChangesBtn');
+            const text = document.getElementById('savePaymentChangesText');
+            const spinner = document.getElementById('savePaymentChangesSpinner');
+
+            btn.disabled = true;
+            text.textContent = 'Saving...';
+            spinner.classList.remove('d-none');
+
+            const formData = {
+                paid_amount: document.getElementById('modalPaidAmount').value,
+                payment_date: document.getElementById('modalPaymentDate').value,
+                //bank_account: document.getElementById('modalBankAccount').value
+            };
+
+            const paymentId = document.getElementById('modalPaymentId').value;
+
+            fetch(`/update_payment/${paymentId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Build success message with receipt download option
+                    let alertContent = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            ${data.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    `;
+
+                    // Add receipt download section if receipt URL is available
+                    if (data.receipt_url) {
+                        alertContent += `
+                            <div class="receipt-download-section mt-2">
+                                <strong>Payment Receipt:</strong>
+                                <div class="mt-2">
+                                    <a href="${data.receipt_url}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="bi bi-download"></i> Download Receipt
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    alertContent += `</div>`;
+
+                    // Create and insert the alert
+                    const alertDiv = document.createElement('div');
+                    alertDiv.innerHTML = alertContent;
+
+                    const container = document.querySelector('.container.py-5');
+                    container.insertBefore(alertDiv, container.children[1]);
+
+                    // Close the modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editPaymentModal'));
+                    modal.hide();
+
+                    // Refresh the page after 5 seconds to give user time to download receipt
+                    setTimeout(() => {
+                        document.getElementById('fullPageLoader').style.display = 'flex';
+                        window.location.reload();
+                    }, 5000);
+                } else {
+                    showErrorAlert(data.message || 'Failed to update payment', 'modal');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showErrorAlert(error.message || 'An unexpected error occurred while updating payment', 'modal');
+            })
+            .finally(() => {
+                document.getElementById('fullPageLoader').style.display = 'none';
+                btn.disabled = false;
+                text.textContent = 'Save Changes';
+                spinner.classList.add('d-none');
+            });
+        });
+
+        // Helper function to show error alerts
+        function showErrorAlert(message, location = 'page') {
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-danger alert-dismissible fade show';
             alertDiv.role = 'alert';
             alertDiv.innerHTML = `
-                Error: An unexpected error occurred while updating payment
+                ${message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             `;
 
-            const modalBody = document.querySelector('#editPaymentModal .modal-body');
-            modalBody.insertBefore(alertDiv, modalBody.firstChild);
-        })
-        .finally(() => {
-            btn.disabled = false;
-            text.textContent = 'Save Changes';
-            spinner.classList.add('d-none');
-        });
-    });
-</script>
+            if (location === 'modal') {
+                const modalBody = document.querySelector('#editPaymentModal .modal-body');
+                modalBody.insertBefore(alertDiv, modalBody.firstChild);
+            } else {
+                const container = document.querySelector('.container.py-5');
+                container.insertBefore(alertDiv, container.firstChild);
+            }
+        }
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

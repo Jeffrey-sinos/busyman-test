@@ -1,0 +1,30 @@
+<button type="button" id="backToAddSearch" class="btn btn-outline-secondary back-to-search mb-3">
+    &larr; Back to Search
+</button>
+<form id="addSupplierForm" class="editable-form">
+    <input type="hidden" name="form_type" value="add">
+    <table class="table table-bordered">
+        <tbody>
+            <tr>
+                <th>Supplier Name</th>
+                <td><input type="text" class="form-control" id="add-supplier_name" name="supplier_name"></td>
+            </tr>
+            <tr>
+                <th>Contact Person</th>
+                <td><input type="text" class="form-control" id="add-contact_name" name="contact_name"></td>
+            </tr>
+            <tr>
+                <th>Telephone</th>
+                <td><input type="text" class="form-control" id="add-telephone" name="telephone"></td>
+            </tr>
+            <tr>
+                <th>Email</th>
+                <td><input type="email" class="form-control" id="add-email" name="email"></td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="text-right mt-3">
+        <button type="button" id="cancelAdd" class="btn btn-secondary mr-2">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Supplier</button>
+    </div>
+</form>
