@@ -2647,7 +2647,258 @@ def edit_product():
 def add_product():
     return render_template('products/add-product.html')
 
-# Stores Route
+# Suppliers route
+@app.route('/suppliers', methods=['GET', 'POST'])
+def suppliers():
+    if request.method == 'GET' and ('term' in request.args or 'all' in request.args):
+        search_term = request.args.get('term', '').strip()
+        show_all = request.args.get('all', 'false').lower() == 'true'
+        print(f"Search term received: {search_term}, Show all: {show_all}")
+
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            # Main query
+            query = sql.SQL("""
+                SELECT * FROM suppliers WHERE status = 'Active'
+            """)
+
+            # Add WHERE clause only if not showing all and search term exists
+            if not show_all and search_term:
+                query = sql.SQL("""
+                    {base_query}
+                    AND (supplier_name ILIKE %s OR contact_name ILIKE %s OR telephone ILIKE %s OR email ILIKE %s)
+                """).format(base_query=query)
+                search_pattern = f'%{search_term}%'
+                params = (search_pattern, search_pattern, search_pattern, search_pattern)
+            else:
+                params = ()
+
+            # Add ordering and limit
+            query = sql.SQL("""
+                {base_query}
+                ORDER BY supplier, contact
+                LIMIT 100
+            """).format(base_query=query)
+
+            cur.execute(query, params)
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+
+            results = []
+            for idx, row in enumerate(rows):
+                print(f"Row {idx}: {row}")
+                # Safely handle date formatting
+
+                created_at = ''
+                try:
+                    created_at = row[5].strftime('%d-%m-%Y') if row[5] and hasattr(row[5], 'strftime') else str(row[5])
+                    #updated_at = row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] and hasattr(row[6],'strftime') else str(row[6])
+                except Exception as e:
+                    print(f"Date formatting error: {e}")
+                    created_at = str(row[5]) if row[5] else ''
+                    #updated_at = str(row[6]) if row[6] else ''
+
+                display_name = f"{row[1]} - {row[2]}" if row[1] and row[2] else row[1] or row[2] or 'Unnamed Supplier'
+
+                results.append({
+                    'label': display_name,
+                    'value': display_name,
+                    'data': {
+                        'supplier_id': row[0],
+                        'supplier_name': row[1],
+                        'contact_name': row[2],
+                        'telephone': row[3],
+                        'email': row[4],
+                        'created_at': created_at,
+                        #'updated_at': updated_at,
+                        #'status': row[7] if len(row) > 7 else 'Active'
+                    }
+                })
+            return jsonify(results)
+        except Exception as e:
+            print(f"Database error: {e}")
+            return jsonify([])
+
+    elif request.method == 'POST':
+        form_type = request.form.get('form_type')
+
+        if form_type == 'delete':
+            try:
+                supplier_id = request.form['supplier_id']
+                conn = get_db_connection()
+                cur = conn.cursor()
+                cur.execute("""
+                    UPDATE suppliers SET status = 'Not Active' WHERE supplier_id = %s
+                """, (supplier_id,))
+                conn.commit()
+                return jsonify({'success': True, 'message': 'Supplier deleted successfully'})
+            except Exception as e:
+                print(f"Error deleting supplier: {e}")
+                return jsonify({'success': False, 'message': 'Failed to delete supplier'}), 400
+            finally:
+                cur.close()
+                conn.close()
+
+        elif form_type == 'edit':
+            try:
+                # Get all form data
+                supplier_id = request.form['supplier_id']
+                supplier_name = request.form['supplier_name']
+                contact_name = request.form['contact_name']
+                telephone = request.form['telephone']
+                email = request.form['email']
+
+                conn = get_db_connection()
+                cur = conn.cursor()
+
+                # Update query
+                update_query = sql.SQL("""
+                    UPDATE suppliers
+                    SET 
+                        supplier = %s,
+                        contact = %s,
+                        telephone = %s,
+                        email = %s
+                    WHERE supplier_id = %s
+                    RETURNING *
+                """)
+
+                cur.execute(update_query, (
+                    supplier_name,
+                    contact_name,
+                    telephone,
+                    email,
+                    supplier_id
+                ))
+
+                # Get the updated record
+                updated_record = cur.fetchone()
+                conn.commit()
+
+                # Format dates for response
+                created_at = ''
+                #updated_at = ''
+                try:
+                    created_at = updated_record[5].strftime('%Y-%m-%d %H:%M:%S') if updated_record[5] and hasattr(
+                        updated_record[5], 'strftime') else str(updated_record[5])
+                    #updated_at = updated_record[6].strftime('%Y-%m-%d %H:%M:%S') if updated_record[6] and hasattr(
+                        #updated_record[6], 'strftime') else str(updated_record[6])
+                except Exception as e:
+                    print(f"Date formatting error: {e}")
+                    created_at = str(updated_record[5]) if updated_record[5] else ''
+                    #updated_at = str(updated_record[6]) if updated_record[6] else ''
+
+                updated_data = {
+                    'supplier_id': updated_record[0],
+                    'supplier_name': updated_record[1],
+                    'contact_name': updated_record[2],
+                    'telephone': updated_record[3],
+                    'email': updated_record[4],
+                    'created_at': created_at,
+                    #'updated_at': updated_at,
+                    'status': updated_record[6] if len(updated_record) > 6 else 'Active'
+                }
+
+                return jsonify({
+                    'success': True,
+                    'message': 'Supplier updated successfully',
+                    'updated_data': updated_data
+                })
+            except Exception as e:
+                print(f"Error updating supplier: {e}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to update supplier: {str(e)}'
+                }), 400
+            finally:
+                cur.close()
+                conn.close()
+
+        elif form_type == 'add':
+            try:
+                # Get form fields
+                supplier_name = request.form.get('supplier_name', '').strip()
+                contact_name = request.form.get('contact_name', '').strip()
+                telephone = request.form.get('telephone', '').strip()
+                email = request.form.get('email', '').strip()
+
+                if not supplier_name and not contact_name:
+                    return jsonify(
+                        {'success': False, 'message': 'Either supplier name or contact name is required'}), 400
+
+                # Validate email format if provided
+                if email:
+                    import re
+                    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+                    if not re.match(email_pattern, email):
+                        return jsonify({'success': False, 'message': 'Invalid email format'}), 400
+
+                conn = get_db_connection()
+                cur = conn.cursor()
+
+                insert_query = """
+                    INSERT INTO suppliers (
+                        supplier, contact, telephone, email
+                    ) VALUES (%s, %s, %s, %s)
+                    RETURNING supplier_id, supplier, contact, telephone, email, created_date
+                """
+
+                cur.execute(insert_query, (
+                    supplier_name, contact_name, telephone, email
+                ))
+
+                result = cur.fetchone()
+                if not result:
+                    raise Exception("No data returned after insert")
+
+                supplier_id, sup_name, cont_name, tel, em, created_at = result
+                conn.commit()
+
+                # Format the date safely
+                formatted_date = ''
+                try:
+                    formatted_date = created_at.strftime('%d-%m-%Y') if hasattr(created_at,
+                                                                                         'strftime') else str(
+                        created_at)
+                except Exception as e:
+                    print(f"Date formatting error: {e}")
+                    formatted_date = str(created_at)
+
+                return jsonify({
+                    'success': True,
+                    'message': 'Supplier added successfully',
+                    'supplier_name': sup_name,
+                    'contact_name': cont_name,
+                    'created_at': formatted_date
+                })
+
+            except Exception as e:
+                print(f"Error adding supplier: {e}")
+                return jsonify({
+                    'success': False,
+                    'message': f'Failed to add supplier: {str(e)}'
+                }), 400
+            finally:
+                if 'cur' in locals(): cur.close()
+                if 'conn' in locals(): conn.close()
+
+        return jsonify({'success': False, 'message': 'Invalid form type'}), 400
+
+    return render_template('suppliers/search-supplier.html')
+
+# Edit Supplier Route
+@app.route('/edit_supplier')
+def edit_supplier():
+    return render_template('suppliers/edit-supplier.html')
+
+# Add Supplier Route
+@app.route('/add_supplier')
+def add_supplier():
+    return render_template('suppliers/add-supplier.html')
+# Stores Menu Route
 @app.route('/stores')
 def stores_menu():
     return render_template('stores_menu.html')
@@ -4047,6 +4298,8 @@ def update_payment(payment_id):
         except:
             pass
         return jsonify({'success': False, 'message': f'Error updating payment: {str(e)}'})
+
+
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)

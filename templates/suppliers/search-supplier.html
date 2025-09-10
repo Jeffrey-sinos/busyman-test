@@ -1,0 +1,87 @@
+{% extends "suppliers/main-supplier.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card form-container">
+        <div class="card-body">
+            <!-- Search Section -->
+            <div id="searchSection" class="search-section">
+                <h2 class="card-title">Search Supplier</h2>
+                <form method="POST" id="searchForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="search_supplier" class="sr-only">Supplier search</label>
+                            <input type="text" class="form-control" id="search_supplier"
+                                   name="search_supplier" placeholder="Search supplier..." autocomplete="off">
+                            <!-- Hidden fields for all data -->
+                            <input type="hidden" id="supplier_id" name="supplier_id">
+                            <input type="hidden" id="supplier_name" name="supplier_name">
+                            <input type="hidden" id="contact_name" name="contact_name">
+                            <input type="hidden" id="telephone" name="telephone">
+                            <input type="hidden" id="email" name="email">
+                            <input type="hidden" id="created_at" name="created_at">
+                            <input type="hidden" id="updated_at" name="updated_at">
+
+                        </div>
+                        <div class="button-group">
+                            <button type="button" id="searchButton" class="btn btn-primary">Search</button>
+                            <a href="{{ url_for('stores_menu') }}" class="btn btn-secondary">Back to Stores Menu</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Results display area - will be populated dynamically -->
+            <div id="supplierDetails" class="mt-4 hidden">
+                <button type="button" id="backToSearch" class="btn btn-outline-secondary back-to-search">
+                    &larr; Back to Search
+                </button>
+                <h4 id="supplierDetailsTitle">Supplier Details</h4>
+                <div id="viewSupplierDetails" class="editable-form">
+                    <table class="table table-bordered">
+                        <tbody>
+                            <tr>
+                                <th>Supplier Name</th>
+                                <td id="view-supplier_name"></td>
+                            </tr>
+                            <tr>
+                                <th>Contact Person</th>
+                                <td id="view-contact_name"></td>
+                            </tr>
+                            <tr>
+                                <th>Telephone</th>
+                                <td id="view-telephone"></td>
+                            </tr>
+                            <tr>
+                                <th>Email</th>
+                                <td id="view-email"></td>
+                            </tr>
+                            <tr>
+                                <th>Created At</th>
+                                <td id="view-created_at"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div class="text-right mt-3">
+                        <button type="button" id="editSupplierBtn" class="btn btn-primary">Edit Supplier</button>
+                        <button type="button" id="deleteSupplierBtn" class="btn btn-danger">Delete Supplier</button>
+                    </div>
+                </div>
+                {% include "suppliers/edit-supplier.html" %}
+            </div>
+            <div id="addSupplierContainer" class="mt-4 hidden">
+                <!-- This will be populated by the add supplier form -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include results popup -->
+{% include "suppliers/results.html" %}
+
+
+{% block extra_js %}
+<script > var searchUrl = "{{ url_for('suppliers') }}";</script>
+<script src="{{ url_for('static', filename='js/suppliers.js') }}"></script>
+{% endblock %}
+{% endblock %}

@@ -61,7 +61,7 @@
 
     <div class="d-flex flex-column">
         <a href="{{ url_for('products') }}" class="btn btn-block mb-2">Products</a>
-        <button class="btn btn-block mb-2">Suppliers</button>
+        <a href="{{ url_for('suppliers') }}" class="btn btn-block mb-2">Suppliers</a>
         <a href="{{ url_for('admin_dashboard') if session.get('role') == 2 else url_for('superuser_dashboard') }}" class="btn btn-block mt-3">Back to Menu</a>
     </div>
 </div>
