@@ -1,44 +1,208 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login</title>
+<link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .container { max-width: 500px; }
+    .alert-auto-dismiss {
+        animation: fadeOut 0.5s ease-in 5s forwards;
+    }
+    @keyframes fadeOut {
+        from {opacity: 1;}
+        to {opacity: 0; height:0; padding:0; margin:0; overflow:hidden;}
+    }
+
+    /* Improved form layout */
+    .form-group {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    .form-group label {
+        width: 120px;
+        margin-bottom: 0;
+        text-align: right;
+        padding-right: 1rem;
+        flex-shrink: 0;
+    }
+    .form-group .input-container {
+        flex: 1;
+        max-width: 250px; /* Limit the maximum width of input fields */
+    }
+
+    /* Input field styling - shorter lengths */
+    .form-control {
+        max-width: 250px; /* Maximum width for all form controls */
+        width: 100%;
+    }
+
+    /* Password field specific styling */
+    .password-container {
+        display: flex;
+        width: 100%;
+        max-width: 250px; /* Match the input container width */
+    }
+    .password-container input {
+        flex: 1;
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+    .password-toggle {
+        background: transparent;
+        border: 1px solid #ced4da;
+        border-left: none;
+        border-top-right-radius: 0.25rem;
+        border-bottom-right-radius: 0.25rem;
+        padding: 0.375rem 0.75rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    /* Full page loader */
+    .full-page-loader {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background-color: rgba(255,255,255,0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+    .loader-content {
+        text-align: center;
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+
+    .login-heading {
+        margin-bottom: 1.8rem !important;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .form-group {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .form-group label {
+            width: 100%;
+            text-align: left;
+            padding-right: 0;
+            margin-bottom: 0.5rem;
+        }
+        .form-group .input-container {
+            width: 100%;
+            max-width: none; /* Allow full width on mobile */
+        }
+        .form-control {
+            max-width: none; /* Allow full width on mobile */
+        }
+        .password-container {
+            max-width: none; /* Allow full width on mobile */
+        }
+    }
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="text-center mb-5">
-            <h1 class="display-4">BusyMan Pro</h1>
-            <p class="lead">Manage your sales and invoices</p>
+
+<!-- Full page loader -->
+<div id="fullPageLoader" class="full-page-loader">
+    <div class="loader-content">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+            <span class="sr-only">Loading...</span>
         </div>
-        <h2 class="text-center mt-5">Login</h2>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-        <form method="POST">
-            <div class="form-group">
-                <label for="username">Username</label>
+        <p class="mt-3">Loading, please wait...</p>
+    </div>
+</div>
+
+<div class="container mt-5">
+    <div class="text-center mb-5">
+        <h1 class="display-4">BusyMan Pro</h1>
+        <p class="lead">Manage your sales and invoices</p>
+    </div>
+    <h2 class="text-center mt-5 login-heading">Login</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-auto-dismiss" role="alert">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <form method="POST" id="loginForm">
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <div class="input-container">
                 <input type="text" class="form-control" id="username" name="username" required>
             </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <div class="input-container">
+                <div class="password-container">
+                    <input type="password" class="form-control" id="password" name="password" required>
+                    <span class="password-toggle" id="passwordToggle">
+                        <i class="far fa-eye"></i>
+                    </span>
+                </div>
             </div>
-            <button type="submit" class="btn btn-primary">Login</button>
-        </form>
-    </div>
-    <!-- Bootstrap JS for dismissible alert -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+        </div>
+
+        <div class="text-center">
+            <button type="submit" class="btn btn-primary" id="loginButton">Login</button>
+        </div>
+    </form>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Toggle password visibility
+    document.getElementById('passwordToggle').addEventListener('click', function () {
+        const passwordInput = document.getElementById('password');
+        const icon = this.querySelector('i');
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.classList.replace('fa-eye', 'fa-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            icon.classList.replace('fa-eye-slash', 'fa-eye');
+        }
+    });
+
+    // Full page loader on form submission
+    document.getElementById('loginForm').addEventListener('submit', function() {
+        // Show the loader but don't prevent form submission
+        document.getElementById('fullPageLoader').style.display = 'flex';
+
+        // The form will now submit normally to the server
+        // The loader will disappear when the page reloads
+    });
+
+    // Submit with Enter key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.target.tagName === 'INPUT' &&
+            e.target.type !== 'button' && e.target.type !== 'submit') {
+            document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+        }
+    });
+</script>
 </body>
 </html>
