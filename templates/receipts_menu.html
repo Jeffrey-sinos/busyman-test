@@ -63,7 +63,7 @@
         <a href="{{ url_for('view_sales') }}" class="btn btn-block mb-2">View and Receive</a>
         <a href="{{ url_for('customer_search') }}" class="btn btn-block mb-2">Search and Receive</a>
         <a href="{{ url_for('search_receipts') }}" class="btn btn-block mb-2">Edit receipts</a>
-        <a href="{{ url_for('superuser_dashboard') if session.get('role') == 1 else url_for('admin_dashboard') if session.get('role') == 2 else url_for('user_dashboard') }}" class="btn btn-block mt-3">Back to Menu</a>
+        <a href="{{ url_for('invoices_menu') }}" class="btn btn-block mt-3">Back</a>
     </div>
 </div>
 

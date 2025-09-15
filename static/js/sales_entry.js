@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const backToClientSearchBtn = document.getElementById('backToClientSearchBtn');
     const backToTransactionTypeBtn = document.getElementById('backToTransactionTypeBtn');
     const selectedClientDisplay = document.getElementById('selectedClientDisplay');
+    const saveLoader = document.getElementById('saveLoader');
 
     // State variables
     let currentItems = [];
@@ -31,6 +32,143 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentTransactionType = 'sell';
     const clientNames = window.clientNames || [];
     selectedClientDisplay.textContent = 'No client selected';
+
+    // Required fields configuration
+    const requiredFields = {
+        'product': 'Product is required',
+        'quantity': 'Quantity is required',
+        'price': 'Price is required',
+        'category': 'Category is required',
+        'account': 'Account Owner is required',
+        'bank_account': 'Bank Account is required'
+    };
+
+    // Field validation functions
+    function validateField(fieldId, value) {
+        const field = document.getElementById(fieldId);
+        const fieldContainer = field.parentNode;
+        let errorElement = fieldContainer.querySelector('.field-error-message');
+
+        // Remove existing validation classes
+        field.classList.remove('field-error', 'field-valid');
+
+        if (requiredFields[fieldId]) {
+            if (!value || value.trim() === '') {
+                // Field is empty - show error
+                field.classList.add('field-error');
+
+                if (!errorElement) {
+                    errorElement = document.createElement('div');
+                    errorElement.className = 'field-error-message';
+                    fieldContainer.appendChild(errorElement);
+                }
+                errorElement.textContent = requiredFields[fieldId];
+                errorElement.classList.add('show');
+                return false;
+            } else {
+                // Field has value - show valid
+                field.classList.add('field-valid');
+                if (errorElement) {
+                    errorElement.classList.remove('show');
+                }
+                return true;
+            }
+        }
+        return true;
+    }
+
+    function validateAllRequiredFields() {
+        let allValid = true;
+        const fieldValues = {};
+
+        Object.keys(requiredFields).forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            const value = field.value;
+            fieldValues[fieldId] = value;
+
+            if (!validateField(fieldId, value)) {
+                allValid = false;
+            }
+        });
+
+        return { isValid: allValid, values: fieldValues };
+    }
+
+    // Add real-time validation listeners
+    Object.keys(requiredFields).forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('input', function() {
+                validateField(fieldId, this.value);
+            });
+            field.addEventListener('change', function() {
+                validateField(fieldId, this.value);
+            });
+        }
+    });
+
+    // Helper function to stop loading
+    function stopLoading() {
+        saveSaleBtn.disabled = false;
+        saveLoader.style.display = 'none';
+    }
+
+    // Helper function to start loading
+    function startLoading() {
+        saveSaleBtn.disabled = true;
+        saveLoader.style.display = 'inline-block';
+    }
+
+    // Reset form for new item
+    function resetFormForNewItem() {
+        document.getElementById('product').value = '';
+        document.getElementById('quantity').value = '1';
+        document.getElementById('price').value = '';
+        document.getElementById('category').value = '';
+        document.getElementById('notes').value = '';
+
+        // Clear validation styles
+        Object.keys(requiredFields).forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            const fieldContainer = field.parentNode;
+            const errorElement = fieldContainer.querySelector('.field-error-message');
+
+            field.classList.remove('field-error', 'field-valid');
+            if (errorElement) {
+                errorElement.classList.remove('show');
+            }
+        });
+    }
+
+    // Reset entire form to start over
+    function resetToClientSearch() {
+        // Reset all sections
+        salesFormSection.classList.remove('active');
+        transactionTypeSection.classList.remove('active');
+        clientSearchSection.classList.add('active');
+
+        // Reset form
+        resetFormForNewItem();
+        document.getElementById('account').value = '';
+        document.getElementById('bank_account').value = '';
+        clientNameInput.value = '';
+        selectedClientDisplay.textContent = 'No client selected';
+
+        // Reset state
+        currentItems = [];
+        currentInvoiceUrl = '';
+
+        // Hide sections
+        addAnotherSection.style.display = 'none';
+        document.getElementById('invoicePreview').style.display = 'none';
+        document.getElementById('pdfLinksContainer').style.display = 'none';
+
+        // Show save button
+        saveSaleBtn.style.display = 'block';
+
+        // Stop any loading
+        stopLoading();
+    }
 
     // Client search functionality
     clientNameInput.addEventListener('input', function() {
@@ -241,10 +379,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Save sale functionality
     saveSaleBtn.addEventListener('click', function() {
-        saveSaleBtn.disabled = true;
-        const loader = document.createElement('span');
-        loader.className = 'spinner-border spinner-border-sm';
-        saveSaleBtn.appendChild(loader);
+        // Validate all required fields
+        const validation = validateAllRequiredFields();
+
+        if (!validation.isValid) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        startLoading();
 
         const formData = {
             invoice_date: invoiceDate.value,
@@ -261,11 +404,6 @@ document.addEventListener('DOMContentLoaded', function() {
             add_another: 'no'
         };
 
-        if (!formData.product || !formData.price) {
-            alert('Please fill in all required fields');
-            return;
-        }
-
         fetch('/sales/entry', {
             method: 'POST',
             headers: {
@@ -275,9 +413,8 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            // Remove loader
-            saveSaleBtn.disabled = false;
-            saveSaleBtn.removeChild(loader);
+            stopLoading();
+
             if (data.status === 'success' || data.status === 'add_another') {
                 const quantity = currentTransactionType === 'take_back' ?
                     -Math.abs(formData.quantity) : formData.quantity;
@@ -297,28 +434,26 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentInvoiceUrl = data.invoice_url;
                 }
 
-                updateInvoicePreview(
-                    data.invoice_number,
-                    formData.invoice_date,
-                    formData.client_name,
-                    currentTransactionType,
-                    currentItems
-                );
-
+                // Hide save button and show add another section
                 saveSaleBtn.style.display = 'none';
                 addAnotherSection.style.display = 'block';
-                document.getElementById('invoicePreview').style.display = 'block';
+
+                // Don't show preview yet - wait for user decision
             } else {
-                alert(data.message);
+                alert(data.message || 'An error occurred while saving the sale');
             }
+        })
+        .catch(error => {
+            stopLoading();
+            console.error('Error saving sale:', error);
+            alert('An error occurred while saving the sale');
         });
     });
 
     // Function to show multiple PDF links
-
     function showMultiplePdfLinks(pdfUrls){
         const pdfLinksContainer = document.getElementById('pdfLinksContainer');
-        pdfLinksContainer.innerHTML = '<h6> Generated Invoices: </h6>';
+        pdfLinksContainer.innerHTML = '<h6>Generated Invoices:</h6>';
 
         pdfUrls.forEach(pdf => {
             const link = document.createElement('a');
@@ -334,30 +469,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add another item
     addAnotherYesBtn.addEventListener('click', function() {
-        document.getElementById('product').value = '';
-        document.getElementById('quantity').value = '1';
-        document.getElementById('price').value = '';
-        document.getElementById('category').value = document.getElementById('category').options[0].value;
-        document.getElementById('notes').value = '';
+        resetFormForNewItem();
         addAnotherSection.style.display = 'none';
         saveSaleBtn.style.display = 'block';
         document.getElementById('product').focus();
     });
 
-    // Download invoice
+    // Finish and show preview
     addAnotherNoBtn.addEventListener('click', function() {
-        if (currentInvoiceUrl) {
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = currentInvoiceUrl;
-            document.body.appendChild(iframe);
-            downloadSuccessToast.show();
-            setTimeout(function() {
-                window.location.href = '/sales';
-            }, 2000);
-        }
+        addAnotherSection.style.display = 'none';
+
+        // Now show the invoice preview
+        updateInvoicePreview(
+            invoiceNumber.value,
+            invoiceDate.value,
+            customerNameDisplay.value,
+            currentTransactionType,
+            currentItems
+        );
+
+        document.getElementById('invoicePreview').style.display = 'block';
     });
 
+    // Download invoice
     downloadInvoiceBtn.addEventListener('click', function(e) {
         e.preventDefault();
         if (currentInvoiceUrl) {
@@ -366,6 +500,11 @@ document.addEventListener('DOMContentLoaded', function() {
             iframe.src = currentInvoiceUrl;
             document.body.appendChild(iframe);
             downloadSuccessToast.show();
+
+            // Return to client search instead of exiting
+            setTimeout(function() {
+                resetToClientSearch();
+            }, 2000);
         }
     });
 
@@ -384,8 +523,8 @@ document.addEventListener('DOMContentLoaded', function() {
             row.innerHTML = `
                 <td>${item.description}</td>
                 <td>${Math.abs(item.quantity)}</td>
-                <td>KSh ${parseFloat(item.unitPrice).toFixed(2)}</td>
-                <td>KSh ${parseFloat(item.total).toFixed(2)}</td>
+                <td>Ksh ${parseFloat(item.unitPrice).toFixed(2)}</td>
+                <td>Ksh ${parseFloat(item.total).toFixed(2)}</td>
             `;
             invoiceItemsTable.appendChild(row);
             totalAmount += parseFloat(item.total);
