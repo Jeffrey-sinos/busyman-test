@@ -87,7 +87,7 @@
                 <span id="searchText">Search</span>
                 <span id="searchSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
             </button>
-            <a href="{{ url_for('search_menu') }}" class="btn btn-secondary">Back to Search Menu</a>
+            <a href="{{ url_for('invoices_menu') }}" class="btn btn-secondary">Back</a>
         </form>
 
         {% if invoices %}
@@ -107,7 +107,7 @@
                             <th>Price</th>
                             <th>Total</th>
                             <th>Category</th>
-                            <th>Status</th>
+                        <!--<th>Status</th>-->
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -122,11 +122,12 @@
                             <td>{{ invoice[6] }}</td>
                             <td>{{ "Ksh {:,.2f}".format(invoice[7])}}</td>
                             <td>{{ invoice[9] }}</td>
-                            <td>
+                        <!--<<td>
                                 <span class="badge bg-{% if invoice[12] == 'Active' %}success{% else %}danger{% endif %}">
                                     {{ invoice[12] }}
                                 </span>
                             </td>
+                            -->
                             <td>
                                 <button type="button" class="btn btn-sm btn-warning edit-btn" data-bs-toggle="modal" data-bs-target="#editModal"
                                     data-sales-acc-id="{{ invoice[0] }}"

@@ -782,7 +782,7 @@ def sales_entry():
                         'message': 'Sale added successfully! Add another item?',
                         'invoice_number': invoice_number,
                         'client_name': customer_name,
-                        'invoice_date': invoice_date.strftime('%Y-%m-%d'),
+                        'invoice_date': invoice_date.strftime('%d-%m-%Y'),
                         'invoice_url': url_for('download_invoice', filename=filename),
                         'current_items': all_items
                     })
@@ -809,7 +809,7 @@ def sales_entry():
 
     customer_name = request.args.get('customer_name', '')
     invoice_number = request.args.get('invoice_number', next_invoice_number)
-    date_created = datetime.today().strftime('%Y-%m-%d')
+    date_created = datetime.today().strftime('%d-%m-%Y')
 
     return render_template('sales_entry.html',
                            product_names=product_names,
@@ -831,7 +831,6 @@ def download_invoice(filename):
         as_attachment=True
     )
 
-
 # Download receipt route
 @app.route('/receipts/<filename>')
 def download_receipt(filename):
@@ -851,9 +850,9 @@ def download_payment(filename):
     )
 
 # Search Invoices Menu
-@app.route('/search_menu', methods=['GET', 'POST'])
-def search_menu():
-    return render_template('search_menu.html')
+@app.route('/invoices_menu', methods=['GET', 'POST'])
+def invoices_menu():
+    return render_template('invoices_menu.html')
 
 # Search invoices route
 @app.route('/search_invoices', methods=['GET', 'POST'])
