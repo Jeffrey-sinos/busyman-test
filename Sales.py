@@ -564,13 +564,17 @@ def initiate_payment():
         product_id, product_name, price_per_unit, duration_days, is_active = product
         amount = float(price_per_unit)
 
-        # Format phone number to 254XXXXXXXXX
+        # Clean and format phone number to 254XXXXXXXXX
+        phone_number = phone_number.replace(" ", "").strip()  # Remove spaces and trim
+
         if phone_number.startswith('07'):
+            # If number starts with 07, replace leading 0 with 254
             phone_number = '254' + phone_number[1:]
         elif phone_number.startswith('0'):
+            # Covers other cases like 01, etc.
             phone_number = '254' + phone_number[1:]
         elif phone_number.startswith('+254'):
-            phone_number = phone_number[1:]
+            phone_number = phone_number[1:]  # Strip the +
         elif not phone_number.startswith('254'):
             phone_number = '254' + phone_number
 
