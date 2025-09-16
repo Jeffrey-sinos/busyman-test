@@ -1,4 +1,7 @@
 # import  libraries
+import base64
+
+import requests
 from flask import Flask,flash, session, render_template, request, redirect, url_for, send_from_directory, jsonify, make_response
 import os
 import io
@@ -38,6 +41,14 @@ app.config['PAYMENTS_FOLDER'] = 'payments'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
 
 
+# MPESA API Configuration
+MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY')
+MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET')
+MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE')
+MPESA_PASSKEY = os.getenv('MPESA_PASSKEY')
+MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')  # Your callback URL
+
+
 # Database configuration
 def get_db_connection():
     return psycopg2.connect(
@@ -49,6 +60,157 @@ def get_db_connection():
     )
 
 
+def get_mpesa_access_token():
+    """Get M-Pesa access token"""
+    api_url = "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+    # api_url = "https://sandbox-api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+
+    credentials = f"{MPESA_CONSUMER_KEY}:{MPESA_CONSUMER_SECRET}"
+    encoded_credentials = base64.b64encode(credentials.encode()).decode()
+
+    headers = {
+        'Authorization': f'Basic {encoded_credentials}',
+        'Content-Type': 'application/json'
+    }
+
+    response = requests.get(api_url, headers=headers)
+    return response.json().get('access_token')
+
+
+def get_active_products():
+    """Get all active subscription products"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT product_id, product_name, description, price_per_unit, duration_days
+            FROM subscription_products 
+            WHERE is_active = true
+            ORDER BY duration_days ASC
+        """)
+
+        products = cur.fetchall()
+
+        product_list = []
+        for product in products:
+            product_list.append({
+                'product_id': product[0],
+                'product_name': product[1],
+                'description': product[2],
+                'price_per_unit': float(product[3]),
+                'duration_days': product[4]
+            })
+
+        return product_list
+
+    except Exception as e:
+        print(f"Error fetching products: {str(e)}")
+        return []
+    finally:
+        cur.close()
+        conn.close()
+
+    # Check if user has an active subscription
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        cur.execute("""
+            SELECT subscription_id, start_date, end_date, status 
+            FROM subscriptions 
+            WHERE user_id = %s 
+            ORDER BY end_date DESC 
+            LIMIT 1
+        """, (user_id,))
+
+        subscription = cur.fetchone()
+
+        if not subscription:
+            return {'active': False, 'message': 'No subscription found'}
+
+        subscription_id, start_date, end_date, status = subscription
+        current_date = datetime.now().date()
+
+        if status == 'active' and end_date >= current_date:
+            return {'active': True, 'end_date': end_date}
+        else:
+            return {'active': False, 'message': 'Subscription expired', 'end_date': end_date}
+
+    except Exception as e:
+        return {'active': False, 'message': f'Error checking subscription: {str(e)}'}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def create_subscription_tables():
+    """Create subscription tables if they don't exist"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # Create subscription_products table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS subscription_products (
+            product_id SERIAL PRIMARY KEY,
+            product_name VARCHAR(100) NOT NULL,
+            description TEXT,
+            price_per_unit DECIMAL(10,2) NOT NULL,
+            duration_days INTEGER NOT NULL,
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create subscriptions table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS subscriptions (
+            subscription_id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(user_id),
+            product_id INTEGER REFERENCES subscription_products(product_id),
+            start_date DATE NOT NULL,
+            end_date DATE NOT NULL,
+            status VARCHAR(20) DEFAULT 'active',
+            amount DECIMAL(10,2),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Create mpesa_transactions table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS mpesa_transactions (
+            transaction_id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(user_id),
+            product_id INTEGER REFERENCES subscription_products(product_id),
+            merchant_request_id VARCHAR(100),
+            checkout_request_id VARCHAR(100),
+            phone_number VARCHAR(15),
+            amount DECIMAL(10,2),
+            status VARCHAR(20) DEFAULT 'pending',
+            mpesa_receipt_number VARCHAR(50),
+            transaction_date TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Insert default subscription products
+    cur.execute("""
+        INSERT INTO subscription_products (product_name, description, price_per_unit, duration_days, is_active)
+        VALUES 
+        ('Busyman Lite', 'One day subscription', 1.00, 1, true),
+        ('Weekly Plan', 'Seven days subscription', 50.00, 7, false),
+        ('Monthly Plan', 'Thirty days subscription', 100.00, 30, false),
+        ('Quarterly Plan', 'Ninety days subscription', 250.00, 90, false)
+        ('Yearly Plan', 'One Year subscription', 500.00, 365, false)
+        ON CONFLICT DO NOTHING
+    """)
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 # Current date function
 def get_current_date():
     return datetime.now().strftime('%Y-%m-%d')
@@ -57,6 +219,7 @@ def get_current_date():
 # Current time function
 def get_current_datetime():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
 
 # Display products function
 def read_product_names():
@@ -2391,6 +2554,7 @@ def create_invoice(invoice_data, filename):
     c.drawString(50, 180, "ACCOUNTANT")
     c.save()
 
+
 # Products route
 @app.route('/products', methods=['GET', 'POST'])
 def products():
@@ -2637,15 +2801,18 @@ def products():
 
     return render_template('products/search_product.html')
 
+
 # Edit product Route
 @app.route('/edit_product')
 def edit_product():
     return render_template('products/edit-product.html')
 
+
 # Add Product Route
 @app.route('/add_product')
 def add_product():
     return render_template('products/add-product.html')
+
 
 # Suppliers route
 @app.route('/suppliers', methods=['GET', 'POST'])
@@ -2695,11 +2862,11 @@ def suppliers():
                 created_at = ''
                 try:
                     created_at = row[5].strftime('%d-%m-%Y') if row[5] and hasattr(row[5], 'strftime') else str(row[5])
-                    #updated_at = row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] and hasattr(row[6],'strftime') else str(row[6])
+                    # updated_at = row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] and hasattr(row[6],'strftime') else str(row[6])
                 except Exception as e:
                     print(f"Date formatting error: {e}")
                     created_at = str(row[5]) if row[5] else ''
-                    #updated_at = str(row[6]) if row[6] else ''
+                    # updated_at = str(row[6]) if row[6] else ''
 
                 display_name = f"{row[1]} - {row[2]}" if row[1] and row[2] else row[1] or row[2] or 'Unnamed Supplier'
 
@@ -2713,8 +2880,8 @@ def suppliers():
                         'telephone': row[3],
                         'email': row[4],
                         'created_at': created_at,
-                        #'updated_at': updated_at,
-                        #'status': row[7] if len(row) > 7 else 'Active'
+                        # 'updated_at': updated_at,
+                        # 'status': row[7] if len(row) > 7 else 'Active'
                     }
                 })
             return jsonify(results)
@@ -2780,16 +2947,16 @@ def suppliers():
 
                 # Format dates for response
                 created_at = ''
-                #updated_at = ''
+                # updated_at = ''
                 try:
                     created_at = updated_record[5].strftime('%Y-%m-%d %H:%M:%S') if updated_record[5] and hasattr(
                         updated_record[5], 'strftime') else str(updated_record[5])
-                    #updated_at = updated_record[6].strftime('%Y-%m-%d %H:%M:%S') if updated_record[6] and hasattr(
-                        #updated_record[6], 'strftime') else str(updated_record[6])
+                    # updated_at = updated_record[6].strftime('%Y-%m-%d %H:%M:%S') if updated_record[6] and hasattr(
+                        # updated_record[6], 'strftime') else str(updated_record[6])
                 except Exception as e:
                     print(f"Date formatting error: {e}")
                     created_at = str(updated_record[5]) if updated_record[5] else ''
-                    #updated_at = str(updated_record[6]) if updated_record[6] else ''
+                    # updated_at = str(updated_record[6]) if updated_record[6] else ''
 
                 updated_data = {
                     'supplier_id': updated_record[0],
@@ -2798,7 +2965,7 @@ def suppliers():
                     'telephone': updated_record[3],
                     'email': updated_record[4],
                     'created_at': created_at,
-                    #'updated_at': updated_at,
+                    # 'updated_at': updated_at,
                     'status': updated_record[6] if len(updated_record) > 6 else 'Active'
                 }
 
@@ -2889,19 +3056,24 @@ def suppliers():
 
     return render_template('suppliers/search-supplier.html')
 
+
 # Edit Supplier Route
 @app.route('/edit_supplier')
 def edit_supplier():
     return render_template('suppliers/edit-supplier.html')
 
+
 # Add Supplier Route
 @app.route('/add_supplier')
 def add_supplier():
     return render_template('suppliers/add-supplier.html')
+
+
 # Stores Menu Route
 @app.route('/stores')
 def stores_menu():
     return render_template('stores_menu.html')
+
 
 # Logout Route
 @app.route('/logout')
