@@ -565,7 +565,9 @@ def initiate_payment():
         amount = float(price_per_unit)
 
         # Format phone number to 254XXXXXXXXX
-        if phone_number.startswith('0'):
+        if phone_number.startswith('07'):
+            phone_number = '254' + phone_number[1:]
+        elif phone_number.startswith('0'):
             phone_number = '254' + phone_number[1:]
         elif phone_number.startswith('+254'):
             phone_number = phone_number[1:]
