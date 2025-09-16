@@ -144,6 +144,25 @@
         {% endfor %}
     {% endif %}
     {% endwith %}
+    <script>
+    // Check if there's a subscription message in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const subscriptionMessage = urlParams.get('subscription_message');
+
+    if (subscriptionMessage) {
+        // Display the message
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+        alertDiv.innerHTML = `
+            ${subscriptionMessage}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        `;
+
+        document.querySelector('form').parentNode.insertBefore(alertDiv, document.querySelector('form'));
+    }
+</script>
 
     <form method="POST" id="loginForm">
         <div class="form-group">

@@ -23,6 +23,7 @@ from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash # password hashing
 from dotenv import load_dotenv
 
+
 # Load environment variables
 load_dotenv()
 
@@ -40,13 +41,13 @@ app.config['PAYMENTS_FOLDER'] = 'payments'
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
 
-
 # MPESA API Configuration
 MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY')
 MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET')
 MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE')
+MPESA_TILL = os.getenv('MPESA_TILL')
 MPESA_PASSKEY = os.getenv('MPESA_PASSKEY')
-MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')  # Your callback URL
+MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')
 
 
 # Database configuration
@@ -58,7 +59,6 @@ def get_db_connection():
         host=os.getenv('DB_HOST'),
         port=os.getenv('DB_PORT')
     )
-
 
 def get_mpesa_access_token():
     """Get M-Pesa access token"""
@@ -89,21 +89,18 @@ def get_active_products():
             WHERE is_active = true
             ORDER BY duration_days ASC
         """)
-
         products = cur.fetchall()
 
-        product_list = []
-        for product in products:
-            product_list.append({
-                'product_id': product[0],
-                'product_name': product[1],
-                'description': product[2],
-                'price_per_unit': float(product[3]),
-                'duration_days': product[4]
-            })
-
-        return product_list
-
+        return [
+            {
+                'product_id': p[0],
+                'product_name': p[1],
+                'description': p[2],
+                'price_per_unit': float(p[3]),
+                'duration_days': p[4]
+            }
+            for p in products
+        ]
     except Exception as e:
         print(f"Error fetching products: {str(e)}")
         return []
@@ -111,7 +108,9 @@ def get_active_products():
         cur.close()
         conn.close()
 
-    # Check if user has an active subscription
+
+def check_user_subscription(user_id):
+    """Check if user has an active subscription"""
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -123,7 +122,6 @@ def get_active_products():
             ORDER BY end_date DESC 
             LIMIT 1
         """, (user_id,))
-
         subscription = cur.fetchone()
 
         if not subscription:
@@ -194,17 +192,22 @@ def create_subscription_tables():
         )
     """)
 
-    # Insert default subscription products
-    cur.execute("""
-        INSERT INTO subscription_products (product_name, description, price_per_unit, duration_days, is_active)
-        VALUES 
-        ('Busyman Lite', 'One day subscription', 1.00, 1, true),
-        ('Weekly Plan', 'Seven days subscription', 50.00, 7, false),
-        ('Monthly Plan', 'Thirty days subscription', 100.00, 30, false),
-        ('Quarterly Plan', 'Ninety days subscription', 250.00, 90, false)
-        ('Yearly Plan', 'One Year subscription', 500.00, 365, false)
-        ON CONFLICT DO NOTHING
-    """)
+    # Check if subscription_products table is empty before inserting default values
+    cur.execute("SELECT COUNT(*) FROM subscription_products")
+    count = cur.fetchone()[0]
+
+    if count == 0:
+        # Insert default subscription products only if table is empty
+        cur.execute("""
+            INSERT INTO subscription_products (product_name, description, price_per_unit, duration_days, is_active)
+            VALUES 
+            ('Busyman Lite', 'One day subscription', 1.00, 1, true),
+            ('Weekly Plan', 'Seven days subscription', 50.00, 7, false),
+            ('Monthly Plan', 'Thirty days subscription', 100.00, 30, false),
+            ('Quarterly Plan', 'Ninety days subscription', 250.00, 90, false),
+            ('Yearly Plan', 'One Year subscription', 500.00, 365, false)
+        """)
+        print("Default subscription products inserted.")
 
     conn.commit()
     cur.close()
@@ -243,6 +246,8 @@ def read_categories():
         "Consultancy",
         "Rent",
     ]
+
+
 # Display account owners function
 def read_account_owners():
     conn = get_db_connection()
@@ -258,6 +263,7 @@ def read_account_owners():
         cursor.close
         conn.close
 
+
 # Display clients function
 def read_client_names():
     conn = get_db_connection()
@@ -271,6 +277,7 @@ def read_client_names():
     finally:
         cursor.close()
         conn.close()
+
 
 # Bank Accounts function
 def read_bank_accounts():
@@ -286,6 +293,7 @@ def read_bank_accounts():
     finally:
         cursor.close()
         conn.close()
+
 
 # Password validation page
 def validate_password(password):
@@ -430,50 +438,61 @@ def generate_receipt(receipt_data, filename):
     c.save()
 
 
-# Login Page
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username'] # Get the name from the form
-        password = request.form['password'] # Get the password from the form
+        username = request.form['username']
+        password = request.form['password']
 
         conn = get_db_connection()
         cur = conn.cursor()
-
-        cur.execute("SELECT user_id, role, username, password, status FROM users WHERE username = %s", (username,))
+        cur.execute("SELECT user_id, username, password, role FROM users WHERE username = %s", (username,))
         user = cur.fetchone()
-
         cur.close()
         conn.close()
 
-        if user:
-            if user[4] == 'Inactive':
-                flash('Your account is inactive you cannot login', 'danger')
-                return render_template('login.html')
+        if user and check_password_hash(user[2], password):
+            session['user_id'] = user[0]
+            session['username'] = user[1]
+            session['role'] = user[3]
 
-            if user and check_password_hash(user[3], password):
-                session['user_id'] = user[0]
-                session['role'] = user[1]
-                session['username'] = user[2]
+            # Check subscription status
+            subscription_status = check_user_subscription(user[0])
 
-                if user[1] == 1:
-                    return redirect(url_for('superuser_dashboard'))
-                elif user[1] == 2:
-                    return redirect(url_for('admin_dashboard'))
-                elif user[1] == 3:
-                    return redirect(url_for('user_dashboard'))
+            # Store subscription status in session
+            session['subscription_active'] = subscription_status['active']
 
-        flash("Invalid credentials!", "danger")
+            # Redirect based on role
+            if user[3] == 1:
+                return redirect(url_for('superuser_dashboard'))
+            elif user[3] == 2:
+                return redirect(url_for('admin_dashboard'))
+            else:
+                return redirect(url_for('user_dashboard'))
+        else:
+            flash('Invalid username or password', 'danger')
+
     return render_template('login.html')
 
 
 # User dashboard route
 @app.route('/user_dashboard')
 def user_dashboard():
-    if 'user_id' not in session or session.get('role') != 3: # Redirect to login page if not user
+    # Redirect if user is not logged in or not role 3
+    if 'user_id' not in session or session.get('role') != 3:
         return redirect(url_for('login'))
 
-    return render_template('user_dashboard.html')
+    # Code below now runs only if the user is valid
+    subscription_status = check_user_subscription(session['user_id'])
+    products = get_active_products()
+
+    return render_template(
+        'user_dashboard.html',
+        subscription_status=subscription_status,
+        products=products
+    )
+
+    # return render_template('user_dashboard.html')
 
 
 # Admin dashboard route
@@ -482,7 +501,12 @@ def admin_dashboard():
     if 'user_id' not in session or session.get('role') != 2:
         return redirect(url_for('login'))
 
-    return render_template('admin_dashboard.html')
+    # Check subscription status for admin too (if needed)
+    subscription_status = check_user_subscription(session['user_id'])
+    products = get_active_products()
+
+    return render_template('admin_dashboard.html', subscription_status=subscription_status,
+        products=products)
 
 
 # Superuser dashboard route
@@ -490,7 +514,300 @@ def admin_dashboard():
 def superuser_dashboard():
     if 'user_id' not in session or session.get('role') != 1:
         return redirect(url_for('login'))
-    return render_template('superuser_dashboard.html')
+
+    subscription_status = check_user_subscription(session['user_id'])
+    products = get_active_products()
+    return render_template('superuser_dashboard.html', subscription_status=subscription_status,
+                           products=products)
+
+
+@app.route('/check_subscription_status')
+def check_subscription_status():
+    if 'user_id' not in session:
+        return jsonify({'active': False, 'message': 'Not logged in'})
+
+    subscription_status = check_user_subscription(session['user_id'])
+    return jsonify(subscription_status)
+
+
+@app.route('/initiate_payment', methods=['POST'])
+def initiate_payment():
+    """Initiate M-Pesa STK Push"""
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Not logged in'})
+
+    try:
+        phone_number = request.json.get('phone_number')
+        product_id = request.json.get('product_id')
+
+        # Validate phone number format
+        if not phone_number or len(phone_number) < 10:
+            return jsonify({'success': False, 'message': 'Invalid phone number'})
+
+        # Get product details
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT product_id, product_name, price_per_unit, duration_days, is_active
+            FROM subscription_products 
+            WHERE product_id = %s AND is_active = true
+        """, (product_id,))
+
+        product = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if not product:
+            return jsonify({'success': False, 'message': 'Invalid product selected'})
+
+        product_id, product_name, price_per_unit, duration_days, is_active = product
+        amount = float(price_per_unit)
+
+        # Format phone number to 254XXXXXXXXX
+        if phone_number.startswith('0'):
+            phone_number = '254' + phone_number[1:]
+        elif phone_number.startswith('+254'):
+            phone_number = phone_number[1:]
+        elif not phone_number.startswith('254'):
+            phone_number = '254' + phone_number
+
+        # Get access token
+        access_token = get_mpesa_access_token()
+        if not access_token:
+            return jsonify({'success': False, 'message': 'Failed to get access token'})
+
+        # Generate timestamp
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+        # Generate password
+        password_string = f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{timestamp}"
+        password = base64.b64encode(password_string.encode()).decode()
+
+        # STK Push request
+        # stk_url = "https://sandbox-api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+        stk_url = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+
+        payload = {
+            "BusinessShortCode": MPESA_SHORTCODE,
+            "Password": password,
+            "Timestamp": timestamp,
+            "TransactionType": "CustomerBuyGoodsOnline",
+            "Amount": amount,
+            "PartyA": phone_number,
+            "PartyB": MPESA_TILL,
+            "PhoneNumber": phone_number,
+            "CallBackURL": MPESA_CALLBACK_URL,
+            "AccountReference": f"SUB{session['user_id']}",
+            "TransactionDesc": f"{product_name} Subscription"
+        }
+
+        response = requests.post(stk_url, json=payload, headers=headers)
+        response_data = response.json()
+
+        if response_data.get('ResponseCode') == '0':
+            # Store transaction in database
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            cur.execute("""
+                INSERT INTO mpesa_transactions 
+                (user_id, product_id, merchant_request_id, checkout_request_id, phone_number, amount, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                session['user_id'],
+                product_id,
+                response_data.get('MerchantRequestID'),
+                response_data.get('CheckoutRequestID'),
+                phone_number,
+                amount,
+                'pending'
+            ))
+
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            return jsonify({
+                'success': True,
+                'message': 'STK Push sent successfully',
+                'checkout_request_id': response_data.get('CheckoutRequestID')
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': response_data.get('errorMessage', 'Payment initiation failed')
+            })
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Error: {str(e)}'})
+
+
+@app.route('/mpesa_callback', methods=['POST'])
+def mpesa_callback():
+    """Handle M-Pesa callback"""
+    try:
+        callback_data = request.json
+        print("Raw callback data:", callback_data)  # Debug logging
+
+        # Extract callback information
+        stk_callback = callback_data.get('Body', {}).get('stkCallback', {})
+        result_code = stk_callback.get('ResultCode')
+        checkout_request_id = stk_callback.get('CheckoutRequestID')
+
+        print(f"ResultCode: {result_code}, CheckoutRequestID: {checkout_request_id}")  # Debug logging
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        if result_code == 0:  # Success
+            # Extract callback metadata
+            callback_metadata = stk_callback.get('CallbackMetadata', {}).get('Item', [])
+            print("Callback metadata:", callback_metadata)  # Debug logging
+
+            amount = None
+            mpesa_receipt_number = None
+            phone_number = None
+            transaction_date = None
+
+            for item in callback_metadata:
+                name = item.get('Name')
+                value = item.get('Value')
+                print(f"Metadata item - Name: {name}, Value: {value}")  # Debug logging
+
+                if name == 'Amount':
+                    amount = value
+                elif name == 'MpesaReceiptNumber':
+                    mpesa_receipt_number = value
+                elif name == 'PhoneNumber':
+                    phone_number = value
+                elif name == 'TransactionDate':
+                    # Convert string to datetime
+                    try:
+                        transaction_date = datetime.strptime(str(value), '%Y%m%d%H%M%S')
+                    except ValueError:
+                        transaction_date = datetime.now()
+                        print(f"Could not parse transaction date: {value}")
+
+            print(
+                f"Extracted - Amount: {amount}, Receipt: {mpesa_receipt_number}, Phone: {phone_number}, Date: {transaction_date}")  # Debug logging
+
+            # Update transaction status
+            cur.execute("""
+                UPDATE mpesa_transactions 
+                SET status = 'completed', mpesa_receipt_number = %s, transaction_date = %s
+                WHERE checkout_request_id = %s
+                RETURNING user_id, product_id, amount
+            """, (mpesa_receipt_number, transaction_date, checkout_request_id))
+
+            # Get the transaction details including the original amount
+            transaction_result = cur.fetchone()
+            if transaction_result:
+                user_id, product_id, original_amount = transaction_result
+
+                # Use the original amount from the transaction if amount from callback is None
+                if amount is None:
+                    amount = original_amount
+                    print(f"Using original amount from transaction: {amount}")
+
+                # Get product duration
+                cur.execute("""
+                    SELECT duration_days FROM subscription_products 
+                    WHERE product_id = %s
+                """, (product_id,))
+
+                product_result = cur.fetchone()
+                if product_result:
+                    duration_days = product_result[0]
+
+                    # Create or extend subscription
+                    start_date = datetime.now().date()
+                    end_date = start_date + timedelta(days=duration_days)
+
+                    # Check if user already has a subscription
+                    cur.execute("""
+                        SELECT subscription_id FROM subscriptions 
+                        WHERE user_id = %s ORDER BY end_date DESC LIMIT 1
+                    """, (user_id,))
+                    existing_subscription = cur.fetchone()
+
+                    if existing_subscription:
+                        # Update existing subscription
+                        cur.execute("""
+                            UPDATE subscriptions 
+                            SET end_date = %s, status = 'active', amount = %s
+                            WHERE user_id = %s AND subscription_id = %s
+                        """, (end_date, amount, user_id, existing_subscription[0]))
+                    else:
+                        # Create new subscription
+                        cur.execute("""
+                            INSERT INTO subscriptions (user_id, product_id, start_date, end_date, amount, status)
+                            VALUES (%s, %s, %s, %s, %s, 'active')
+                        """, (user_id, product_id, start_date, end_date, amount))
+
+                    print(f"Subscription updated for user {user_id}, product {product_id}")
+                else:
+                    print(f"Product {product_id} not found")
+            else:
+                print(f"Transaction with checkout_request_id {checkout_request_id} not found")
+
+        else:  # Failed
+            error_message = stk_callback.get('ResultDesc', 'Unknown error')
+            print(f"Payment failed: {error_message}")
+
+            # Update transaction as failed
+            cur.execute("""
+                UPDATE mpesa_transactions 
+                SET status = 'failed'
+                WHERE checkout_request_id = %s
+            """, (checkout_request_id,))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({'ResultCode': 0, 'ResultDesc': 'Success'})
+
+    except Exception as e:
+        print(f"Callback error: {str(e)}")
+        import traceback
+        traceback.print_exc()  # Print full traceback
+        return jsonify({'ResultCode': 1, 'ResultDesc': 'Error processing callback'})
+
+
+@app.route('/check_payment_status/<checkout_request_id>')
+def check_payment_status(checkout_request_id):
+    """Check payment status"""
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Not logged in'})
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT status, mpesa_receipt_number 
+        FROM mpesa_transactions 
+        WHERE checkout_request_id = %s AND user_id = %s
+    """, (checkout_request_id, session['user_id']))
+
+    result = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if result:
+        status, receipt_number = result
+        return jsonify({
+            'success': True,
+            'status': status,
+            'receipt_number': receipt_number
+        })
+    else:
+        return jsonify({'success': False, 'message': 'Transaction not found'})
 
 
 # Sales Menu route
@@ -2553,7 +2870,6 @@ def create_invoice(invoice_data, filename):
     c.drawString(50, 180, "ACCOUNTANT")
     c.save()
 
-
 # Products route
 @app.route('/products', methods=['GET', 'POST'])
 def products():
@@ -2800,18 +3116,15 @@ def products():
 
     return render_template('products/search_product.html')
 
-
 # Edit product Route
 @app.route('/edit_product')
 def edit_product():
     return render_template('products/edit-product.html')
 
-
 # Add Product Route
 @app.route('/add_product')
 def add_product():
     return render_template('products/add-product.html')
-
 
 # Suppliers route
 @app.route('/suppliers', methods=['GET', 'POST'])
@@ -2861,11 +3174,11 @@ def suppliers():
                 created_at = ''
                 try:
                     created_at = row[5].strftime('%d-%m-%Y') if row[5] and hasattr(row[5], 'strftime') else str(row[5])
-                    # updated_at = row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] and hasattr(row[6],'strftime') else str(row[6])
+                    #updated_at = row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] and hasattr(row[6],'strftime') else str(row[6])
                 except Exception as e:
                     print(f"Date formatting error: {e}")
                     created_at = str(row[5]) if row[5] else ''
-                    # updated_at = str(row[6]) if row[6] else ''
+                    #updated_at = str(row[6]) if row[6] else ''
 
                 display_name = f"{row[1]} - {row[2]}" if row[1] and row[2] else row[1] or row[2] or 'Unnamed Supplier'
 
@@ -2879,8 +3192,8 @@ def suppliers():
                         'telephone': row[3],
                         'email': row[4],
                         'created_at': created_at,
-                        # 'updated_at': updated_at,
-                        # 'status': row[7] if len(row) > 7 else 'Active'
+                        #'updated_at': updated_at,
+                        #'status': row[7] if len(row) > 7 else 'Active'
                     }
                 })
             return jsonify(results)
@@ -2946,16 +3259,16 @@ def suppliers():
 
                 # Format dates for response
                 created_at = ''
-                # updated_at = ''
+                #updated_at = ''
                 try:
                     created_at = updated_record[5].strftime('%Y-%m-%d %H:%M:%S') if updated_record[5] and hasattr(
                         updated_record[5], 'strftime') else str(updated_record[5])
-                    # updated_at = updated_record[6].strftime('%Y-%m-%d %H:%M:%S') if updated_record[6] and hasattr(
-                        # updated_record[6], 'strftime') else str(updated_record[6])
+                    #updated_at = updated_record[6].strftime('%Y-%m-%d %H:%M:%S') if updated_record[6] and hasattr(
+                        #updated_record[6], 'strftime') else str(updated_record[6])
                 except Exception as e:
                     print(f"Date formatting error: {e}")
                     created_at = str(updated_record[5]) if updated_record[5] else ''
-                    # updated_at = str(updated_record[6]) if updated_record[6] else ''
+                    #updated_at = str(updated_record[6]) if updated_record[6] else ''
 
                 updated_data = {
                     'supplier_id': updated_record[0],
@@ -2964,7 +3277,7 @@ def suppliers():
                     'telephone': updated_record[3],
                     'email': updated_record[4],
                     'created_at': created_at,
-                    # 'updated_at': updated_at,
+                    #'updated_at': updated_at,
                     'status': updated_record[6] if len(updated_record) > 6 else 'Active'
                 }
 
@@ -3055,24 +3368,19 @@ def suppliers():
 
     return render_template('suppliers/search-supplier.html')
 
-
 # Edit Supplier Route
 @app.route('/edit_supplier')
 def edit_supplier():
     return render_template('suppliers/edit-supplier.html')
 
-
 # Add Supplier Route
 @app.route('/add_supplier')
 def add_supplier():
     return render_template('suppliers/add-supplier.html')
-
-
 # Stores Menu Route
 @app.route('/stores')
 def stores_menu():
     return render_template('stores_menu.html')
-
 
 # Logout Route
 @app.route('/logout')
@@ -4472,6 +4780,10 @@ def update_payment(payment_id):
 
 
 if __name__ == '__main__':
+    # Create tables when the app starts
+    with app.app_context():
+        create_subscription_tables()
+
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['RECEIPT_FOLDER'], exist_ok=True)
     os.makedirs(app.config['PAYMENTS_FOLDER'], exist_ok=True)
