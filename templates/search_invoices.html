@@ -92,6 +92,24 @@
             overflow-y: auto;
         }
 
+        /* Position back button on top of the View Invoices text */
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .back-button-container {
+            margin-right: 15px;
+            margin-top: 5px;
+        }
+
+        .page-title {
+            flex-grow: 1;
+        }
+
         /* Mobile-specific styles */
         @media (max-width: 992px) {
             .filter-container {
@@ -116,10 +134,15 @@
                 flex-direction: column;
             }
 
-            /* Position back button below the View Invoices text */
+            /* Adjust header layout for mobile */
             .page-header {
-                position: relative;
-                padding-bottom: 50px; /* Create space for the button */
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .back-button-container {
+                margin-bottom: 10px;
+                order: -1; /* Move back button to top */
             }
         }
     </style>
@@ -128,9 +151,11 @@
 <body>
     <div class="container py-5">
         <div class="page-header">
-            <h1 class="mb-4">View Invoices</h1>
-            <div class="back-button-mobile d-lg-none">
+            <div class="back-button-container" id="backButtonContainer">
                 <a href="{{ url_for('sales_menu') }}" class="btn btn-secondary">Back</a>
+            </div>
+            <div class="page-title">
+                <h1>View Invoices</h1>
             </div>
         </div>
 
@@ -297,8 +322,10 @@
                 </div>
                 <div class="modal-footer">
                     <div class="modal-actions">
+                        {% if session.get('role') in [1, 2] %}
                         <button type="button" class="btn btn-warning" id="editInvoiceBtn">Edit</button>
                         <button type="button" class="btn btn-danger" id="deleteInvoiceBtn">Delete</button>
+                        {% endif %}
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
@@ -379,6 +406,7 @@
         const detailsModal = document.getElementById('detailsModal');
         const editInvoiceBtn = document.getElementById('editInvoiceBtn');
         const deleteInvoiceBtn = document.getElementById('deleteInvoiceBtn');
+        const backButtonContainer = document.getElementById('backButtonContainer');
 
         let currentInvoiceId = null;
 
@@ -387,6 +415,7 @@
             filtersContainer.style.display = 'none';
             searchControls.style.display = 'none';
             backToFiltersBtn.style.display = 'block';
+            backButtonContainer.style.display = 'none'; // Hide back button when results are shown
         }
 
         // Handle form submission
@@ -406,6 +435,9 @@
                 formValues[key] = value;
             }
             sessionStorage.setItem('searchFilters', JSON.stringify(formValues));
+
+            // Hide back button when search is performed
+            backButtonContainer.style.display = 'none';
         });
 
         // Handle back to filters button
@@ -413,6 +445,8 @@
             filtersContainer.style.display = 'grid';
             searchControls.style.display = 'flex';
             backToFiltersBtn.style.display = 'none';
+            backButtonContainer.style.display = 'flex'; // Show back button again
+
             if (invoiceTable) {
                 invoiceTable.style.display = 'none';
             }
