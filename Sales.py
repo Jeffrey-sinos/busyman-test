@@ -456,11 +456,11 @@ def login():
             session['username'] = user[1]
             session['role'] = user[3]
 
-            # Check subscription status
-            subscription_status = check_user_subscription(user[0])
+            # # Check subscription status
+            # subscription_status = check_user_subscription(user[0])
 
-            # Store subscription status in session
-            session['subscription_active'] = subscription_status['active']
+            # # Store subscription status in session
+            # session['subscription_active'] = subscription_status['active']
 
             # Redirect based on role
             if user[3] == 1:
