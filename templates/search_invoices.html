@@ -6,13 +6,39 @@
     <title>View Invoices - Busyman Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .date-range-container, .filters-container {
-            display: flex;
+        /* Green filter styling */
+        .filter-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 15px;
             margin-bottom: 20px;
         }
-        .form-group {
-            flex: 1;
+        .filter-item {
+            background-color: #28a745; /* Green background */
+            padding: 15px;
+            border-radius: 8px;
+            color: white; /* White text */
+            display: flex;
+            flex-direction: column;
+        }
+        .filter-item .form-label {
+            color: white; /* White text for labels */
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        .filter-item .form-control {
+            background-color: white;
+            color: #333;
+        }
+        .search-controls {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            margin-top: 15px;
+        }
+        .back-to-filters {
+            display: none;
+            margin-bottom: 20px;
         }
         .invoice-table {
             margin-top: 30px;
@@ -28,12 +54,86 @@
             background-color: #BCB8B1;
             cursor: not-allowed;
         }
+        .scrollable-results {
+            max-height: 500px; /* Shows exactly 10 rows at a time */
+            overflow-y: auto;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        .table thead th {
+            position: sticky;
+            top: 0;
+            background-color: #212529;
+            color: white;
+            z-index: 10;
+        }
+        .results-count {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .invoice-detail {
+            margin-bottom: 10px;
+        }
+        .invoice-detail label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* Make modal scrollable */
+        .modal-body-scrollable {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        /* Mobile-specific styles */
+        @media (max-width: 992px) {
+            .filter-container {
+                grid-template-columns: 1fr;
+            }
+            .filter-item {
+                flex-direction: row;
+                align-items: center;
+                gap: 10px;
+            }
+            .filter-item .form-label {
+                margin-bottom: 0;
+                min-width: 120px;
+                text-align: right;
+            }
+            .search-controls {
+                width: 100%;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+            .modal-actions {
+                flex-direction: column;
+            }
+
+            /* Position back button below the View Invoices text */
+            .page-header {
+                position: relative;
+                padding-bottom: 50px; /* Create space for the button */
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="container py-5">
-        <h1 class="mb-4">View Invoices</h1>
+        <div class="page-header">
+            <h1 class="mb-4">View Invoices</h1>
+            <div class="back-button-mobile d-lg-none">
+                <a href="{{ url_for('sales_menu') }}" class="btn btn-secondary">Back</a>
+            </div>
+        </div>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -47,89 +147,75 @@
                 {% endif %}
             {% endwith %}
 
-        <form method="POST" action="{{ url_for('search_invoices') }}">
-            <!-- Date Range Filter -->
-            <div class="date-range-container">
-                <div class="form-group">
+        <form method="POST" action="{{ url_for('search_invoices') }}" id="searchForm">
+            <!-- Filter Controls -->
+            <div class="filter-container" id="filtersContainer">
+                <div class="filter-item">
                     <label for="start_date" class="form-label">Start Date</label>
                     <input type="date" class="form-control" id="start_date" name="start_date" value="{{ default_start_date }}">
                 </div>
-                <div class="form-group">
+                <div class="filter-item">
                     <label for="end_date" class="form-label">End Date</label>
                     <input type="date" class="form-control" id="end_date" name="end_date" value="{{ default_end_date }}">
                 </div>
-            </div>
-
-            <!-- Additional Filters -->
-            <div class="filters-container">
-                <div class="form-group">
-                    <label for="account_owner" class="form-label">Account Owner</label>
-                    <select class="form-control" id="account_owner" name="account_owner">
-                        <option value="">All Account Owners</option>
-                        {% for account_owner in account_owners %}
-                        <option value="{{ account_owner }}">{{ account_owner }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="form-group">
+                <div class="filter-item">
                     <label for="category" class="form-label">Category</label>
                     <select class="form-control" id="category" name="category">
                         <option value="">All Categories</option>
                         {% for category in categories %}
-                        <option value="{{ category }}">{{ category }}</option>
+                        <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="account_owner" class="form-label">Account Owner</label>
+                    <select class="form-control" id="account_owner" name="account_owner">
+                        <option value="">All Account Owners</option>
+                        {% for account_owner in account_owners %}
+                        <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
                         {% endfor %}
                     </select>
                 </div>
             </div>
-
-            <button type="submit" class="btn btn-primary" id="searchBtn">
-                <span id="searchText">Search</span>
-                <span id="searchSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-            </button>
-            <a href="{{ url_for('sales_menu') }}" class="btn btn-secondary">Back</a>
+            <div class="search-controls" id="searchControls">
+                <button type="submit" class="btn btn-primary" id="searchBtn">
+                    <span id="searchText">Search</span>
+                    <span id="searchSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
+            </div>
         </form>
+
+        <!-- Back to Filters Button (shown when results are displayed) -->
+        <button id="backToFilters" class="btn btn-secondary back-to-filters mb-3">
+            Back to filters
+        </button>
 
         {% if invoices %}
         <div class="invoice-table">
             <h2>Search Results</h2>
-            <p>Found {{ invoices|length }} invoices</p>
+            <p class="results-count">Found {{ invoices|length }} invoices</p>
 
-            <div class="table-responsive">
+            <!-- Scrollable Results Container -->
+            <div class="scrollable-results">
                 <table class="table table-striped table-hover">
                     <thead class="table-dark">
                         <tr>
                             <th>Invoice Date</th>
-                            <th>Invoice Number</th>
                             <th>Customer Name</th>
-                            <th>Product</th>
-                            <th>Quantity</th>
-                            <th>Price</th>
-                            <th>Total</th>
-                            <th>Category</th>
-                        <!--<th>Status</th>-->
+                            <th>Invoice Number</th>
+                            <th>Invoice Amount</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="resultsBody">
                         {% for invoice in invoices %}
                         <tr>
                             <td>{{ invoice[1].strftime('%d-%m-%Y') }}</td>
-                            <td>{{ invoice[2] }}</td>
                             <td>{{ invoice[3] }}</td>
-                            <td>{{ invoice[4] }}</td>
-                            <td>{{ invoice[5] }}</td>
-                            <td>{{ invoice[6] }}</td>
+                            <td>{{ invoice[2] }}</td>
                             <td>{{ "Ksh {:,.2f}".format(invoice[7])}}</td>
-                            <td>{{ invoice[8] }}</td>
-                        <!--    <td>
-                                <span class="badge bg-{% if invoice[11] == 'Active' %}success{% else %}danger{% endif %}">
-                                    {{ invoice[11] }}
-                                </span>
-                            </td>
-                            -->
                             <td>
-                                <button type="button" class="btn btn-sm btn-warning edit-btn" data-bs-toggle="modal" data-bs-target="#editModal"
+                                <button type="button" class="btn btn-sm btn-info select-btn" data-bs-toggle="modal" data-bs-target="#detailsModal"
                                     data-sales-id="{{ invoice[0] }}"
                                     data-invoice-date="{{ invoice[1].strftime('%Y-%m-%d') }}"
                                     data-invoice-no="{{ invoice[2] }}"
@@ -137,10 +223,11 @@
                                     data-product="{{ invoice[4] }}"
                                     data-quantity="{{ invoice[5] }}"
                                     data-price="{{ invoice[6] }}"
+                                    data-total="{{ invoice[7] }}"
                                     data-category="{{ invoice[8] }}"
                                     data-account-owner="{{ invoice[9] }}"
                                     data-status="{{ invoice[11] }}">
-                                    Edit
+                                    Select
                                 </button>
                             </td>
                         </tr>
@@ -151,6 +238,74 @@
         </div>
         {% endif %}
     </div>
+
+    <!-- Invoice Details Modal -->
+    <div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Invoice Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body modal-body-scrollable">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="invoice-detail">
+                                <label>Invoice Date:</label>
+                                <span id="detail_invoice_date"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Invoice Number:</label>
+                                <span id="detail_invoice_no"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Customer Name:</label>
+                                <span id="detail_customer_name"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Product:</label>
+                                <span id="detail_product"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="invoice-detail">
+                                <label>Quantity:</label>
+                                <span id="detail_quantity"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Price:</label>
+                                <span id="detail_price"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Total:</label>
+                                <span id="detail_total"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Category:</label>
+                                <span id="detail_category"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Account Owner:</label>
+                                <span id="detail_account_owner"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Status:</label>
+                                <span id="detail_status"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-warning" id="editInvoiceBtn">Edit</button>
+                        <button type="button" class="btn btn-danger" id="deleteInvoiceBtn">Delete</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Invoice Edit Modal -->
     <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -160,7 +315,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="editForm">
-                    <div class="modal-body">
+                    <div class="modal-body modal-body-scrollable">
                     <input type="hidden" id="modalSalesId">
                     <div class="row g-3">
                         <div class="col-md-6">
@@ -215,33 +370,154 @@
 </div>
 
     <script>
-    document.querySelector('form').addEventListener('submit', function () {
-        const btn = document.getElementById('searchBtn');
-        const text = document.getElementById('searchText');
-        const spinner = document.getElementById('searchSpinner');
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchForm = document.getElementById('searchForm');
+        const filtersContainer = document.getElementById('filtersContainer');
+        const searchControls = document.getElementById('searchControls');
+        const backToFiltersBtn = document.getElementById('backToFilters');
+        const invoiceTable = document.querySelector('.invoice-table');
+        const detailsModal = document.getElementById('detailsModal');
+        const editInvoiceBtn = document.getElementById('editInvoiceBtn');
+        const deleteInvoiceBtn = document.getElementById('deleteInvoiceBtn');
 
-        btn.disabled = true;
-        text.textContent = 'Loading...';
-        spinner.classList.remove('d-none');
-    });
-    </script>
-    <script>
-    // Handle modal show event to populate data
-    document.getElementById('editModal').addEventListener('show.bs.modal', function (event) {
-        const button = event.relatedTarget; // Button that triggered the modal
-        const modal = this;
+        let currentInvoiceId = null;
 
-        // Extract data from button attributes
-        modal.querySelector('#modalSalesId').value = button.getAttribute('data-sales-id');
-        modal.querySelector('#modal_invoice_date').value = button.getAttribute('data-invoice-date');
-        modal.querySelector('#modal_invoice_no').value = button.getAttribute('data-invoice-no');
-        modal.querySelector('#modal_customer_name').value = button.getAttribute('data-customer-name');
-        modal.querySelector('#modal_product').value = button.getAttribute('data-product');
-        modal.querySelector('#modal_quantity').value = button.getAttribute('data-quantity');
-        modal.querySelector('#modal_price').value = button.getAttribute('data-price');
-        modal.querySelector('#modal_category').value = button.getAttribute('data-category');
-        modal.querySelector('#modal_account_owner').value = button.getAttribute('data-account-owner');
-        modal.querySelector('#modal_status').value = button.getAttribute('data-status');
+        // Check if we have search results on page load
+        if (invoiceTable) {
+            filtersContainer.style.display = 'none';
+            searchControls.style.display = 'none';
+            backToFiltersBtn.style.display = 'block';
+        }
+
+        // Handle form submission
+        searchForm.addEventListener('submit', function () {
+            const btn = document.getElementById('searchBtn');
+            const text = document.getElementById('searchText');
+            const spinner = document.getElementById('searchSpinner');
+
+            btn.disabled = true;
+            text.textContent = 'Loading...';
+            spinner.classList.remove('d-none');
+
+            // Store form values in sessionStorage to preserve them
+            const formData = new FormData(searchForm);
+            const formValues = {};
+            for (let [key, value] of formData.entries()) {
+                formValues[key] = value;
+            }
+            sessionStorage.setItem('searchFilters', JSON.stringify(formValues));
+        });
+
+        // Handle back to filters button
+        backToFiltersBtn.addEventListener('click', function() {
+            filtersContainer.style.display = 'grid';
+            searchControls.style.display = 'flex';
+            backToFiltersBtn.style.display = 'none';
+            if (invoiceTable) {
+                invoiceTable.style.display = 'none';
+            }
+
+            // Restore form values from sessionStorage
+            const savedFilters = sessionStorage.getItem('searchFilters');
+            if (savedFilters) {
+                const formValues = JSON.parse(savedFilters);
+                for (const [key, value] of Object.entries(formValues)) {
+                    const input = searchForm.querySelector(`[name="${key}"]`);
+                    if (input) {
+                        input.value = value;
+                    }
+                }
+            }
+        });
+
+        // Handle details modal show event
+        detailsModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            currentInvoiceId = button.getAttribute('data-sales-id');
+
+            // Populate details modal
+            document.getElementById('detail_invoice_date').textContent = button.getAttribute('data-invoice-date');
+            document.getElementById('detail_invoice_no').textContent = button.getAttribute('data-invoice-no');
+            document.getElementById('detail_customer_name').textContent = button.getAttribute('data-customer-name');
+            document.getElementById('detail_product').textContent = button.getAttribute('data-product');
+            document.getElementById('detail_quantity').textContent = button.getAttribute('data-quantity');
+            document.getElementById('detail_price').textContent = button.getAttribute('data-price');
+            document.getElementById('detail_total').textContent = "Ksh " + parseFloat(button.getAttribute('data-total')).toLocaleString('en-KE', {minimumFractionDigits: 2});
+            document.getElementById('detail_category').textContent = button.getAttribute('data-category');
+            document.getElementById('detail_account_owner').textContent = button.getAttribute('data-account-owner');
+            document.getElementById('detail_status').textContent = button.getAttribute('data-status');
+        });
+
+        // Handle edit button click
+        editInvoiceBtn.addEventListener('click', function() {
+            // Close details modal
+            const detailsModalInstance = bootstrap.Modal.getInstance(detailsModal);
+            detailsModalInstance.hide();
+
+            // Open edit modal and populate data
+            const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+
+            // Find the select button that was clicked
+            const selectButton = document.querySelector(`.select-btn[data-sales-id="${currentInvoiceId}"]`);
+
+            // Populate edit modal
+            document.getElementById('modalSalesId').value = currentInvoiceId;
+            document.getElementById('modal_invoice_date').value = selectButton.getAttribute('data-invoice-date');
+            document.getElementById('modal_invoice_no').value = selectButton.getAttribute('data-invoice-no');
+            document.getElementById('modal_customer_name').value = selectButton.getAttribute('data-customer-name');
+            document.getElementById('modal_product').value = selectButton.getAttribute('data-product');
+            document.getElementById('modal_quantity').value = selectButton.getAttribute('data-quantity');
+            document.getElementById('modal_price').value = selectButton.getAttribute('data-price');
+            document.getElementById('modal_category').value = selectButton.getAttribute('data-category');
+            document.getElementById('modal_account_owner').value = selectButton.getAttribute('data-account-owner');
+            document.getElementById('modal_status').value = selectButton.getAttribute('data-status');
+
+            editModal.show();
+        });
+
+        // Handle delete button click
+        deleteInvoiceBtn.addEventListener('click', function() {
+            if (confirm("Are you sure you want to delete this invoice? This action cannot be undone.")) {
+                // Show loading state
+                deleteInvoiceBtn.disabled = true;
+                deleteInvoiceBtn.textContent = 'Deleting...';
+
+                // Send delete request
+                fetch(`/delete_invoice/${currentInvoiceId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.status === "success") {
+                        alert("Invoice deleted successfully!");
+                        // Close the modal
+                        const detailsModalInstance = bootstrap.Modal.getInstance(detailsModal);
+                        detailsModalInstance.hide();
+                        // Refresh the page to update the results
+                        location.reload();
+                    } else {
+                        alert("Error: " + (data.message || 'Unknown error occurred'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting invoice:', error);
+                    alert('Error deleting invoice');
+                })
+                .finally(() => {
+                    // Reset button state whether success or failure
+                    deleteInvoiceBtn.disabled = false;
+                    deleteInvoiceBtn.textContent = 'Delete';
+                });
+            }
+        });
     });
 
     document.getElementById('editForm').addEventListener('submit', function (e) {
@@ -281,7 +557,7 @@
                 // Close the modal
                 const modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
                 modal.hide();
-                // Optionally, refresh the page or update the table row
+                // Refresh the page to update the results
                 location.reload();
             } else {
                 alert("Error: " + (data.message || 'Unknown error occurred'));
