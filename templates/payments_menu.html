@@ -60,12 +60,13 @@
     <div class="top-space"></div>
 
     <div class="d-flex flex-column">
-        <a href="{{ url_for('search_billing_account') }}" class="btn btn-block mb-2">Billing Accounts</a>
-        <a href="{{ url_for('search_bills') }}" class="btn btn-block mb-2">Bills</a>
+        <a href="{{ url_for('search_bills') }}" class="btn btn-block mb-2">Bill</a>
+        <a href="{{ url_for('view_payments') }}" class="btn btn-block mb-2">Payments</a>
         <a href="{{ url_for('view_bills') }}" class="btn btn-block mb-2">Pay</a>
-        <a href="{{ url_for('view_payments') }}" class="btn btn-block mb-2">Edit payments</a>
+        <a href="{{ url_for('search_billing_account') }}" class="btn btn-block mb-2">Billing Accounts</a>
+        <a class="btn btn-block mb-2">Service Providers</a>
         <button class="btn btn-block mb-2" id="reports">Reports</button>
-        <a href="{{ url_for('admin_dashboard') if session.get('role') == 2 else url_for('superuser_dashboard') }}" class="btn btn-block mt-3">Back to Menu</a>
+        <a href="{{ url_for('admin_dashboard') if session.get('role') == 2 else url_for('superuser_dashboard') }}" class="btn btn-block mt-3">Back</a>
     </div>
 </div>
 
