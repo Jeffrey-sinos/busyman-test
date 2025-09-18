@@ -486,13 +486,14 @@ def user_dashboard():
     subscription_status = check_user_subscription(session['user_id'])
     products = get_active_products()
 
-    return render_template(
-        'user_dashboard.html',
-        subscription_status=subscription_status,
-        products=products
-    )
+    return render_template('user_dashboard.html')
+    # return render_template(
+    #     'user_dashboard.html',
+    #     subscription_status=subscription_status,
+    #     products=products
+    # )
 
-    # return render_template('user_dashboard.html')
+    
 
 
 # Admin dashboard route
@@ -500,13 +501,13 @@ def user_dashboard():
 def admin_dashboard():
     if 'user_id' not in session or session.get('role') != 2:
         return redirect(url_for('login'))
-
+    
     # Check subscription status for admin too (if needed)
     subscription_status = check_user_subscription(session['user_id'])
     products = get_active_products()
-
-    return render_template('admin_dashboard.html', subscription_status=subscription_status,
-        products=products)
+    return render_template('admin_dashboard.html')
+    # return render_template('admin_dashboard.html', subscription_status=subscription_status,
+    #     products=products)
 
 
 # Superuser dashboard route
@@ -517,8 +518,9 @@ def superuser_dashboard():
 
     subscription_status = check_user_subscription(session['user_id'])
     products = get_active_products()
-    return render_template('superuser_dashboard.html', subscription_status=subscription_status,
-                           products=products)
+    return render_template('superuser_dashboard.html')
+    # return render_template('superuser_dashboard.html', subscription_status=subscription_status,
+    #                        products=products)
 
 
 @app.route('/check_subscription_status')
