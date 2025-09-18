@@ -482,9 +482,9 @@ def user_dashboard():
     if 'user_id' not in session or session.get('role') != 3:
         return redirect(url_for('login'))
 
-    # Code below now runs only if the user is valid
-    subscription_status = check_user_subscription(session['user_id'])
-    products = get_active_products()
+    # # Code below now runs only if the user is valid
+    # subscription_status = check_user_subscription(session['user_id'])
+    # products = get_active_products()
 
     return render_template('user_dashboard.html')
     # return render_template(
@@ -493,18 +493,15 @@ def user_dashboard():
     #     products=products
     # )
 
-    
-
-
 # Admin dashboard route
 @app.route('/admin_dashboard')
 def admin_dashboard():
     if 'user_id' not in session or session.get('role') != 2:
         return redirect(url_for('login'))
     
-    # Check subscription status for admin too (if needed)
-    subscription_status = check_user_subscription(session['user_id'])
-    products = get_active_products()
+    # # Check subscription status for admin too (if needed)
+    # subscription_status = check_user_subscription(session['user_id'])
+    # products = get_active_products()
     return render_template('admin_dashboard.html')
     # return render_template('admin_dashboard.html', subscription_status=subscription_status,
     #     products=products)
@@ -516,20 +513,20 @@ def superuser_dashboard():
     if 'user_id' not in session or session.get('role') != 1:
         return redirect(url_for('login'))
 
-    subscription_status = check_user_subscription(session['user_id'])
-    products = get_active_products()
+    # subscription_status = check_user_subscription(session['user_id'])
+    # products = get_active_products()
     return render_template('superuser_dashboard.html')
     # return render_template('superuser_dashboard.html', subscription_status=subscription_status,
     #                        products=products)
 
 
-@app.route('/check_subscription_status')
-def check_subscription_status():
-    if 'user_id' not in session:
-        return jsonify({'active': False, 'message': 'Not logged in'})
-
-    subscription_status = check_user_subscription(session['user_id'])
-    return jsonify(subscription_status)
+# @app.route('/check_subscription_status')
+# def check_subscription_status():
+#     if 'user_id' not in session:
+#         return jsonify({'active': False, 'message': 'Not logged in'})
+#
+#     subscription_status = check_user_subscription(session['user_id'])
+#     return jsonify(subscription_status)
 
 
 @app.route('/initiate_payment', methods=['POST'])
