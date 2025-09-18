@@ -25,6 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const backToTransactionTypeBtn = document.getElementById('backToTransactionTypeBtn');
     const selectedClientDisplay = document.getElementById('selectedClientDisplay');
     const saveLoader = document.getElementById('saveLoader');
+    const addClientBtnContainer = document.getElementById('addClientBtnContainer');
+    const clientNotFoundAlert = document.getElementById('clientNotFoundAlert'); // Added this line
 
     // State variables
     let currentItems = [];
@@ -163,6 +165,10 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('invoicePreview').style.display = 'none';
         document.getElementById('pdfLinksContainer').style.display = 'none';
 
+        // Hide add client button and alert
+        addClientBtnContainer.style.display = 'none';
+        clientNotFoundAlert.style.display = 'none';
+
         // Show save button
         saveSaleBtn.style.display = 'block';
 
@@ -176,6 +182,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (searchTerm.length < 1) {
             clientSuggestions.style.display = 'none';
             clientNameInput.classList.remove('suggesting');
+            addClientBtnContainer.style.display = 'none';
+            clientNotFoundAlert.style.display = 'none'; // Hide alert when input is empty
             return;
         }
 
@@ -192,14 +200,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     clientNameInput.value = client;
                     clientSuggestions.style.display = 'none';
                     clientNameInput.classList.remove('suggesting');
+                    addClientBtnContainer.style.display = 'none';
+                    clientNotFoundAlert.style.display = 'none'; // Hide alert when selecting a client
                 });
                 clientSuggestions.appendChild(item);
             });
             clientSuggestions.style.display = 'block';
             clientNameInput.classList.add('suggesting');
+            addClientBtnContainer.style.display = 'none';
+            clientNotFoundAlert.style.display = 'none'; // Hide alert when there are suggestions
         } else {
             clientSuggestions.style.display = 'none';
             clientNameInput.classList.remove('suggesting');
+            addClientBtnContainer.style.display = 'block';
+            clientNotFoundAlert.style.display = 'block'; // Show alert when no suggestions
         }
     });
 
@@ -229,12 +243,24 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.status === 'not_found') {
-                alert('Client not found. Please add the client first.');
+                // Show the add client button and alert when client is not found
+                addClientBtnContainer.style.display = 'block';
+                clientNotFoundAlert.style.display = 'block';
+                // Don't show alert again as it's already visible from the typing detection
             } else if (data.status === 'single_result') {
+                addClientBtnContainer.style.display = 'none';
+                clientNotFoundAlert.style.display = 'none'; // Hide alert when client is found
                 selectClient(data.client_name);
             } else if (data.status === 'multiple_results') {
+                addClientBtnContainer.style.display = 'none';
+                clientNotFoundAlert.style.display = 'none'; // Hide alert when multiple clients found
                 showClientResults(data.clients);
             }
+        })
+        .catch(error => {
+            console.error('Error searching client:', error);
+            addClientBtnContainer.style.display = 'block';
+            clientNotFoundAlert.style.display = 'block'; // Show alert on error
         });
     });
 
@@ -295,6 +321,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (clients.length === 0) {
             clientSearchResults.style.display = 'none';
+            addClientBtnContainer.style.display = 'block';
+            clientNotFoundAlert.style.display = 'block'; // Show alert when no results
             return;
         }
 
@@ -318,6 +346,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         clientSearchResults.style.display = 'block';
+        addClientBtnContainer.style.display = 'none';
+        clientNotFoundAlert.style.display = 'none'; // Hide alert when results are shown
     }
 
     function selectClient(clientName) {
@@ -326,6 +356,8 @@ document.addEventListener('DOMContentLoaded', function() {
         clientNameInput.classList.remove('suggesting');
         customerNameDisplay.value = clientName;
         selectedClientDisplay.textContent = clientName;
+        addClientBtnContainer.style.display = 'none';
+        clientNotFoundAlert.style.display = 'none'; // Hide alert when client is selected
 
         fetch('/sales/entry', {
             method: 'POST',
@@ -508,9 +540,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    function formatDateToDDMMYYYY(dateString) {
+        if (!dateString) return '';
+
+        const [year, month, day] = dateString.split('-');
+        return `${day}-${month}-${year}`;
+    }
     function updateInvoicePreview(invoiceNumber, invoiceDate, customerName, transactionType, items) {
         document.getElementById('previewInvoiceNumber').textContent = invoiceNumber;
-        document.getElementById('previewDate').textContent = invoiceDate;
+        document.getElementById('previewDate').textContent = formatDateToDDMMYYYY(invoiceDate);
         document.getElementById('previewCustomer').textContent = customerName;
         document.getElementById('previewTransactionType').textContent =
             transactionType === 'sell' ? 'Sale' : 'Take Back';
@@ -554,6 +592,9 @@ document.getElementById('addClientForm').addEventListener('submit', function(e) 
             if (typeof clientNames !== 'undefined') {
                 clientNames.push(data.customer_name);
             }
+            // Hide the add client button and alert after successful addition
+            document.getElementById('addClientBtnContainer').style.display = 'none';
+            document.getElementById('clientNotFoundAlert').style.display = 'none';
         } else {
             alert('Error: ' + data.error);
         }

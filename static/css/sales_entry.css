@@ -46,7 +46,7 @@
 
 .form-control.field-valid, .form-select.field-valid {
     border-color: #28a745;
-    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+    box-shadow: 0 0 极 0.2rem rgba(40, 167, 69, 0.25);
 }
 
 .field-error-message {
@@ -98,7 +98,7 @@
 #addAnotherSection {
     margin-top: 20px;
     padding: 15px;
-    background-color: #f8f9fa;
+    background-color: #f8极9fa;
     border-radius: 5px;
     border: 1px solid #dee2e6;
 }
@@ -174,4 +174,89 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+#clientName::placeholder {
+            color: #ccc !important;
+            opacity: 1;
+}
+#addClientBtnContainer {
+            display: none;
+}
+#clientSearchSection .row.mb-3 {
+            max-width: 600px;
+}
+.client-not-found-alert {
+            display: none;
+            padding: 4px 8px;
+            margin-top: 4px;
+            border-radius: 3px;
+            background-color: transparent;
+            color: #dc3545;
+            border: none;
+            font-size: 0.875rem;
+}
+.heading-container {
+            margin-bottom: 1rem;
+}
+/* Make the container smaller to match search section */
+.container.py-4 {
+            max-width: 800px;
+            padding-left: 15px;
+            padding-right: 15px;
+}
+
+/* Make the card match the search section width */
+.card {
+            max-width: 800px;
+            margin: 0 auto;
+}
+
+/* Client not found alert styling */
+.client-not-found-alert {
+    display: none;
+    padding: 4px 8px;
+    margin-top: 4px;
+    border-radius: 3px;
+    background-color: transparent;
+    color: #dc3545;
+    border: none;
+    font-size: 0.875rem;
+}
+
+/* Loading spinner for client selection */
+.client-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1001;
+    border-radius: 5px;
+}
+
+/* Back button positioning */
+.section-back-button {
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    z-index: 10;
+}
+
+/* Adjust card padding to accommodate back button */
+.card-body {
+    position: relative;
+    padding-top: 50px;
+}
+
+/* Transaction type section specific adjustments */
+#transactionTypeSection .section-back-button {
+    top: 20px;
+}
+
+#salesFormSection .section-back-button {
+    top: 20px;
 }
