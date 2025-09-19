@@ -121,10 +121,7 @@
 
 #transactionTypeSection {
     text-align: left;
-    padding: 20px;
-    margin: 20px 0;
-    border: 1px solid #dee2e6;
-    border-radius: 5px;
+    padding: 5px;
 }
 
 #downloadSuccessToast {
@@ -208,7 +205,7 @@
 /* Make the card match the search section width */
 .card {
             max-width: 800px;
-            margin: 0 auto;
+            margin: 0;
 }
 
 /* Client not found alert styling */
@@ -249,7 +246,10 @@
 /* Adjust card padding to accommodate back button */
 .card-body {
     position: relative;
-    padding-top: 50px;
+    padding-top: 15px;
+    padding-bottom: 5px;
+    padding-left: 15px;
+    padding-right: 15px;
 }
 
 /* Transaction type section specific adjustments */
