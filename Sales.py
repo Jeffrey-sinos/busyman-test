@@ -1,8 +1,9 @@
 # import  libraries
 import base64
-
+import secrets
 import requests
-from flask import Flask,flash, session, render_template, request, redirect, url_for, send_from_directory, jsonify, make_response
+from flask import Flask,flash, session, render_template, request, redirect, url_for, send_from_directory, jsonify, make_response, Blueprint
+import secrets, datetime
 import os
 import io
 from io import BytesIO
@@ -22,6 +23,10 @@ from psycopg2 import sql, errors
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash # password hashing
 from dotenv import load_dotenv
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
 
 
 # Load environment variables
@@ -41,6 +46,95 @@ app.config['PAYMENTS_FOLDER'] = 'payments'
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
 
+admin_bp = Blueprint('admin', __name__)
+app.register_blueprint(admin_bp)
+
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
+
+# ... keep your existing imports ...
+
+from dotenv import load_dotenv
+load_dotenv()
+
+# Load Gmail credentials from .env
+GMAIL_USER = os.getenv("GMAIL_USER")
+GMAIL_PASS = os.getenv("GMAIL_PASS")
+
+
+@app.route('/admin/create_invite', methods=['POST'])
+def create_invite():
+    org_name = request.form['org_name']
+    contact_email = request.form['contact_email']
+
+    # Generate secure token and expiration date
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(days=7)
+
+    # Save to database
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO organization_invites (org_name, contact_email, token, expires_at)
+        VALUES (%s, %s, %s, %s)
+    """, (org_name, contact_email, token, expires_at))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    # Build invite link
+    invite_link = f"https://busyman.ltd/onboard/{token}"
+
+    # ---- SEND EMAIL ----
+    try:
+        subject = f"Invitation to join {org_name}"
+        sender_name = "Busyman Admin"
+
+        # Email body (plain text or HTML)
+        html_body = f"""
+        <html>
+        <body>
+            <p>Hello,</p>
+            <p>You have been invited to join <b>{org_name}</b>.</p>
+            <p>Click the link below to accept the invitation (valid for 7 days):<br>
+            <a href="{invite_link}">{invite_link}</a></p>
+            <p>Regards,<br>Busyman Team</p>
+        </body>
+        </html>
+        """
+
+        # Create MIME message
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = formataddr((sender_name, GMAIL_USER))
+        msg["To"] = contact_email
+        msg.attach(MIMEText(html_body, "html"))
+
+        # Gmail SMTP connection
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASS)
+            server.send_message(msg)
+
+        flash(f"Invite created and email sent to {contact_email}", "success")
+
+    except Exception as e:
+        flash(f"Invite saved, but email failed to send: {str(e)}", "error")
+
+    return redirect(url_for('admin_dashboard'))
+
+
+@app.route('/admin/create_invite', methods=['GET'])
+def show_invite_form():
+    return render_template('/organizations/create_invite.html')
+
+
+# Load Gmail credentials from .env
+GMAIL_USER = os.getenv("GMAIL_USER")
+GMAIL_PASS = os.getenv("GMAIL_PASS")
+
 # MPESA API Configuration
 MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY')
 MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET')
@@ -59,6 +153,7 @@ def get_db_connection():
         host=os.getenv('DB_HOST'),
         port=os.getenv('DB_PORT')
     )
+
 
 def get_mpesa_access_token():
     """Get M-Pesa access token"""
@@ -492,6 +587,7 @@ def user_dashboard():
     #     subscription_status=subscription_status,
     #     products=products
     # )
+
 
 # Admin dashboard route
 @app.route('/admin_dashboard')
