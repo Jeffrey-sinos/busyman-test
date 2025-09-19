@@ -88,12 +88,10 @@ def create_invite():
     # Build invite link
     invite_link = f"https://busyman.ltd/onboard/{token}"
 
-    # ---- SEND EMAIL ----
     try:
         subject = f"Invitation to join {org_name}"
         sender_name = "Busyman Admin"
 
-        # Email body (plain text or HTML)
         html_body = f"""
         <html>
         <body>
