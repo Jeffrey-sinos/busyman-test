@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Organization Invite</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 2rem 0;
+        }
+
+        .main-container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .form-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #4263eb;
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            border: none;
+        }
+
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .card-subtitle {
+            opacity: 0.9;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .card-body {
+            padding: 1.75rem;
+        }
+
+        /* ====== INDIVIDUAL LABEL & FIELD STYLING ====== */
+        .org-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.25rem;
+            font-size: 1rem;      /* Resize org label here */
+        }
+
+        .org-input {
+            height: 42px;          /* Resize org input height */
+            font-size: 0.95rem;    /* Resize org input font */
+            padding: 0.5rem 0.75rem;
+        }
+
+        .email-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;     /* Resize email label here */
+        }
+
+        .email-input {
+            height: 38px;          /* Resize email input height */
+            padding: 0.4rem 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .form-control:focus {
+            border-color: #4263eb;
+            box-shadow: 0 0 0 3px rgba(66, 99, 235, 0.1);
+        }
+
+        .btn-primary {
+            background-color: #4263eb;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            font-size: 1rem;
+            width: 100%;
+            transition: background-color 0.15s ease-in-out;
+        }
+
+        .btn-primary:hover {
+            background-color: #3451b2;
+        }
+
+        .alert {
+            border-radius: 6px;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .main-container { padding: 0 0.5rem; }
+            .card-body { padding: 1.5rem; }
+            .card-header { padding: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="form-card">
+            <div class="card-header">
+                <h2 class="card-title">Create Organization Invite</h2>
+                <p class="card-subtitle">Send an invitation to join your organization</p>
+            </div>
+
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('create_invite') }}" id="inviteForm" novalidate>
+
+                    <!-- Organization Name -->
+                    <div class="mb-4">
+                        <label for="org_name" class="form-label org-label">Organization Name</label>
+                        <input
+                            type="text"
+                            class="form-control org-input"
+                            id="org_name"
+                            name="org_name"
+                            required
+                            minlength="2"
+                            maxlength="100"
+                            placeholder="Enter your organization name"
+                        >
+                        <div class="invalid-feedback">
+                            Please provide a valid organization name (2-100 characters).
+                        </div>
+                    </div>
+
+                    <!-- Contact Email -->
+                    <div class="mb-4">
+                        <label for="contact_email" class="form-label email-label">Contact Email</label>
+                        <input
+                            type="email"
+                            class="form-control email-input"
+                            id="contact_email"
+                            name="contact_email"
+                            required
+                            placeholder="contact@yourorganization.com"
+                        >
+                        <div class="invalid-feedback">
+                            Please provide a valid email address.
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <i class="fas fa-paper-plane me-2"></i>
+                        Send Invite
+                    </button>
+                </form>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="mt-4">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('inviteForm');
+            form.addEventListener('submit', function(event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            });
+        });
+    </script>
+</body>
+</html>
