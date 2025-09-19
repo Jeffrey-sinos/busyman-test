@@ -1184,6 +1184,7 @@ def search_invoices():
     account_owners = read_account_owners()
     bank_accounts = read_bank_accounts()
     products = read_product_names()
+
     # Set default date range
     today = datetime.today()
     default_start_date = (today - relativedelta(months=6)).strftime('%Y-%m-%d')
