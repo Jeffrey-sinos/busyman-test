@@ -131,10 +131,6 @@ def show_invite_form():
     return render_template('/organizations/create_invite.html')
 
 
-# Load Gmail credentials from .env
-GMAIL_USER = os.getenv("GMAIL_USER")
-GMAIL_PASS = os.getenv("GMAIL_PASS")
-
 # MPESA API Configuration
 MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY')
 MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET')
