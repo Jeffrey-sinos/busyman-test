@@ -1182,11 +1182,12 @@ def search_invoices():
     invoices = []
     categories = read_categories()
     account_owners = read_account_owners()
-
+    bank_accounts = read_bank_accounts()
+    products = read_product_names()
     # Set default date range
     today = datetime.today()
-    default_start_date = (today - timedelta(days=730)).strftime('%Y-%m-%d')
-    default_end_date = (today + timedelta(days=7)).strftime('%Y-%m-%d')
+    default_start_date = (today - relativedelta(months=6)).strftime('%Y-%m-%d')
+    default_end_date = (today + relativedelta(weeks=1)).strftime('%Y-%m-%d')
 
     try:
         conn = get_db_connection()
@@ -1242,6 +1243,8 @@ def search_invoices():
                                invoices=invoices,
                                account_owners=account_owners,
                                categories=categories,
+                               bank_accounts=bank_accounts,
+                               products=products,
                                default_start_date=default_start_date,
                                default_end_date=default_end_date)
 
@@ -1249,6 +1252,8 @@ def search_invoices():
                            invoices=invoices,
                            account_owners=account_owners,
                            categories=categories,
+                           bank_accounts=bank_accounts,
+                           products=products,
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
 
@@ -1275,7 +1280,8 @@ def edit_sale(sales_id):
         total = quantity * price
         category = data.get('category')
         account_owner = data.get('account_owner')
-        status = data.get('status')
+        bank_account = data.get('bank_account')
+        #status = data.get('status')
 
         try:
             cur.execute("""
@@ -1289,12 +1295,12 @@ def edit_sale(sales_id):
                     total = %s,
                     category = %s,
                     account_owner = %s,
-                    status = %s
+                    bank_account = %s
                 WHERE sales_id = %s
             """, (
                 invoice_date, invoice_no, customer_name, product,
-                quantity, price, total, category, account_owner,
-                status, sales_id
+                quantity, price, total, category, account_owner, bank_account,
+                sales_id
             ))
 
             # Update sales_list total and balance
@@ -1326,7 +1332,7 @@ def edit_sale(sales_id):
                     "total": total,
                     "category": category,
                     "account_owner": account_owner,
-                    "status": status
+                    "bank_account": bank_account
                 }
             })
 
