@@ -49,17 +49,6 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload size
 admin_bp = Blueprint('admin', __name__)
 app.register_blueprint(admin_bp)
 
-
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.utils import formataddr
-
-# ... keep your existing imports ...
-
-from dotenv import load_dotenv
-load_dotenv()
-
 # Load Gmail credentials from .env
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
