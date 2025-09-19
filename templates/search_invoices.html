@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Invoices - Busyman Pro</title>
+    <title>View Invoices</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         /* Green filter styling */
         .filter-container {
@@ -92,57 +93,99 @@
             overflow-y: auto;
         }
 
-        /* Position back button on top of the View Invoices text */
+        /* Fixed header positioning for desktop */
         .page-header {
             display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
+            flex-direction: column;
             margin-bottom: 20px;
-            position: relative;
         }
 
         .back-button-container {
-            margin-right: 15px;
-            margin-top: 5px;
+            margin-bottom: 10px;
         }
 
         .page-title {
-            flex-grow: 1;
+            width: 100%;
+            text-align: left;
+        }
+
+        .page-title h1 {
+            margin: 0;
         }
 
         /* Mobile-specific styles */
         @media (max-width: 992px) {
+            .container {
+                padding-left: 10px !important;
+                padding-right: 10px !important;
+            }
+
             .filter-container {
                 grid-template-columns: 1fr;
+                margin-left: 0;
+                margin-right: 0;
             }
+
             .filter-item {
                 flex-direction: row;
                 align-items: center;
                 gap: 10px;
+                margin-left: 0;
+                margin-right: 0;
             }
+
             .filter-item .form-label {
                 margin-bottom: 0;
                 min-width: 120px;
                 text-align: right;
             }
+
             .search-controls {
                 width: 100%;
                 justify-content: flex-start;
                 flex-wrap: wrap;
+                margin-left: 0;
             }
+
             .modal-actions {
                 flex-direction: column;
             }
 
-            /* Adjust header layout for mobile */
+            /* Reset header layout for mobile */
             .page-header {
                 flex-direction: column;
                 align-items: flex-start;
+                margin-left: 0;
+                margin-right: 0;
             }
 
             .back-button-container {
-                margin-bottom: 10px;
-                order: -1; /* Move back button to top */
+                position: static; /* Reset absolute positioning */
+                margin-bottom: 15px;
+                left: auto;
+                top: auto;
+            }
+
+            .page-title {
+                width: 100%;
+                text-align: left;
+            }
+        }
+
+        /* Extra small mobile adjustments */
+        @media (max-width: 576px) {
+            .container {
+                padding-left: 5px !important;
+                padding-right: 5px !important;
+            }
+
+            .filter-item {
+                padding: 12px;
+            }
+
+            .filter-item .form-label {
+                min-width: 100px;
+                font-size: 14px;
             }
         }
     </style>
@@ -152,25 +195,29 @@
     <div class="container py-5">
         <div class="page-header">
             <div class="back-button-container" id="backButtonContainer">
-                <a href="{{ url_for('sales_menu') }}" class="btn btn-secondary">Back</a>
+                <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+                    </svg>
+                    Back
+                </a>
             </div>
             <div class="page-title">
                 <h1>View Invoices</h1>
             </div>
         </div>
 
+        <!-- Flash messages section -->
         {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                                <span aria-hidden="true">&times;</span>
-                            </button>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
         <form method="POST" action="{{ url_for('search_invoices') }}" id="searchForm">
             <!-- Filter Controls -->
@@ -211,8 +258,11 @@
         </form>
 
         <!-- Back to Filters Button (shown when results are displayed) -->
-        <button id="backToFilters" class="btn btn-secondary back-to-filters mb-3">
-            Back to filters
+        <button id="backToFilters" class="btn btn-outline-secondary back-to-filters mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+            </svg>
+            Back
         </button>
 
         {% if invoices %}
@@ -251,7 +301,8 @@
                                     data-total="{{ invoice[7] }}"
                                     data-category="{{ invoice[8] }}"
                                     data-account-owner="{{ invoice[9] }}"
-                                    data-status="{{ invoice[11] }}">
+                                    data-status="{{ invoice[11] }}"
+                                    data-bank-account="{{ invoice[12] }}">
                                     Select
                                 </button>
                             </td>
@@ -314,6 +365,10 @@
                                 <span id="detail_account_owner"></span>
                             </div>
                             <div class="invoice-detail">
+                                <label>Bank Account:</label>
+                                <span id="detail_bank_account"></span>
+                            </div>
+                            <div class="invoice-detail">
                                 <label>Status:</label>
                                 <span id="detail_status"></span>
                             </div>
@@ -347,7 +402,7 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label">Invoice Date</label>
-                            <input type="date" class="form-control" name="invoice_date" id="modal_invoice_date" readonly>
+                            <input type="date" class="form-control editable-field" name="invoice_date" id="modal_invoice_date">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Invoice No</label>
@@ -359,9 +414,12 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Product</label>
-                            <input type="text" class="form-control" name="product" id="modal_product" readonly>
+                            <select class="form-control editable-field" name="product" id="modal_product">
+                                {% for product in products %}
+                                <option value="{{ product }}">{{ product }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
-                        <!-- Editable fields -->
                         <div class="col-md-6">
                             <label class="form-label">Quantity</label>
                             <input type="number" class="form-control editable-field" name="quantity" id="modal_quantity">
@@ -372,16 +430,34 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Category</label>
-                            <input type="text" class="form-control" name="category" id="modal_category" readonly>
+                            <select class="form-control editable-field" name="category" id="modal_category">
+                                {% for category in categories %}
+                                <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                         <div class="col-md-6">
+                            <label class="form-label">Account Owner</label>
+                            <select class="form-control editable-field" name="account_owner" id="modal_account_owner">
+                                {% for account_owner in account_owners %}
+                                <option value="{{ account_owner }}">{{ account_owner }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Account Owner</label>
-                            <input type="text" class="form-control" name="account_owner" id="modal_account_owner" readonly>
+                            <label class="form-label">Bank Account</label>
+                            <select class="form-control editable-field" name="bank_account" id="modal_bank_account">
+                                {% for bank_account in bank_accounts %}
+                                <option value="{{ bank_account }}">{{ bank_account }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
+                        <!--
                         <div class="col-md-6">
                             <label class="form-label">Status</label>
                             <input type="text" class="form-control" name="status" id="modal_status" readonly>
                         </div>
+                        -->
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -479,6 +555,7 @@
             document.getElementById('detail_total').textContent = "Ksh " + parseFloat(button.getAttribute('data-total')).toLocaleString('en-KE', {minimumFractionDigits: 2});
             document.getElementById('detail_category').textContent = button.getAttribute('data-category');
             document.getElementById('detail_account_owner').textContent = button.getAttribute('data-account-owner');
+            document.getElementById('detail_bank_account').textContent = button.getAttribute('data-bank-account');
             document.getElementById('detail_status').textContent = button.getAttribute('data-status');
         });
 
@@ -504,7 +581,8 @@
             document.getElementById('modal_price').value = selectButton.getAttribute('data-price');
             document.getElementById('modal_category').value = selectButton.getAttribute('data-category');
             document.getElementById('modal_account_owner').value = selectButton.getAttribute('data-account-owner');
-            document.getElementById('modal_status').value = selectButton.getAttribute('data-status');
+            document.getElementById('modal_bank_account').value = selectButton.getAttribute('data-bank-account');
+           //document.getElementById('modal_status').value = selectButton.getAttribute('data-status');
 
             editModal.show();
         });
