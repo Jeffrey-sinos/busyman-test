@@ -25,7 +25,7 @@
         <!-- Add new user -->
         <div class="d-flex justify-content-end mb-3">
             <a href="{{ url_for('add_user') }}" class="btn btn-primary">+ Add New User</a>
-            <a href="{{ url_for('superuser_dashboard') if session.get('role') == 1 else url_for('admin_dashboard') if session.get('role') == 2 else url_for('user_dashboard') }}" class="btn btn-secondary ml-3">Back to Menu</a>
+            <a href="{{ url_for('admin_menu') }}" class="btn btn-secondary ml-3">Back to Menu</a>
         </div>
         <table class="table">
             <thead>

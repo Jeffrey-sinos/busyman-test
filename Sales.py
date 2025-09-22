@@ -54,6 +54,11 @@ GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
 
+@app.route('/admin')
+def admin_menu():
+    return render_template('/admin/admin_menu.html')
+
+
 @app.route('/admin/create_invite', methods=['POST'])
 def create_invite():
     org_name = request.form['org_name']
@@ -74,8 +79,8 @@ def create_invite():
     cur.close()
     conn.close()
 
-    # Build invite link
-    invite_link = f"https://busyman.ltd/onboard/{token}"
+    # invite_link = f"https://busyman.ltd/onboard/{token}"
+    invite_link = f"onboard/{token}"
 
     try:
         subject = f"Invitation to join {org_name}"
@@ -116,6 +121,21 @@ def create_invite():
 @app.route('/admin/create_invite', methods=['GET'])
 def show_invite_form():
     return render_template('/organizations/create_invite.html')
+
+
+@app.route('/onboard/<token>', methods=['GET', 'POST'])
+def onboard_superuser(token):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT invite_id, org_name, expires_at, used
+        FROM organization_invites
+        WHERE token = %s
+    """, (token,))
+    invite = cur.fetchone()
+
+    if not invite or invite[3] or invite[2] < datetime.datetime.utcnow():
+        return "Invalid or expired invite.", 400
 
 
 # MPESA API Configuration
