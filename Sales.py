@@ -79,8 +79,8 @@ def create_invite():
     cur.close()
     conn.close()
 
-    # invite_link = f"https://busyman.ltd/onboard/{token}"
-    invite_link = f"onboard/{token}"
+    invite_link = f"https://busyman.ltd/onboard/{token}"
+    # invite_link = f"onboard/{token}"
 
     try:
         subject = f"Invitation to join {org_name}"
@@ -115,7 +115,7 @@ def create_invite():
     except Exception as e:
         flash(f"Invite saved, but email failed to send: {str(e)}", "error")
 
-    return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('create_invite'))
 
 
 @app.route('/admin/create_invite', methods=['GET'])
