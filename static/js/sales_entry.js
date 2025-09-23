@@ -149,6 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
         transactionTypeSection.classList.remove('active');
         clientSearchSection.classList.add('active');
 
+        showBackToMenuButton();
         // Reset form
         resetFormForNewItem();
         document.getElementById('account').value = '';
@@ -359,6 +360,8 @@ document.addEventListener('DOMContentLoaded', function() {
         addClientBtnContainer.style.display = 'none';
         clientNotFoundAlert.style.display = 'none'; // Hide alert when client is selected
 
+        hideBackToMenuButton();
+
         fetch('/sales/entry', {
             method: 'POST',
             headers: {
@@ -401,6 +404,7 @@ document.addEventListener('DOMContentLoaded', function() {
     backToClientSearchBtn.addEventListener('click', function() {
         transactionTypeSection.classList.remove('active');
         clientSearchSection.classList.add('active');
+        showBackToMenuButton();
     });
 
     backToTransactionTypeBtn.addEventListener('click', function() {
@@ -600,3 +604,18 @@ document.getElementById('addClientForm').addEventListener('submit', function(e) 
         }
     });
 });
+// Function to hide the back to menu button
+function hideBackToMenuButton() {
+    const backButton = document.getElementById('backToMenuBtn');
+    if (backButton) {
+        backButton.classList.add('back-button-hidden');
+    }
+}
+
+// Function to show the back to menu button
+function showBackToMenuButton() {
+    const backButton = document.getElementById('backToMenuBtn');
+    if (backButton) {
+        backButton.classList.remove('back-button-hidden');
+    }
+}
