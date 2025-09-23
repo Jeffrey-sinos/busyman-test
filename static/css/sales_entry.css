@@ -124,6 +124,10 @@
     padding: 5px;
 }
 
+.back-button-hidden {
+    display: none !important;
+}
+
 #downloadSuccessToast {
     position: fixed;
     top: 20px;
