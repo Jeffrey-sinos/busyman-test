@@ -79,7 +79,7 @@ def create_invite():
     cur.close()
     conn.close()
 
-    invite_link = f"https://busyman.ltd/onboard/{token}"
+    invite_link = f"https://test.busyman.ltd/onboard/{token}"
     # invite_link = f"onboard/{token}"
 
     try:
