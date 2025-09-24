@@ -951,9 +951,19 @@ def sales_entry():
 
         elif action == 'select_client':
             client_name = request.form.get('client_name')
+
+            # get institution of selected client
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT institution FROM clients WHERE customer_name = %s", (client_name,))
+            result = cursor.fetchone()
+            institution = result[0] if result else ""
+            cursor.close()
+            conn.close()
             return jsonify({
                 'status': 'success',
                 'client_name': client_name,
+                'institution': institution,
                 'invoice_number': generate_next_invoice_number(),
                 'current_date': get_current_date()
             })
@@ -2341,7 +2351,7 @@ def search_customers():
                         SELECT DISTINCT customer_name
                         FROM sales_list
                         WHERE balance > 0
-                        ORDER BY customer_name LIMIT 100
+                        ORDER BY customer_name
                         """)
 
         customers = [row[0] for row in cur.fetchall()]

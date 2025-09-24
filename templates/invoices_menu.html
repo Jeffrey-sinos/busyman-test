@@ -55,13 +55,15 @@
 <div class="container text-center">
     <div class="top-space"></div>
 
-    <h1>Search Invoices Menu</h1>
+    <h1>Invoices Menu</h1>
 
     <div class="top-space"></div>
 
     <div class="d-flex flex-column">
-        <a href="{{ url_for('search_invoices') }}" class="btn btn-block mb-2">View Invoices</a>
-        <a href="{{ url_for('sales_menu') }}" class="btn btn-block mt-3">Back to Sales Menu</a>
+        <a href="{{ url_for('sales_entry') }}" class="btn btn-block mb-2">Create</a>
+        <a href="{{ url_for('search_invoices') }}" class="btn btn-block mb-2">Edit</a>
+        <a href="{{ url_for('view_sales') }}" class="btn btn-block mb-2">Receive</a>
+        <a href="{{ url_for('sales_menu') }}" class="btn btn-block mt-3">Back</a>
     </div>
 </div>
 
