@@ -176,7 +176,7 @@ def show_invite_form():
 
 @app.route('/onboard/<token>', methods=['GET', 'POST'])
 def onboard_superuser(token):
-    with get_db_connection() as conn:
+    with get_db_connection2() as conn:
         cur = conn.cursor()
         cur.execute("""
             SELECT invite_id, org_name, contact_email, expires_at, used
@@ -294,7 +294,7 @@ def subscription_required():
         return redirect(url_for('login'))
 
     # Get available subscription products
-    with get_db_connection() as conn:
+    with get_db_connection2() as conn:
         cur = conn.cursor()
         cur.execute("""
             SELECT product_id, product_name, description, price_per_unit, duration_days
