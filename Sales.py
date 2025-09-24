@@ -209,7 +209,7 @@ def onboard_superuser(token):
             try:
                 # Get form data
                 full_name = request.form.get('full_name', '').strip()
-                email = request.form.get('email', '').strip()
+                email = request.form.get('email', '').strip().lower()  # Normalize to lowercase
                 phone_number = request.form.get('phone_number', '').strip()
                 organization_name = request.form.get('organization_name', '').strip()
                 password = request.form.get('password', '')
@@ -217,6 +217,19 @@ def onboard_superuser(token):
                 # Simple validation
                 if not all([full_name, email, organization_name, password]):
                     flash("All required fields must be filled", "error")
+                    return render_template('organizations/onboard_form.html',
+                                           org_name=org_name,
+                                           contact_email=contact_email,
+                                           token=token)
+
+                # Check if email already exists before attempting insertion
+                cur.execute("SELECT user_id FROM organizations WHERE email = %s OR username = %s", (email, email))
+                existing_user = cur.fetchone()
+
+                if existing_user:
+                    flash(
+                        "An account with this email address already exists. Please use a different email or try logging in.",
+                        "error")
                     return render_template('organizations/onboard_form.html',
                                            org_name=org_name,
                                            contact_email=contact_email,
@@ -256,12 +269,23 @@ def onboard_superuser(token):
 
             except Exception as e:
                 conn.rollback()
-                flash(f"Registration failed: {str(e)}", "error")
+
+                # Handle specific database errors with user-friendly messages
+                error_message = str(e)
+                if "organizations_username_key" in error_message or "duplicate key" in error_message.lower():
+                    flash(
+                        "An account with this email address already exists. Please use a different email or try logging in.",
+                        "error")
+                elif "organizations_email_key" in error_message:
+                    flash("This email address is already registered. Please use a different email address.", "error")
+                else:
+                    # Generic error message for other database errors
+                    flash("Registration failed. Please try again or contact support if the problem persists.", "error")
+
                 return render_template('organizations/onboard_form.html',
                                        org_name=org_name,
                                        contact_email=contact_email,
                                        token=token)
-
 
 @app.route('/subscription_required')
 def subscription_required():
