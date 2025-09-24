@@ -287,6 +287,7 @@ def onboard_superuser(token):
                                        contact_email=contact_email,
                                        token=token)
 
+
 @app.route('/subscription_required')
 def subscription_required():
     if 'user_id' not in session:
@@ -303,7 +304,7 @@ def subscription_required():
         """)
         products = cur.fetchall()
 
-    return render_template('subscriptions/subscription_required.html', products=products)
+    return render_template('subscription/subscription_required.html', products=products)
 
 
 # MPESA API Configuration
