@@ -14,9 +14,16 @@
             gap: 10px;
             margin-bottom: 20px;
         }
+        .filter-bar {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
         .filter-item {
             background-color: #28a745; /* Green background */
-            padding: 8px 12px;
+            padding: 12px 16px;
             border-radius: 6px;
             color: white; /* White text */
             display: flex;
@@ -26,19 +33,19 @@
             color: white; /* White text for labels */
             font-weight: 500;
             margin-bottom: 5px;
-            font-size: 0.875rem;
+            font-size: 1rem;
         }
         .filter-item .form-control {
             background-color: white;
             color: #333;
-            font-size: 0.875rem;
-            padding: 4px 8px;
-            height: 32px;
+            font-size: 1rem;
+            padding: 6px 10px;
+            height: 40px;
         }
         .filter-item .form-select {
-            font-size: 0.875rem;
-            padding: 4px 8px;
-            height: 32px;
+            font-size: 1rem;
+            padding: 6px 10px;
+            height: 40px;
         }
         .search-controls {
             display: flex;
@@ -143,12 +150,12 @@
                 margin-bottom: 0;
                 min-width: 80px;
                 text-align: left;
-                font-size: 0.8rem;
+                font-size: 0.9rem;
             }
             .filter-item .form-control,
             .filter-item .form-select {
-                height: 28px;
-                font-size: 0.8rem;
+                height: 30px;
+                font-size: 0.9rem;
             }
 
             .search-controls {
@@ -196,7 +203,7 @@
 
             .filter-item .form-label {
                 min-width: 70px;
-                font-size: 0.75rem;
+                font-size: 0.8rem;
             }
         }
     </style>
@@ -206,7 +213,7 @@
     <div class="container py-5">
         <div class="page-header">
             <div class="back-button-container" id="backButtonContainer">
-                <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-secondary">
+                <a href="{{ url_for('invoices_menu') }}" class="btn btn-outline-secondary">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
                     </svg>
@@ -232,40 +239,43 @@
 
         <form method="POST" action="{{ url_for('search_invoices') }}" id="searchForm">
             <!-- Filter Controls -->
-            <div class="filter-container" id="filtersContainer">
-                <div class="filter-item">
-                    <label for="start_date" class="form-label">Start Date</label>
-                    <input type="date" class="form-control" id="start_date" name="start_date" value="{{ default_start_date }}">
-                </div>
-                <div class="filter-item">
-                    <label for="end_date" class="form-label">End Date</label>
-                    <input type="date" class="form-control" id="end_date" name="end_date" value="{{ default_end_date }}">
-                </div>
-                <div class="filter-item">
-                    <label for="category" class="form-label">Category</label>
-                    <select class="form-control" id="category" name="category">
-                        <option value="">All Categories</option>
-                        {% for category in categories %}
-                        <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="filter-item">
-                    <label for="account_owner" class="form-label">Account Owner</label>
-                    <select class="form-control" id="account_owner" name="account_owner">
-                        <option value="">All Account Owners</option>
-                        {% for account_owner in account_owners %}
-                        <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <div class="search-controls" id="searchControls">
-                <button type="submit" class="btn btn-primary" id="searchBtn">
-                    <span id="searchText">Search</span>
-                    <span id="searchSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
-                </button>
-            </div>
+            <div class="filter-bar">
+    <div class="filter-item">
+        <label for="start_date" class="form-label">Start Date</label>
+        <input type="date" class="form-control" id="start_date" name="start_date" value="{{ default_start_date }}">
+    </div>
+    <div class="filter-item">
+        <label for="end_date" class="form-label">End Date</label>
+        <input type="date" class="form-control" id="end_date" name="end_date" value="{{ default_end_date }}">
+    </div>
+    <div class="filter-item">
+        <label for="category" class="form-label">Category</label>
+        <select class="form-control" id="category" name="category">
+            <option value="">All Categories</option>
+            {% for category in categories %}
+            <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="filter-item">
+        <label for="account_owner" class="form-label">Account Owner</label>
+        <select class="form-control" id="account_owner" name="account_owner">
+            <option value="">All Account Owners</option>
+            {% for account_owner in account_owners %}
+            <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <!-- Search button pushed to the right -->
+    <div class="search-controls">
+        <button type="submit" class="btn btn-primary" id="searchBtn">
+            <span id="searchText">Search</span>
+            <span id="searchSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+        </button>
+    </div>
+</div>
+
         </form>
 
         {% if invoices %}

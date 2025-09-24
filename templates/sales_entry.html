@@ -10,7 +10,7 @@
 <body>
     <div class="container py-4">
         <div class="heading-container">
-            <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-secondary btn-sm" id="backToMenuBtn">
+            <a href="{{ url_for('invoices_menu') }}" class="btn btn-outline-secondary btn-sm" id="backToMenuBtn">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
                 </svg>
@@ -66,7 +66,7 @@
                 <div id="transactionTypeSection" class="form-section">
                 <!--    <h4 class="mb-4">Step 2: Select Transaction Type</h4> -->
                     <div class="alert alert-info mb-4">
-                        <strong>Client:</strong> <span id="selectedClientDisplay">No client selected</span>
+                        <span id="selectedClientDisplay">No client selected</span>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
@@ -91,12 +91,23 @@
                 <!-- Sales Form Section -->
                 <div id="salesFormSection" class="form-section">
                     <span id="transactionTypeHeading" hidden></span>
-                    <div class="row g-3">
+                    <!-- Client Name and Invoice Number at the top -->
+                    <div class="alert alert-info mb-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Client:</strong> <span id="selectedClientFormDisplay">No client selected</span>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Invoice Number:</strong> <span id="invoiceNumberDisplay"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-4">
                         <div class="col-md-4">
                             <label for="invoiceDate" class="form-label">Invoice Date</label>
                             <input type="date" class="form-control" id="invoiceDate" value="{{ current_date }}">
                         </div>
-
+                        <!--
                         <div class="col-md-4">
                             <label for="invoiceNumber" class="form-label">Invoice Number</label>
                             <input type="text" class="form-control" id="invoiceNumber" readonly>
@@ -106,8 +117,10 @@
                             <label for="customerNameDisplay" class="form-label">Customer Name</label>
                             <input type="text" class="form-control" id="customerNameDisplay" readonly>
                         </div>
-
-                        <div class="col-md-6">
+                        -->
+                        <input type="hidden" id="customerNameDisplay">
+                        <input type="hidden" id="invoiceNumber">
+                        <div class="col-md-4">
                             <label for="product" class="form-label">Product</label>
                             <select class="form-select" id="product">
                                 <option value="">Select a product</option>
@@ -117,12 +130,12 @@
                             </select>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label for="quantity" class="form-label">Quantity</label>
                             <input type="number" class="form-control" id="quantity" min="1" value="1">
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-4">
                             <label for="price" class="form-label">Price (KSh)</label>
                             <input type="number" class="form-control" id="price" step="0.01" min="0">
                         </div>
@@ -262,7 +275,7 @@
                     </div>
             <div class="modal-body row g-3">
                 <div class="col-md-6">
-                    <label for="customer_name" class="form-label">Customer Name</label>
+                    <label for="customer_name" class="form-label">Client Name</label>
                     <input type="text" class="form-control" name="customer_name" id="customer_name" required>
                 </div>
                 <div class="col-md-6">

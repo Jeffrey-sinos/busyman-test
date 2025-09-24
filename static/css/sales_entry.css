@@ -127,6 +127,25 @@
 .back-button-hidden {
     display: none !important;
 }
+/* Style for the client info display at top of form */
+#selectedClientFormDisplay strong {
+    font-size: 1.1em;
+}
+
+#selectedClientFormDisplay small {
+    font-size: 0.9em;
+}
+
+/* Ensure the alert at top looks good */
+#salesFormSection .alert-info {
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+    color: #0c5460;
+}
+
+#salesFormSection .alert-info strong {
+    color: #0c5460;
+}
 
 #downloadSuccessToast {
     position: fixed;

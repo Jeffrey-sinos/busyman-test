@@ -374,6 +374,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.status === 'success') {
                 invoiceNumber.value = data.invoice_number;
                 invoiceDate.value = data.current_date;
+                selectedClientDisplay.innerHTML = `
+                    <strong>${data.client_name}</strong>
+                    ${data.institution ? `<br><small class="text-muted">${data.institution}</small>` : ''}
+                `;
+                document.getElementById('selectedClientFormDisplay').innerHTML = `
+                    <strong>${data.client_name}</strong>
+                    ${data.institution ? `<br><small class="text-muted">${data.institution}</small>` : ''}
+                `;
+                document.getElementById('invoiceNumberDisplay').textContent = data.invoice_number;
                 clientSearchSection.classList.remove('active');
                 transactionTypeSection.classList.add('active');
             }
@@ -396,6 +405,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function proceedToSalesForm() {
+        document.getElementById('selectedClientFormDisplay').innerHTML = selectedClientDisplay.innerHTML;
+        document.getElementById('invoiceNumberDisplay').textContent = invoiceNumber.value;
         transactionTypeSection.classList.remove('active');
         salesFormSection.classList.add('active');
     }

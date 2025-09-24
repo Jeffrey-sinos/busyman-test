@@ -4,15 +4,15 @@ $(document).ready(function() {
 
     // Debounced autocomplete search - now triggers after 1 character
     $('#customerSearch').on('input', function() {
-    const searchTerm = $(this).val().trim();
+        const searchTerm = $(this).val().trim();
 
-    // Show suggestions immediately for any input
-    if (searchTerm.length > 0) {
-        fetchCustomers(searchTerm);
-    } else {
-        $('#searchSuggestions').hide();
-    }
-});
+        // Show suggestions immediately for any input
+        if (searchTerm.length > 0) {
+            fetchCustomers(searchTerm);
+        } else {
+            $('#searchSuggestions').hide();
+        }
+    });
 
     // Search button click
     $('#searchBtn').click(function() {
@@ -20,16 +20,101 @@ $(document).ready(function() {
         if (searchTerm.length > 0) {
             fetchCustomers(searchTerm, true);
         } else {
-            showAlert('Please enter a search term', 'warning');
+            // Show modal with all customers when search term is empty
+            showAllCustomersModal();
         }
     });
 
-    // Show all customers with unpaid invoices
-    $('#showAllBtn').click(function() {
-        fetchCustomers('', true);
+    // Function to show all customers modal
+    function showAllCustomersModal() {
+        const modal = new bootstrap.Modal(document.getElementById('allCustomersModal'));
+        modal.show();
+
+        // Load all customers with unpaid invoices
+        loadAllCustomers();
+    }
+
+    // Function to load all customers with unpaid invoices
+    // Function to load all customers with unpaid invoices
+function loadAllCustomers() {
+    const tbody = $('#allCustomersTable tbody');
+    tbody.html(`
+        <tr>
+            <td colspan="2" class="text-center">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Loading all customers with unpaid invoices...
+            </td>
+        </tr>
+    `);
+
+    $.get('/search_customers', {term: ''})
+        .done(function(data) {
+            tbody.empty();
+
+            if (Array.isArray(data) && data.length > 0) {
+                // Update customer count badge
+                $('#customerCount').text(`${data.length} customers`);
+
+                data.forEach(function(customer) {
+                    const row = `
+                        <tr class="customer-list-item">
+                            <td>${escapeHtml(customer)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary select-customer-btn"
+                                        data-customer="${escapeHtml(customer)}">
+                                    <i class="bi bi-eye me-1"></i> View Invoices
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                });
+
+                // Show message if many customers are loaded
+                if (data.length > 50) {
+                    tbody.prepend(`
+                        <tr class="table-info">
+                            <td colspan="2" class="text-center fw-bold">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Showing all ${data.length} customers with unpaid invoices
+                            </td>
+                        </tr>
+                    `);
+                }
+            } else {
+                tbody.append(`
+                    <tr>
+                        <td colspan="2" class="text-center text-muted">
+                            <i class="bi bi-check-circle me-2"></i>
+                            No customers with unpaid invoices found
+                        </td>
+                    </tr>
+                `);
+                $('#customerCount').text('0 customers');
+            }
+        })
+        .fail(function() {
+            tbody.html(`
+                <tr>
+                    <td colspan="2" class="text-center text-danger">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Error loading customers. Please try again.
+                    </td>
+                </tr>
+            `);
+            $('#customerCount').text('Error');
+        });
+}
+
+    // Handle customer selection from all customers modal
+    $(document).on('click', '.select-customer-btn', function() {
+        const customerName = $(this).data('customer');
+        $('#customerSearch').val(customerName);
+        $('#allCustomersModal').modal('hide');
+        loadUnpaidInvoices(customerName);
     });
 
-    // Function to fetch customers
+    // Function to fetch customers for autocomplete
     function fetchCustomers(searchTerm) {
         $.get('/search_customers', {term: searchTerm})
             .done(function (data) {
@@ -180,25 +265,25 @@ $(document).ready(function() {
                                 <input type="hidden" name="customer_name" value="${escapeHtml(customerName)}">
                                 <input type="hidden" name="category" value="${category}">
                                 <input type="hidden" name="account_owner" value="${accountOwner}">
-                                
+
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label">Invoice Date</label>
-                                        <input type="date" class="form-control" name="invoice_date" 
+                                        <input type="date" class="form-control" name="invoice_date"
                                                value="${invoiceDate}" readonly>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label">Invoice Number</label>
-                                        <input type="text" class="form-control" name="invoice_no" 
+                                        <input type="text" class="form-control" name="invoice_no"
                                                value="${invoiceNo}" readonly>
                                     </div>
-                                    
+
                                     <div class="col-md-6">
                                         <label class="form-label">Invoice Amount</label>
-                                        <input type="number" class="form-control" name="invoice_amount" 
+                                        <input type="number" class="form-control" name="invoice_amount"
                                                value="${invoiceAmount}" readonly>
                                     </div>
-                                    
+
                                     <div class="col-md-6">
                                         <label class="form-label">Amount Paid</label>
                                         <input type="number" class="form-control editable-field paid-amount-input" name="paid_amount"
@@ -207,32 +292,32 @@ $(document).ready(function() {
                                             <i class="bi bi-exclamation-circle"></i> Cannot exceed invoice amount
                                         </small>
                                     </div>
-                                    
+
                                     <div class="col-md-6">
                                         <label class="form-label">Balance</label>
-                                        <input type="number" class="form-control balance-amount" 
+                                        <input type="number" class="form-control balance-amount"
                                                value="${balance}" readonly>
                                     </div>
-                                    
+
                                     <div class="col-md-6">
                                         <label class="form-label">Status</label>
-                                        <input type="text" class="form-control payment-status" 
+                                        <input type="text" class="form-control payment-status"
                                                value="${paymentStatus}" readonly>
                                     </div>
-                                    
+
                                     <div class="col-md-6">
                                         <label class="form-label">Category</label>
-                                        <input type="text" class="form-control" name="category" 
+                                        <input type="text" class="form-control" name="category"
                                                value="${category}" readonly>
                                     </div>
-                                    
+
                                     <div class="col-md-6">
                                         <label class="form-label">Account Owner</label>
-                                        <input type="text" class="form-control" name="account_owner" 
+                                        <input type="text" class="form-control" name="account_owner"
                                                value="${accountOwner}" readonly>
                                     </div>
                                 </div>
-                                
+
                                 <div class="modal-footer mt-3">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                     <button type="submit" class="btn btn-primary">
