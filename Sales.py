@@ -243,13 +243,16 @@ def onboard_superuser(token):
 
                 conn.commit()
 
-                # Log the user in
+                # Set up session for the new user
                 session['user_id'] = user_id
                 session['username'] = email
                 session['role'] = 1
+                session['needs_subscription'] = True  # Flag to show subscription modal
 
-                flash(f"Welcome {full_name}! Your account has been created successfully.", "success")
-                return redirect(url_for('superuser_dashboard'))
+                flash(f"Welcome {full_name}! Please complete your subscription to access the dashboard.", "success")
+
+                # Redirect to subscription page instead of dashboard
+                return redirect(url_for('subscription_required'))
 
             except Exception as e:
                 conn.rollback()
@@ -258,6 +261,25 @@ def onboard_superuser(token):
                                        org_name=org_name,
                                        contact_email=contact_email,
                                        token=token)
+
+
+@app.route('/subscription_required')
+def subscription_required():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    # Get available subscription products
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT product_id, product_name, description, price_per_unit, duration_days
+            FROM subscription_products 
+            WHERE is_active = true
+            ORDER BY price_per_unit
+        """)
+        products = cur.fetchall()
+
+    return render_template('subscriptions/subscription_required.html', products=products)
 
 
 # MPESA API Configuration
