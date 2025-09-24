@@ -7,206 +7,252 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
-        /* Green filter styling */
-        .filter-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
+    /* Green filter styling */
+    .filter-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .filter-bar {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    .filter-item {
+        background-color: #28a745; /* Green background */
+        padding: 12px 16px;
+        border-radius: 6px;
+        color: white; /* White text */
+        display: flex;
+        flex-direction: column;
+    }
+    .filter-item .form-label {
+        color: white; /* White text for labels */
+        font-weight: 500;
+        margin-bottom: 5px;
+        font-size: 1rem;
+        line-height: 1.4; /* Added line height for better text display */
+    }
+    .filter-item .form-control {
+        background-color: white;
+        color: #333;
+        font-size: 1rem;
+        padding: 6px 10px;
+        height: 40px;
+        line-height: 1.4; /* Added line height */
+    }
+    .filter-item .form-select {
+        font-size: 1rem;
+        padding: 6px 10px;
+        height: 40px;
+        line-height: 1.4; /* Added line height */
+    }
+    .search-controls {
+        display: flex;
+        gap: 10px;
+        align-items: flex-end;
+        margin-bottom: 20px;
+    }
+    .invoice-table {
+        margin-top: 30px;
+    }
+    .error-message {
+        color: #dc3545;
+        margin-bottom: 15px;
+    }
+    .editable-field {
+        background-color: #90EE90;
+    }
+    input[readonly] {
+        background-color: #BCB8B1;
+        cursor: not-allowed;
+    }
+    .scrollable-results {
+        max-height: 500px; /* Shows exactly 10 rows at a time */
+        overflow-y: auto;
+        margin-bottom: 20px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+    }
+    .table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #212529;
+        color: white;
+        z-index: 10;
+    }
+    .results-count {
+        margin-bottom: 10px;
+    }
+    .invoice-detail {
+        margin-bottom: 10px;
+    }
+    .invoice-detail label {
+        font-weight: bold;
+        margin-right: 10px;
+    }
+    .modal-actions {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    /* Make modal scrollable */
+    .modal-body-scrollable {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    /* Fixed header positioning for desktop */
+    .page-header {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 20px;
+    }
+
+    .back-button-container {
+        margin-bottom: 10px;
+    }
+
+    .page-title {
+        width: 100%;
+        text-align: left;
+    }
+
+    .page-title h1 {
+        margin: 0;
+    }
+
+    /* Mobile-specific styles - UPDATED TO MATCH FIRST STYLE */
+    @media (max-width: 992px) {
+        .container {
+            padding-left: 10px !important;
+            padding-right: 10px !important;
         }
+
         .filter-bar {
-            display: flex;
-            align-items: flex-end;
-            gap: 10px;
-            margin-bottom: 20px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+        }
+
+        .filter-item {
+            flex-direction: row;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px; /* Increased padding to give more space */
+        }
+
+        .filter-item .form-label {
+            margin-bottom: 0;
+            min-width: 80px;
+            text-align: left;
+            font-size: 0.9rem;
+            line-height: 1.5; /* Increased line height for better text spacing */
+            padding-bottom: 2px; /* Small padding to ensure descenders aren't cut */
+        }
+
+        /* Increased size for mobile input fields */
+        .filter-item .form-control,
+        .filter-item .form-select {
+            height: 42px; /* Increased height to accommodate text properly */
+            font-size: 0.875rem; /* Prevents zoom on iOS */
+            padding: 10px 12px; /* Increased padding for better text spacing */
+            min-height: 42px; /* Ensures minimum height */
+            box-sizing: border-box; /* Includes padding in height calculation */
+            line-height: 1.5; /* Proper line height for text */
+            vertical-align: middle; /* Center text vertically */
+        }
+
+        .search-controls {
+            width: 100%;
+            justify-content: flex-start;
             flex-wrap: wrap;
         }
-        .filter-item {
-            background-color: #28a745; /* Green background */
-            padding: 12px 16px;
-            border-radius: 6px;
-            color: white; /* White text */
-            display: flex;
-            flex-direction: column;
-        }
-        .filter-item .form-label {
-            color: white; /* White text for labels */
-            font-weight: 500;
-            margin-bottom: 5px;
-            font-size: 1rem;
-        }
-        .filter-item .form-control {
-            background-color: white;
-            color: #333;
-            font-size: 1rem;
-            padding: 6px 10px;
-            height: 40px;
-        }
-        .filter-item .form-select {
-            font-size: 1rem;
-            padding: 6px 10px;
-            height: 40px;
-        }
-        .search-controls {
-            display: flex;
-            gap: 10px;
-            align-items: flex-end;
-            margin-bottom: 20px;
-        }
-        .invoice-table {
-            margin-top: 30px;
-        }
-        .error-message {
-            color: #dc3545;
-            margin-bottom: 15px;
-        }
-        .editable-field {
-            background-color: #90EE90;
-        }
-        input[readonly] {
-            background-color: #BCB8B1;
-            cursor: not-allowed;
-        }
-        .scrollable-results {
-            max-height: 500px; /* Shows exactly 10 rows at a time */
-            overflow-y: auto;
-            margin-bottom: 20px;
-            border: 1px solid #dee2e6;
-            border-radius: 5px;
-        }
-        .table thead th {
-            position: sticky;
-            top: 0;
-            background-color: #212529;
-            color: white;
-            z-index: 10;
-        }
-        .results-count {
-            margin-bottom: 10px;
-        }
-        .invoice-detail {
-            margin-bottom: 10px;
-        }
-        .invoice-detail label {
-            font-weight: bold;
-            margin-right: 10px;
-        }
+
         .modal-actions {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        /* Make modal scrollable */
-        .modal-body-scrollable {
-            max-height: 60vh;
-            overflow-y: auto;
-        }
-
-        /* Fixed header positioning for desktop */
-        .page-header {
-            display: flex;
             flex-direction: column;
-            margin-bottom: 20px;
+        }
+
+        /* Reset header layout for mobile */
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
         }
 
         .back-button-container {
-            margin-bottom: 10px;
+            position: static;
+            margin-bottom: 15px;
         }
 
         .page-title {
             width: 100%;
             text-align: left;
         }
+    }
 
-        .page-title h1 {
-            margin: 0;
+    /* Extra small mobile adjustments */
+    @media (max-width: 576px) {
+        .container {
+            padding-left: 5px !important;
+            padding-right: 5px !important;
         }
 
-        /* Mobile-specific styles */
-        @media (max-width: 992px) {
-            .container {
-                padding-left: 10px !important;
-                padding-right: 10px !important;
-            }
-
-            .filter-container {
-                grid-template-columns: 1fr;
-                margin-left: 0;
-                margin-right: 0;
-                gap:8px;
-            }
-
-            .filter-item {
-                flex-direction: row;
-                align-items: center;
-                gap: 8px;
-                margin-left: 0;
-                margin-right: 0;
-            }
-
-            .filter-item .form-label {
-                margin-bottom: 0;
-                min-width: 80px;
-                text-align: left;
-                font-size: 0.9rem;
-            }
-            .filter-item .form-control,
-            .filter-item .form-select {
-                height: 30px;
-                font-size: 0.9rem;
-            }
-
-            .search-controls {
-                width: 100%;
-                justify-content: flex-start;
-                flex-wrap: wrap;
-                margin-left: 0;
-            }
-
-            .modal-actions {
-                flex-direction: column;
-            }
-
-            /* Reset header layout for mobile */
-            .page-header {
-                flex-direction: column;
-                align-items: flex-start;
-                margin-left: 0;
-                margin-right: 0;
-            }
-
-            .back-button-container {
-                position: static; /* Reset absolute positioning */
-                margin-bottom: 15px;
-                left: auto;
-                top: auto;
-            }
-
-            .page-title {
-                width: 100%;
-                text-align: left;
-            }
+        .filter-item {
+            padding: 12px 10px; /* Increased padding further */
         }
 
-        /* Extra small mobile adjustments */
-        @media (max-width: 576px) {
-            .container {
-                padding-left: 5px !important;
-                padding-right: 5px !important;
-            }
-
-            .filter-item {
-                padding: 5px 8px;
-            }
-
-            .filter-item .form-label {
-                min-width: 70px;
-                font-size: 0.8rem;
-            }
+        .filter-item .form-label {
+            min-width: 70px;
+            font-size: 0.85rem; /* Slightly larger font */
+            line-height: 1.6; /* Even better line height */
+            padding-bottom: 3px; /* More padding for descenders */
         }
-    </style>
+
+        /* Further increased size for very small screens */
+        .filter-item .form-control,
+        .filter-item .form-select {
+            height: 44px; /* Even larger on very small screens */
+            font-size: 16px; /* Maintains 16px to prevent zoom */
+            padding: 12px 12px; /* More padding for better touch targets and text spacing */
+            min-height: 44px;
+            line-height: 1.4; /* Optimal line height for 16px font */
+        }
+
+        /* Ensure inputs have proper touch target size */
+        input, select {
+            min-height: 44px; /* Minimum touch target size */
+            line-height: 1.4; /* Consistent line height */
+        }
+    }
+
+    /* Additional fix for iOS devices */
+    @media (max-width: 992px) {
+        input[type="text"],
+        input[type="search"],
+        input[type="number"],
+        input[type="email"],
+        input[type="tel"],
+        select {
+            -webkit-appearance: none; /* Remove default iOS styling */
+            -moz-appearance: none;
+            appearance: none;
+            border-radius: 4px; /* Consistent border radius */
+            line-height: 1.5; /* Ensure proper line height */
+        }
+
+        /* Ensure proper box sizing */
+        .form-control, .form-select {
+            box-sizing: border-box;
+            width: 100%; /* Full width within container */
+            line-height: 1.5; /* Consistent line height */
+        }
+    }
+</style>
 </head>
 
 <body>
@@ -240,32 +286,32 @@
         <form method="POST" action="{{ url_for('search_invoices') }}" id="searchForm">
             <!-- Filter Controls -->
             <div class="filter-bar">
-    <div class="filter-item">
-        <label for="start_date" class="form-label">Start Date</label>
-        <input type="date" class="form-control" id="start_date" name="start_date" value="{{ default_start_date }}">
-    </div>
-    <div class="filter-item">
-        <label for="end_date" class="form-label">End Date</label>
-        <input type="date" class="form-control" id="end_date" name="end_date" value="{{ default_end_date }}">
-    </div>
-    <div class="filter-item">
-        <label for="category" class="form-label">Category</label>
-        <select class="form-control" id="category" name="category">
-            <option value="">All Categories</option>
-            {% for category in categories %}
-            <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="filter-item">
-        <label for="account_owner" class="form-label">Account Owner</label>
-        <select class="form-control" id="account_owner" name="account_owner">
-            <option value="">All Account Owners</option>
-            {% for account_owner in account_owners %}
-            <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
-            {% endfor %}
-        </select>
-    </div>
+                <div class="filter-item">
+                    <label for="start_date" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" value="{{ default_start_date }}">
+                </div>
+                <div class="filter-item">
+                    <label for="end_date" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" value="{{ default_end_date }}">
+                </div>
+                <div class="filter-item">
+                    <label for="category" class="form-label">Category</label>
+                    <select class="form-control" id="category" name="category">
+                        <option value="">All Categories</option>
+                            {% for category in categories %}
+                        <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
+                            {% endfor %}
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <label for="account_owner" class="form-label">Account Owner</label>
+                    <select class="form-control" id="account_owner" name="account_owner">
+                        <option value="">All Account Owners</option>
+                            {% for account_owner in account_owners %}
+                        <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
 
     <!-- Search button pushed to the right -->
     <div class="search-controls">
@@ -412,16 +458,16 @@
                     <input type="hidden" id="modalSalesId">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Invoice Date</label>
-                            <input type="date" class="form-control editable-field" name="invoice_date" id="modal_invoice_date">
-                        </div>
-                        <div class="col-md-6">
                             <label class="form-label">Invoice No</label>
                             <input type="text" class="form-control" name="invoice_no" id="modal_invoice_no" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Customer Name</label>
                             <input type="text" class="form-control" name="customer_name" id="modal_customer_name" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Invoice Date</label>
+                            <input type="date" class="form-control editable-field" name="invoice_date" id="modal_invoice_date">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Product</label>
