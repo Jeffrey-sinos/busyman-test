@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search and Receive - BusyMan Pro</title>
+    <title>Receive - BusyMan Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <style>
@@ -75,7 +75,7 @@
                 <i class="bi bi-arrow-left"></i> Back
             </a>
 
-            <h1 class="mb-4">Search and Receive</h1>
+            <h1 class="mb-4">Receive</h1>
 
             <!-- Flash messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -93,10 +93,10 @@
             <div class="card mb-4">
                 <div class="card-body position-relative">
                     <div class="mb-3">
-                        <label for="customerSearch" class="form-label">Search Customers</label>
+                        <!--<label for="customerSearch" class="form-label">Search Customers</label>-->
                         <div class="input-group">
                             <input type="text" class="form-control" id="customerSearch"
-                                   placeholder="Start typing customer name...">
+                                   placeholder="Type customer name...">
                             <button class="btn btn-primary" id="searchBtn">
                                 <i class="bi bi-search"></i> Search
                                 <span class="loading-spinner spinner-border spinner-border-sm ms-2" role="status"></span>
@@ -143,7 +143,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title">
                         All Customers with Unpaid Invoices
-                        <span id="customerCount" class="badge bg-primary customer-count">0 customers</span>
+                        <!--<span id="customerCount" class="badge bg-primary customer-count">0 customers</span>-->
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>

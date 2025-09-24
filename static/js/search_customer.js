@@ -71,16 +71,16 @@ function loadAllCustomers() {
                 });
 
                 // Show message if many customers are loaded
-                if (data.length > 50) {
-                    tbody.prepend(`
-                        <tr class="table-info">
-                            <td colspan="2" class="text-center fw-bold">
-                                <i class="bi bi-info-circle me-2"></i>
-                                Showing all ${data.length} customers with unpaid invoices
-                            </td>
-                        </tr>
-                    `);
-                }
+//                if (data.length > 50) {
+//                    tbody.prepend(`
+//                        <tr class="table-info">
+//                            <td colspan="2" class="text-center fw-bold">
+//                                <i class="bi bi-info-circle me-2"></i>
+//                                Showing all ${data.length} customers with unpaid invoices
+//                            </td>
+//                        </tr>
+//                    `);
+//                }
             } else {
                 tbody.append(`
                     <tr>
@@ -197,7 +197,7 @@ function loadAllCustomers() {
                                             data-balance="${invoice.balance}"
                                             data-paid-amount="${invoice.paid_amount}"
                                             data-payment-status="${invoice.payment_status}">
-                                        <i class="bi bi-cash-coin me-1"></i> Record Payment
+                                         Receive
                                     </button>
                                 </td>
                             </tr>
