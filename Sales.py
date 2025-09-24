@@ -2,7 +2,8 @@
 import base64
 import secrets
 import requests
-from flask import Flask,flash, session, render_template, request, redirect, url_for, send_from_directory, jsonify, make_response, Blueprint
+from flask import Flask, flash, session, render_template, request, redirect, url_for, send_from_directory, jsonify, \
+    make_response, Blueprint
 import secrets, datetime
 import os
 import io
@@ -21,13 +22,12 @@ from reportlab.lib.enums import TA_LEFT
 import psycopg2
 from psycopg2 import sql, errors
 from werkzeug.utils import secure_filename
-from werkzeug.security import generate_password_hash, check_password_hash # password hashing
+from werkzeug.security import generate_password_hash, check_password_hash  # password hashing
 from dotenv import load_dotenv
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
-
 
 # Load environment variables
 load_dotenv()
@@ -383,7 +383,8 @@ def read_bank_accounts():
     cursor = conn.cursor()
 
     try:
-        cursor.execute("SELECT account_name || '-' || bank_name FROM banks ORDER BY account_name;") # Concatenation of the account name and bank name
+        cursor.execute(
+            "SELECT account_name || '-' || bank_name FROM banks ORDER BY account_name;")  # Concatenation of the account name and bank name
         return [row[0] for row in cursor.fetchall()]
     except Exception as e:
         print(f"Error reading bank accounts: {e}")
@@ -597,7 +598,7 @@ def user_dashboard():
 def admin_dashboard():
     if 'user_id' not in session or session.get('role') != 2:
         return redirect(url_for('login'))
-    
+
     # # Check subscription status for admin too (if needed)
     # subscription_status = check_user_subscription(session['user_id'])
     # products = get_active_products()
@@ -1101,7 +1102,7 @@ def sales_entry():
 
                     if delta:
                         next_due_date = invoice_date.date()
-                        pdf_urls = [] # PDF links for backdated invoices
+                        pdf_urls = []  # PDF links for backdated invoices
                         while next_due_date <= today + delta:
                             new_invoice_number = generate_next_invoice_number()
 
@@ -1253,6 +1254,7 @@ def sales_entry():
                            current_date=get_current_date(),
                            date_created=date_created)
 
+
 # Download invoice route
 @app.route('/invoices/<filename>')
 def download_invoice(filename):
@@ -1261,6 +1263,7 @@ def download_invoice(filename):
         filename,
         as_attachment=True
     )
+
 
 # Download receipt route
 @app.route('/receipts/<filename>')
@@ -1271,6 +1274,7 @@ def download_receipt(filename):
         as_attachment=True
     )
 
+
 # Download payment route
 @app.route('/payments/<filename>')
 def download_payment(filename):
@@ -1280,10 +1284,12 @@ def download_payment(filename):
         as_attachment=True
     )
 
+
 # Search Invoices Menu
 @app.route('/invoices_menu', methods=['GET', 'POST'])
 def invoices_menu():
     return render_template('invoices_menu.html')
+
 
 # Search invoices route
 @app.route('/search_invoices', methods=['GET', 'POST'])
@@ -1367,13 +1373,14 @@ def search_invoices():
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
 
+
 # Edit specific sales
 @app.route('/edit_sale/<int:sales_id>', methods=['GET', 'POST'])
 def edit_sale(sales_id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    if session.get('role') not in [1,2]:
+    if session.get('role') not in [1, 2]:
         cur.close()
         conn.close()
         flash('You do not have access to edit sales', 'danger')
@@ -1391,7 +1398,7 @@ def edit_sale(sales_id):
         category = data.get('category')
         account_owner = data.get('account_owner')
         bank_account = data.get('bank_account')
-        #status = data.get('status')
+        # status = data.get('status')
 
         try:
             cur.execute("""
@@ -1459,6 +1466,7 @@ def edit_sale(sales_id):
     cur.close()
     conn.close()
     return jsonify({"invoice": invoice})
+
 
 # Search sales account route
 @app.route('/search_sales_account', methods=['GET', 'POST'])
@@ -1533,6 +1541,7 @@ def search_sales_account():
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
 
+
 # Edit sales account
 @app.route('/edit_sales_account/<int:sales_acc_id>', methods=['POST'])
 def edit_sales_account(sales_acc_id):
@@ -1563,7 +1572,8 @@ def edit_sales_account(sales_acc_id):
         bank_account = data.get('bank_account', '')
 
         # Deactivate old sales account and related records
-        cur.execute("UPDATE sales_account SET status = 'Not Active' WHERE sales_acc_id = %s RETURNING invoice_number", (sales_acc_id,))
+        cur.execute("UPDATE sales_account SET status = 'Not Active' WHERE sales_acc_id = %s RETURNING invoice_number",
+                    (sales_acc_id,))
         original_invoice_no = cur.fetchone()[0]
 
         cur.execute("UPDATE sales SET status = 'Not Active' WHERE sales_acc_invoice_no = %s", (original_invoice_no,))
@@ -1670,10 +1680,12 @@ def edit_sales_account(sales_acc_id):
         cur.close()
         conn.close()
 
+
 # Receipts Menu route
 @app.route('/receipts_menu', methods=['GET', 'POST'])
 def receipts_menu():
     return render_template('receipts_menu.html')
+
 
 # View receipts
 @app.route('/view_sales', methods=['GET', 'POST'])
@@ -1981,8 +1993,9 @@ def record_payment(sales_list_id):
         cur.close()
         conn.close()
 
+
 # Search receipts
-@app.route('/search_receipts', methods =['GET', 'POST'])
+@app.route('/search_receipts', methods=['GET', 'POST'])
 def search_receipts():
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -2055,6 +2068,7 @@ def search_receipts():
                            categories=categories,
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
+
 
 # Edit receipts route
 @app.route('/edit_receipt/<int:receipt_id>', methods=['GET', 'POST'])
@@ -2156,10 +2170,10 @@ def edit_receipt(receipt_id):
                             account_owner          = %s
                         WHERE receipt_id = %s
                         """, (
-                            paid_date, invoice_number, invoice_date, customer_name,
-                            paid_amount, new_balance, receipt_invoice_number,
-                            category, account_owner, receipt_id
-                        ))
+                paid_date, invoice_number, invoice_date, customer_name,
+                paid_amount, new_balance, receipt_invoice_number,
+                category, account_owner, receipt_id
+            ))
 
             # Update sales_list table
             cur.execute("""
@@ -2270,11 +2284,11 @@ def edit_receipt(receipt_id):
                                                                        sales_acc_invoice_no, bank_account)
                                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                                                     """, (
-                                                        next_due_date, new_invoice_number, customer_name,
-                                                        item['product'], item['quantity'], item['unit_price'],
-                                                        item['total'], current_datetime, category, account_owner,
-                                                        sales_acc_invoice_no, bank_account
-                                                    ))
+                                            next_due_date, new_invoice_number, customer_name,
+                                            item['product'], item['quantity'], item['unit_price'],
+                                            item['total'], current_datetime, category, account_owner,
+                                            sales_acc_invoice_no, bank_account
+                                        ))
 
                                     # Create invoice record
                                     cur.execute("""
@@ -2290,10 +2304,10 @@ def edit_receipt(receipt_id):
                                                                         account_owner, reference_no)
                                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                                                 """, (
-                                                    customer_name, new_invoice_number, next_due_date,
-                                                    invoice_amount, 0, invoice_amount,
-                                                    category, account_owner, sales_acc_invoice_no,
-                                                ))
+                                        customer_name, new_invoice_number, next_due_date,
+                                        invoice_amount, 0, invoice_amount,
+                                        category, account_owner, sales_acc_invoice_no,
+                                    ))
                                     next_invoice_generated = True
 
             conn.commit()
@@ -2327,6 +2341,7 @@ def edit_receipt(receipt_id):
     cur.close()
     conn.close()
     return jsonify({"receipt": receipt})
+
 
 # Search and receive route
 @app.route('/search_customers')
@@ -2363,10 +2378,12 @@ def search_customers():
         cur.close()
         conn.close()
 
+
 # Customer search route
 @app.route('/customer_search')
 def customer_search():
     return render_template('customer_search.html')
+
 
 # Unpaid invoices route
 @app.route('/get_unpaid_invoices/<customer_name>')
@@ -2406,6 +2423,8 @@ def get_unpaid_invoices(customer_name):
     finally:
         cur.close()
         conn.close()
+
+
 # View sales route
 """@app.route('/invoice/<int:sales_id>')
 def view_sales(sales_id):
@@ -2426,6 +2445,8 @@ def view_sales(sales_id):
     return render_template('view_sales.html', invoice=invoice)
 
 """
+
+
 # Manage users route
 @app.route('/manage_users')
 def manage_users():
@@ -2712,8 +2733,7 @@ def add_client():
         email = request.form['email']
         position = request.form['position']
         id_no = request.form['id_no']
-        date_created = datetime.today() # Today's date is used by default
-
+        date_created = datetime.today()  # Today's date is used by default
 
         try:
             # Check if the client already exists
@@ -2760,7 +2780,7 @@ def add_client_ajax():
         email = request.form['email']
         position = request.form['position']
         id_no = request.form['id_no']
-        date_created = datetime.today() # Today's date is used by default
+        date_created = datetime.today()  # Today's date is used by default
 
         # Check if client already exists
         cur.execute("SELECT * FROM clients WHERE phone_no = %s", (phone_no,))
@@ -2912,7 +2932,7 @@ def create_invoice(invoice_data, filename):
     c.drawString(430, 730, address)
     c.drawString(430, 720, city_state_zip)
     c.drawString(430, 710, phone)
-    c.drawString(430,700,email)
+    c.drawString(430, 700, email)
     c.drawString(430, 690, kra_pin)
     c.drawString(430, 660, "")
 
@@ -2980,7 +3000,8 @@ def create_invoice(invoice_data, filename):
         c.drawString(50, 360, "Notes:")
         c.setFont("Helvetica", 10)
         notes = Paragraph(invoice_data['notes'].replace('\n', '<br/>'),
-                          ParagraphStyle(name='Normal', alignment=TA_LEFT, parent= style_normal, fontName='Helvetica', fontSize=10, leading=14))
+                          ParagraphStyle(name='Normal', alignment=TA_LEFT, parent=style_normal, fontName='Helvetica',
+                                         fontSize=10, leading=14))
         w, h = notes.wrap(400, 100)
         notes.drawOn(c, 50, 340 - h)
 
@@ -2990,6 +3011,7 @@ def create_invoice(invoice_data, filename):
     c.setFont("Helvetica-Bold", 12)
     c.drawString(50, 180, "ACCOUNTANT")
     c.save()
+
 
 # Products route
 @app.route('/products', methods=['GET', 'POST'])
@@ -3130,14 +3152,14 @@ def products():
                 date_created = ''
                 try:
                     date_created = updated_record[7].strftime('%Y-%m-%d') if hasattr(updated_record[7],
-                                                                          'strftime') else str(
+                                                                                     'strftime') else str(
                         updated_record[7])
                 except Exception as e:
                     print(f"Date formatting error: {e}")
                     date_created = str(updated_record[7])
 
                 updated_data = {
-                    'product_number':updated_record[0],
+                    'product_number': updated_record[0],
                     'product': updated_record[1],
                     'edition': updated_record[2],
                     'isbn': updated_record[3],
@@ -3237,15 +3259,18 @@ def products():
 
     return render_template('products/search_product.html')
 
+
 # Edit product Route
 @app.route('/edit_product')
 def edit_product():
     return render_template('products/edit-product.html')
 
+
 # Add Product Route
 @app.route('/add_product')
 def add_product():
     return render_template('products/add-product.html')
+
 
 # Suppliers route
 @app.route('/suppliers', methods=['GET', 'POST'])
@@ -3295,11 +3320,11 @@ def suppliers():
                 created_at = ''
                 try:
                     created_at = row[5].strftime('%d-%m-%Y') if row[5] and hasattr(row[5], 'strftime') else str(row[5])
-                    #updated_at = row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] and hasattr(row[6],'strftime') else str(row[6])
+                    # updated_at = row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] and hasattr(row[6],'strftime') else str(row[6])
                 except Exception as e:
                     print(f"Date formatting error: {e}")
                     created_at = str(row[5]) if row[5] else ''
-                    #updated_at = str(row[6]) if row[6] else ''
+                    # updated_at = str(row[6]) if row[6] else ''
 
                 display_name = f"{row[1]} - {row[2]}" if row[1] and row[2] else row[1] or row[2] or 'Unnamed Supplier'
 
@@ -3313,8 +3338,8 @@ def suppliers():
                         'telephone': row[3],
                         'email': row[4],
                         'created_at': created_at,
-                        #'updated_at': updated_at,
-                        #'status': row[7] if len(row) > 7 else 'Active'
+                        # 'updated_at': updated_at,
+                        # 'status': row[7] if len(row) > 7 else 'Active'
                     }
                 })
             return jsonify(results)
@@ -3380,16 +3405,16 @@ def suppliers():
 
                 # Format dates for response
                 created_at = ''
-                #updated_at = ''
+                # updated_at = ''
                 try:
                     created_at = updated_record[5].strftime('%Y-%m-%d %H:%M:%S') if updated_record[5] and hasattr(
                         updated_record[5], 'strftime') else str(updated_record[5])
-                    #updated_at = updated_record[6].strftime('%Y-%m-%d %H:%M:%S') if updated_record[6] and hasattr(
-                        #updated_record[6], 'strftime') else str(updated_record[6])
+                    # updated_at = updated_record[6].strftime('%Y-%m-%d %H:%M:%S') if updated_record[6] and hasattr(
+                    # updated_record[6], 'strftime') else str(updated_record[6])
                 except Exception as e:
                     print(f"Date formatting error: {e}")
                     created_at = str(updated_record[5]) if updated_record[5] else ''
-                    #updated_at = str(updated_record[6]) if updated_record[6] else ''
+                    # updated_at = str(updated_record[6]) if updated_record[6] else ''
 
                 updated_data = {
                     'supplier_id': updated_record[0],
@@ -3398,7 +3423,7 @@ def suppliers():
                     'telephone': updated_record[3],
                     'email': updated_record[4],
                     'created_at': created_at,
-                    #'updated_at': updated_at,
+                    # 'updated_at': updated_at,
                     'status': updated_record[6] if len(updated_record) > 6 else 'Active'
                 }
 
@@ -3461,7 +3486,7 @@ def suppliers():
                 formatted_date = ''
                 try:
                     formatted_date = created_at.strftime('%d-%m-%Y') if hasattr(created_at,
-                                                                                         'strftime') else str(
+                                                                                'strftime') else str(
                         created_at)
                 except Exception as e:
                     print(f"Date formatting error: {e}")
@@ -3489,19 +3514,24 @@ def suppliers():
 
     return render_template('suppliers/search-supplier.html')
 
+
 # Edit Supplier Route
 @app.route('/edit_supplier')
 def edit_supplier():
     return render_template('suppliers/edit-supplier.html')
 
+
 # Add Supplier Route
 @app.route('/add_supplier')
 def add_supplier():
     return render_template('suppliers/add-supplier.html')
+
+
 # Stores Menu Route
 @app.route('/stores')
 def stores_menu():
     return render_template('stores_menu.html')
+
 
 # Logout Route
 @app.route('/logout')
@@ -3514,6 +3544,7 @@ def logout():
 @app.route('/payments')
 def payments_menu():
     return render_template('payments_menu.html')
+
 
 # Search billing account route
 @app.route('/search_billing_account', methods=['GET', 'POST'])
@@ -3588,6 +3619,7 @@ def search_billing_account():
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
 
+
 # Edit billing account route
 @app.route('/edit_billing_account/<int:billing_acc_id>', methods=['POST'])
 def edit_billing_account(billing_acc_id):
@@ -3637,10 +3669,10 @@ def edit_billing_account(billing_acc_id):
                                                  invoice_number, status, bank_account, bill_amount)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active', %s, %s) RETURNING *
                     """, (
-                        service_provider, account_name, account_number, category,
-                        paybill_number, ussd_number, frequency, billing_date,
-                        account_owner, new_invoice_no, bank_account, bill_amount
-                    ))
+            service_provider, account_name, account_number, category,
+            paybill_number, ussd_number, frequency, billing_date,
+            account_owner, new_invoice_no, bank_account, bill_amount
+        ))
 
         new_account = cur.fetchone()
 
@@ -3682,11 +3714,11 @@ def edit_billing_account(billing_acc_id):
                                                invoice_number, status, bank_account)
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             """, (
-                                service_provider, account_name, account_number, category,
-                                paybill_number, ussd_number, next_due_date, bill_amount,
-                                account_owner, datetime.now(), pay_status, bill_invoice_number,
-                                new_invoice_no, bill_status, bank_account
-                            ))
+                    service_provider, account_name, account_number, category,
+                    paybill_number, ussd_number, next_due_date, bill_amount,
+                    account_owner, datetime.now(), pay_status, bill_invoice_number,
+                    new_invoice_no, bill_status, bank_account
+                ))
 
                 # Insert into invoices table
                 cur.execute("""
@@ -3777,7 +3809,7 @@ def add_billing_account():
         else:
             delta = None
 
-        generated_bills = [] # List to store the generated bills
+        generated_bills = []  # List to store the generated bills
         next_due_date = billing_date
 
         while next_due_date <= today + delta:
@@ -3791,11 +3823,11 @@ def add_billing_account():
                                    invoice_number, status, bank_account)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """, (
-                    service_provider, account_name, account_number, category,
-                    paybill_number, ussd_number, next_due_date, bill_amount,
-                    account_owner, created_date, pay_status, bill_invoice_number,
-                    invoice_number, bill_status, bank_account
-                ))
+                service_provider, account_name, account_number, category,
+                paybill_number, ussd_number, next_due_date, bill_amount,
+                account_owner, created_date, pay_status, bill_invoice_number,
+                invoice_number, bill_status, bank_account
+            ))
 
             cur.execute("""
                 INSERT INTO invoices (invoice_number)
@@ -3988,6 +4020,7 @@ def search_bills():
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
 
+
 def parse_date(date_str):
     """Parse date from multiple possible formats"""
     for fmt in ('%d-%m-%Y', '%Y-%m-%d', '%d/%m/%Y', '%d/%m/%y'):
@@ -3997,13 +4030,14 @@ def parse_date(date_str):
             continue
     raise ValueError(f"Date '{date_str}' doesn't match any expected format")
 
+
 # Edit bill route
 @app.route('/edit_bill/<int:bill_id>', methods=['GET', 'POST'])
 def edit_bill(bill_id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    if session.get('role') not in [1,2]:
+    if session.get('role') not in [1, 2]:
         cur.close()
         conn.close()
         flash('You do not have access to edit bills', 'danger')
@@ -4127,6 +4161,7 @@ def delete_bill():
         cur.close()
         conn.close()
 
+
 # Add bill route
 @app.route('/add_bill', methods=['POST'])
 def add_bill():
@@ -4160,10 +4195,10 @@ def add_bill():
                 status, bank_account)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING bill_id, bill_invoice_number
         """, (
-                service_provider, account_name, account_number, category,
-                paybill_number, ussd_number, billing_date, bill_amount,
-                account_owner, datetime.now(), 'Not Paid', bill_invoice_number,
-                'Active', bank_account
+            service_provider, account_name, account_number, category,
+            paybill_number, ussd_number, billing_date, bill_amount,
+            account_owner, datetime.now(), 'Not Paid', bill_invoice_number,
+            'Active', bank_account
         ))
 
         result = cur.fetchone()
@@ -4281,103 +4316,104 @@ def view_bills():
                                default_start_date=default_start_date,
                                default_end_date=default_end_date)
 
+
 # Generate payment pdf route
 def create_payment(payment_data, filename):
+    # Create a canvas
+    c = canvas.Canvas(filename, pagesize=letter)
 
-        # Create a canvas
-        c = canvas.Canvas(filename, pagesize=letter)
+    # Set up styles
+    styles = getSampleStyleSheet()
+    style_normal = styles["Normal"]
 
-        # Set up styles
-        styles = getSampleStyleSheet()
-        style_normal = styles["Normal"]
+    # Add company logo as the letterhead
+    # logo_path = 'teknobyte-tagline.jpg'
+    # logo_width = 2 * inch
+    # logo_height = 0.5 * inch
+    # logo_x = 430
+    # logo_y = 750
+    # c.drawImage(logo_path, logo_x, logo_y, width=logo_width, height=logo_height)
 
-        # Add company logo as the letterhead
-        #logo_path = 'teknobyte-tagline.jpg'
-        #logo_width = 2 * inch
-        #logo_height = 0.5 * inch
-        #logo_x = 430
-        #logo_y = 750
-        #c.drawImage(logo_path, logo_x, logo_y, width=logo_width, height=logo_height)
+    # # Add company information
+    address = "Brightwoods Apartment, Chania Ave "
+    city_state_zip = "PO. Box 74080-00200, Nairobi, KENYA "
+    phone = "Phone: +254-705917383"
+    email = "Email: info@teknobyte.ltd"
+    kra_pin = "PIN: P051155522R"
+    c.setFont("Helvetica", 8)
+    c.drawString(430, 740, "")
+    c.drawString(430, 730, address)
+    c.drawString(430, 720, city_state_zip)
+    c.drawString(430, 710, phone)
+    c.drawString(430, 700, email)
+    c.drawString(430, 690, kra_pin)
+    c.drawString(430, 660, "")
+    # Add invoice details
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(280, 640, "Payment")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 620, "")
 
-        # # Add company information
-        address = "Brightwoods Apartment, Chania Ave "
-        city_state_zip = "PO. Box 74080-00200, Nairobi, KENYA "
-        phone = "Phone: +254-705917383"
-        email = "Email: info@teknobyte.ltd"
-        kra_pin = "PIN: P051155522R"
-        c.setFont("Helvetica", 8)
-        c.drawString(430, 740, "")
-        c.drawString(430, 730, address)
-        c.drawString(430, 720, city_state_zip)
-        c.drawString(430, 710, phone)
-        c.drawString(430, 700, email)
-        c.drawString(430, 690, kra_pin)
-        c.drawString(430, 660, "")
-        # Add invoice details
-        c.setFont("Helvetica-Bold", 20)
-        c.drawString(280, 640, "Payment")
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, 620, "")
+    c.drawString(50, 600, f"Date:               {payment_data['payment_date']}")
+    invoice_label = "Payment No:"
+    invoice_number = payment_data['invoice_number']
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 580, invoice_label)
+    label_width = c.stringWidth(invoice_label, "Helvetica-Bold", 12)
 
-        c.drawString(50, 600, f"Date:               {payment_data['payment_date']}")
-        invoice_label = "Payment No:"
-        invoice_number = payment_data['invoice_number']
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, 580, invoice_label)
-        label_width = c.stringWidth(invoice_label, "Helvetica-Bold", 12)
+    # Draw the client name in regular font next to the label
+    c.setFont("Helvetica", 12)
+    c.drawString(50 + label_width + 5, 580, invoice_number)
 
-        # Draw the client name in regular font next to the label
-        c.setFont("Helvetica", 12)
-        c.drawString(50 + label_width + 5, 580, invoice_number)
+    # c.drawString(50, 610, f"Invoice Number: {invoice_data['invoice_number']}")
+    c.drawString(50, 560, "")
+    client_label = "Account:"
+    account_name = payment_data['account_name']
 
-        # c.drawString(50, 610, f"Invoice Number: {invoice_data['invoice_number']}")
-        c.drawString(50, 560, "")
-        client_label = "Account:"
-        account_name = payment_data['account_name']
+    # Draw the bold label
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 540, client_label)
 
-        # Draw the bold label
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, 540, client_label)
+    # Calculate the width of the label text to position the client name
+    label_width = c.stringWidth(client_label, "Helvetica-Bold", 12)
 
-        # Calculate the width of the label text to position the client name
-        label_width = c.stringWidth(client_label, "Helvetica-Bold", 12)
+    # Draw the client name in regular font next to the label
+    c.setFont("Helvetica", 12)
+    c.drawString(50 + label_width + 5, 540, account_name)
 
-        # Draw the client name in regular font next to the label
-        c.setFont("Helvetica", 12)
-        c.drawString(50 + label_width + 5, 540, account_name)
+    # Add line items table
+    data = [['Service Provider', 'Account Name', 'Account No', 'Bill Amt']]
+    for item in payment_data['items']:
+        data.append([item['description'], item['quantity'], item['unit-price'], item['total']])
 
-        # Add line items table
-        data = [['Service Provider', 'Account Name', 'Account No', 'Bill Amt']]
-        for item in payment_data['items']:
-            data.append([item['description'], item['quantity'], item['unit-price'], item['total']])
+    # Set the width of each column
+    col_widths = [1.5 * inch, 2 * inch, 1.5 * inch, 2 * inch]  # Adjust widths as needed
+    t = Table(data, colWidths=col_widths)
+    t.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.gray),
+                           ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                           ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                           ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                           ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                           ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                           ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
 
-        # Set the width of each column
-        col_widths = [1.5 * inch, 2 * inch, 1.5 * inch, 2 * inch]  # Adjust widths as needed
-        t = Table(data, colWidths=col_widths)
-        t.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.gray),
-                               ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                               ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                               ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                               ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                               ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                               ('GRID', (0, 0), (-1, -1), 1, colors.black)]))
+    table_height = len(data) * 20
+    t.wrapOn(c, 0, 0)
+    t.drawOn(c, 50, 500 - table_height)
 
-        table_height = len(data) * 20
-        t.wrapOn(c, 0, 0)
-        t.drawOn(c, 50, 500 - table_height)
+    # Add total amount
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(400, 480 - table_height, f"Total Paid: {payment_data['total_amount']}")
+    c.drawString(400, 460 - table_height, f"Balance:    {payment_data['balance']}")
 
-        # Add total amount
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(400, 480 - table_height, f"Total Paid: {payment_data['total_amount']}")
-        c.drawString(400, 460 - table_height, f"Balance:    {payment_data['balance']}")
+    c.setFont("Helvetica", 12)
+    c.drawString(50, 200, "John Kungu")
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, 180, "ACCOUNTANT")
 
-        c.setFont("Helvetica", 12)
-        c.drawString(50, 200, "John Kungu")
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(50, 180, "ACCOUNTANT")
+    # Save the PDF
+    c.save()
 
-        # Save the PDF
-        c.save()
 
 # Pay bill route
 @app.route('/pay_bill/<int:bill_id>', methods=['POST'])
@@ -4676,6 +4712,7 @@ def view_payments():
                                categories=categories,
                                default_start_date=default_start_date,
                                default_end_date=default_end_date)
+
 
 # Edit payments route
 @app.route('/update_payment/<int:payment_id>', methods=['POST'])
