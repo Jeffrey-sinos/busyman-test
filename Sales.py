@@ -28,7 +28,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
-
+from psycopg2 import pool
+import threading
+from contextlib import contextmanager
 # Load environment variables
 load_dotenv()
 
@@ -53,6 +55,53 @@ app.register_blueprint(admin_bp)
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
+# Database connection pool (at the module level, not inside any function)
+connection_pool = None
+pool_lock = threading.Lock()
+
+
+def initialize_db_pool():
+    global connection_pool
+    try:
+        connection_pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=10,
+            dbname=os.getenv('DB_NAME'),
+            user=os.getenv('DB_USERNAME'),
+            password=os.getenv('DB_PASSWORD'),
+            host=os.getenv('DB_HOST'),
+            port=os.getenv('DB_PORT'),
+            keepalives_idle=600,
+            keepalives_interval=60,
+            keepalives_count=3
+        )
+        print("✅ Database connection pool initialized")
+    except Exception as e:
+        print(f"❌ Failed to initialize database pool: {e}")
+        raise
+
+
+@contextmanager
+def get_db_connection2():
+    connection = None
+    try:
+        with pool_lock:
+            connection = connection_pool.getconn()
+        yield connection
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        raise e
+    finally:
+        if connection:
+            connection.commit()
+            with pool_lock:
+                connection_pool.putconn(connection)
+
+
+# Initialize database pool AFTER the functions are defined
+initialize_db_pool()
+
 
 @app.route('/admin')
 def admin_menu():
@@ -68,16 +117,18 @@ def create_invite():
     token = secrets.token_urlsafe(32)
     expires_at = datetime.utcnow() + timedelta(days=7)
 
-    # Save to database
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO organization_invites (org_name, contact_email, token, expires_at)
-        VALUES (%s, %s, %s, %s)
-    """, (org_name, contact_email, token, expires_at))
-    conn.commit()
-    cur.close()
-    conn.close()
+    # # Save to database
+    # conn = get_db_connection()
+    # cur = conn.cursor()
+    with get_db_connection2() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO organization_invites (org_name, contact_email, token, expires_at)
+            VALUES (%s, %s, %s, %s)
+        """, (org_name, contact_email, token, expires_at))
+    # conn.commit()
+    # cur.close()
+    # conn.close()
 
     invite_link = f"https://test.busyman.ltd/onboard/{token}"
     # invite_link = f"onboard/{token}"
@@ -125,17 +176,88 @@ def show_invite_form():
 
 @app.route('/onboard/<token>', methods=['GET', 'POST'])
 def onboard_superuser(token):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT invite_id, org_name, expires_at, used
-        FROM organization_invites
-        WHERE token = %s
-    """, (token,))
-    invite = cur.fetchone()
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT invite_id, org_name, contact_email, expires_at, used
+            FROM organization_invites
+            WHERE token = %s
+        """, (token,))
+        invite = cur.fetchone()
 
-    if not invite or invite[3] or invite[2] < datetime.datetime.utcnow():
-        return "Invalid or expired invite.", 400
+        if not invite:
+            return "Invalid invite link.", 400
+
+        invite_id, org_name, contact_email, expires_at, used = invite
+
+        # Check if invite is expired or already used
+        if used:
+            return "This invite has already been used.", 400
+
+        if expires_at < datetime.utcnow():
+            return "This invite has expired.", 400
+
+        if request.method == 'GET':
+            # Show the registration form
+            return render_template('organizations/onboard_form.html',
+                                   org_name=org_name,
+                                   contact_email=contact_email,
+                                   token=token)
+
+        elif request.method == 'POST':
+            # Process the registration
+            try:
+                # Get form data
+                full_name = request.form.get('full_name', '').strip()
+                email = request.form.get('email', '').strip()
+                phone_number = request.form.get('phone_number', '').strip()
+                organization_name = request.form.get('organization_name', '').strip()
+                password = request.form.get('password', '')
+
+                # Simple validation
+                if not all([full_name, email, organization_name, password]):
+                    flash("All required fields must be filled", "error")
+                    return render_template('organizations/onboard_form.html',
+                                           org_name=org_name,
+                                           contact_email=contact_email,
+                                           token=token)
+
+                # Hash the password
+                password_hash = generate_password_hash(password)
+
+                # Create the user (for now, just in the main users table)
+                cur.execute("""
+                    INSERT INTO users (username, password, role, full_name, email, phone_number)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING user_id
+                """, (email, password_hash, 1, full_name, email, phone_number))  # role=1 for superuser
+
+                user_id = cur.fetchone()[0]
+
+                # Mark the invite as used
+                cur.execute("""
+                    UPDATE organization_invites 
+                    SET used = TRUE
+                    WHERE invite_id = %s
+                """, (invite_id,))
+
+                conn.commit()
+
+                # Log the user in
+                session['user_id'] = user_id
+                session['username'] = email
+                session['role'] = 1
+
+                flash(f"Welcome {full_name}! Your account has been created successfully.", "success")
+                return redirect(url_for('superuser_dashboard'))
+
+            except Exception as e:
+                conn.rollback()
+                flash(f"Registration failed: {str(e)}", "error")
+                return render_template('organizations/onboard_form.html',
+                                       org_name=org_name,
+                                       contact_email=contact_email,
+                                       token=token)
 
 
 # MPESA API Configuration
@@ -542,13 +664,15 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
 
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("SELECT user_id, username, password, role FROM users WHERE username = %s", (username,))
-        user = cur.fetchone()
-        cur.close()
-        conn.close()
+        # conn = get_db_connection()
+        # cur = conn.cursor()
+            cur.execute("SELECT user_id, username, password, role FROM users WHERE username = %s", (username,))
+            user = cur.fetchone()
+        # cur.close()
+        # conn.close()
 
         if user and check_password_hash(user[2], password):
             session['user_id'] = user[0]

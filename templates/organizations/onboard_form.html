@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Your Registration - Busyman</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            margin: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .invite-info {
+            background: #f8f9ff;
+            border: 1px solid #e1e8ff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .invite-info h3 {
+            color: #4f46e5;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .invite-info p {
+            color: #555;
+            margin: 5px 0;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+
+        .required {
+            color: #dc2626;
+        }
+
+        .password-note {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+                margin: 10px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Welcome to Busyman</h1>
+            <p>Complete your organization setup</p>
+        </div>
+
+        <div class="invite-info">
+            <h3>Organization Invitation</h3>
+            <p><strong>Organization:</strong> {{ org_name }}</p>
+            <p><strong>Contact Email:</strong> {{ contact_email }}</p>
+        </div>
+
+        <!-- Flask flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'error' if category == 'error' else 'success' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('onboard_superuser', token=token) }}">
+            <div class="form-group">
+                <label for="full_name">Full Name <span class="required">*</span></label>
+                <input type="text"
+                       id="full_name"
+                       name="full_name"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address <span class="required">*</span></label>
+                <input type="email"
+                       id="email"
+                       name="email"
+                       value="{{ contact_email }}"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label for="phone_number">Phone Number</label>
+                <input type="tel"
+                       id="phone_number"
+                       name="phone_number"
+                       placeholder="+254 700 000 000">
+            </div>
+
+            <div class="form-group">
+                <label for="organization_name">Organization Name <span class="required">*</span></label>
+                <input type="text"
+                       id="organization_name"
+                       name="organization_name"
+                       value="{{ org_name }}"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password <span class="required">*</span></label>
+                <input type="password"
+                       id="password"
+                       name="password"
+                       required>
+                <div class="password-note">
+                    Choose a strong password for your account
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">Complete Registration</button>
+        </form>
+
+        <div class="footer">
+            <p>By registering, you agree to our Terms of Service</p>
+        </div>
+    </div>
+
+    <script>
+        // Simple form validation
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const requiredFields = ['full_name', 'email', 'organization_name', 'password'];
+            let hasError = false;
+
+            requiredFields.forEach(fieldName => {
+                const field = document.getElementById(fieldName);
+                if (!field.value.trim()) {
+                    field.style.borderColor = '#dc2626';
+                    hasError = true;
+                } else {
+                    field.style.borderColor = '#e1e5e9';
+                }
+            });
+
+            if (hasError) {
+                e.preventDefault();
+                alert('Please fill in all required fields');
+            }
+        });
+    </script>
+</body>
+</html>
