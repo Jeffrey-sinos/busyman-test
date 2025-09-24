@@ -227,7 +227,7 @@ def onboard_superuser(token):
 
                 # Create the user (for now, just in the main users table)
                 cur.execute("""
-                    INSERT INTO users (username, password, role, full_name, email, phone_number)
+                    INSERT INTO organizations (username, password, role, full_name, email, phone_number)
                     VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING user_id
                 """, (email, password_hash, 1, full_name, email, phone_number))  # role=1 for superuser
