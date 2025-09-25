@@ -135,7 +135,7 @@ def create_invite():
 
     try:
         subject = f"Invitation to join {org_name}"
-        sender_name = "Busyman Admin"
+        sender_name = "Shughuli Pap Admin"
 
         html_body = f"""
         <html>
@@ -144,7 +144,7 @@ def create_invite():
             <p>You have been invited to join <b>{org_name}</b>.</p>
             <p>Click the link below to accept the invitation (valid for 7 days):<br>
             <a href="{invite_link}">{invite_link}</a></p>
-            <p>Regards,<br>Busyman Team</p>
+            <p>Regards,<br>Shughuli Pap Team</p>
         </body>
         </html>
         """
@@ -225,7 +225,7 @@ def onboard_superuser(token):
                 org_id = generate_next_org_id()
 
                 # Check if email already exists before attempting insertion
-                cur.execute("SELECT user_id FROM organizations WHERE email = %s OR username = %s", (email, email))
+                cur.execute("SELECT org_id FROM organizations WHERE contact_email = %s", email)
                 existing_user = cur.fetchone()
 
                 if existing_user:
@@ -240,7 +240,6 @@ def onboard_superuser(token):
                 # Hash the password
                 password_hash = generate_password_hash(password)
 
-                # Create the user (for now, just in the main users table)
                 cur.execute("""
                     INSERT INTO organizations (org_id, org_name, contact_email, created_at)
                     VALUES (%s, %s, %s, %s)
