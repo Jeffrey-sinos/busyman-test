@@ -225,7 +225,7 @@ def onboard_superuser(token):
                 org_id = generate_next_org_id()
 
                 # Check if email already exists before attempting insertion
-                cur.execute("SELECT org_id FROM organizations WHERE contact_email = %s", email)
+                cur.execute("SELECT user_id FROM org_users WHERE email = %s OR username = %s", (email, email))
                 existing_user = cur.fetchone()
 
                 if existing_user:
@@ -247,8 +247,8 @@ def onboard_superuser(token):
 
                 # Create the superuser in main users table
                 cur.execute("""
-                                    INSERT INTO org_users (username, password, role, full_name, email, phone_number, org_id)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                    INSERT INTO org_users (user_id, username, password, role, full_name, email, phone_number, org_id)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                                     RETURNING user_id
                                 """, (email, password_hash, 1, full_name, email, phone_number, org_id))
 
