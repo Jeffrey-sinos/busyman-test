@@ -1743,7 +1743,117 @@ def download_payment(filename):
 # Search Invoices Menu
 @app.route('/invoices_menu', methods=['GET', 'POST'])
 def invoices_menu():
-    return render_template('invoices_menu.html')
+    # Pre-load all necessary data for all sections
+    client_names = read_client_names()
+    product_names = read_product_names()
+    categories = read_categories()
+    account_owners = read_account_owners()
+    bank_accounts = read_bank_accounts()
+
+    # Set default dates
+    today = datetime.today()
+    default_start_date = (today - relativedelta(months=6)).strftime('%Y-%m-%d')
+    default_end_date = (today + relativedelta(weeks=1)).strftime('%Y-%m-%d')
+    current_date = today.strftime('%Y-%m-%d')
+
+    # Generate next invoice number
+    next_invoice_number = generate_next_invoice_number()
+
+    # Initialize invoices variable for search results
+    invoices = None
+
+    # Handle search form submission
+    if request.method == 'POST':
+        # Get search parameters from form
+        start_date = request.form.get('start_date')
+        end_date = request.form.get('end_date')
+        category = request.form.get('category')
+        account_owner = request.form.get('account_owner')
+
+        # Perform search
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+
+            query = """
+                SELECT sales_id, invoice_date, invoice_no, customer_name, product, 
+                       quantity, price, total, category, account_owner,sales_acc_invoice_no, status, bank_account
+                FROM sales 
+                WHERE status = 'Active'
+            """
+            params = []
+
+            if start_date:
+                query += " AND invoice_date >= %s"
+                params.append(start_date)
+            if end_date:
+                query += " AND invoice_date <= %s"
+                params.append(end_date)
+            if category:
+                query += " AND category = %s"
+                params.append(category)
+            if account_owner:
+                query += " AND account_owner = %s"
+                params.append(account_owner)
+
+            query += " ORDER BY invoice_date DESC"
+
+            cur.execute(query, params)
+            invoices = cur.fetchall()
+
+            cur.close()
+            conn.close()
+
+        except Exception as e:
+            print(f"Error searching invoices: {e}")
+            flash('Error searching invoices', 'error')
+
+    # Pre-load initial data for edit and receive sections (your existing code)
+    recent_invoices = []
+    recent_sales = []
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Get recent invoices for edit section
+        cur.execute("""
+            SELECT sales_id, invoice_date, invoice_no, customer_name, product, 
+                   quantity, price, total, category, account_owner, bank_account
+            FROM sales 
+            WHERE status = 'Active' 
+            ORDER BY invoice_date DESC 
+        """)
+        recent_invoices = cur.fetchall()
+
+        # Get recent sales for receive payments section
+        cur.execute("""
+            SELECT id, invoice_date, invoice_no, customer_name, invoice_amount,
+                   paid_amount, balance, payment_status, category, account_owner
+            FROM sales_list 
+            ORDER BY invoice_date DESC 
+        """)
+        recent_sales = cur.fetchall()
+
+        cur.close()
+        conn.close()
+
+    except Exception as e:
+        print(f"Error loading initial data: {e}")
+
+    return render_template('invoices_menu.html',
+                           client_names=client_names,
+                           product_names=product_names,
+                           categories=categories,
+                           account_owners=account_owners,
+                           bank_accounts=bank_accounts,
+                           next_invoice_number=next_invoice_number,
+                           current_date=current_date,
+                           default_start_date=default_start_date,
+                           default_end_date=default_end_date,
+                           recent_invoices=recent_invoices,
+                           recent_sales=recent_sales,
+                           invoices=invoices)
 
 
 # Search invoices route

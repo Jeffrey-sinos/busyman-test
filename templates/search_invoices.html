@@ -530,153 +530,153 @@
 </div>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-    const searchForm = document.getElementById('searchForm');
-    const detailsModal = document.getElementById('detailsModal');
-    const editInvoiceBtn = document.getElementById('editInvoiceBtn');
-    const deleteInvoiceBtn = document.getElementById('deleteInvoiceBtn');
+        const searchForm = document.getElementById('searchForm');
+        const detailsModal = document.getElementById('detailsModal');
+        const editInvoiceBtn = document.getElementById('editInvoiceBtn');
+        const deleteInvoiceBtn = document.getElementById('deleteInvoiceBtn');
 
-    let currentInvoiceId = null;
+        let currentInvoiceId = null;
 
-    // Function to load saved filter values
-    function loadSavedFilters() {
-        const savedFilters = sessionStorage.getItem('searchFilters');
-        if (savedFilters) {
-            const filters = JSON.parse(savedFilters);
+        // Function to load saved filter values
+        function loadSavedFilters() {
+            const savedFilters = sessionStorage.getItem('searchFilters');
+            if (savedFilters) {
+                const filters = JSON.parse(savedFilters);
 
-            // Apply saved values to form fields
-            if (filters.start_date) document.getElementById('start_date').value = filters.start_date;
-            if (filters.end_date) document.getElementById('end_date').value = filters.end_date;
-            if (filters.category) document.getElementById('category').value = filters.category;
-            if (filters.account_owner) document.getElementById('account_owner').value = filters.account_owner;
+                // Apply saved values to form fields
+                if (filters.start_date) document.getElementById('start_date').value = filters.start_date;
+                if (filters.end_date) document.getElementById('end_date').value = filters.end_date;
+                if (filters.category) document.getElementById('category').value = filters.category;
+                if (filters.account_owner) document.getElementById('account_owner').value = filters.account_owner;
+            }
         }
-    }
 
-    // Function to save current filter values
-    function saveFilters() {
-        const formData = new FormData(searchForm);
-        const formValues = {};
-        for (let [key, value] of formData.entries()) {
-            formValues[key] = value;
+        // Function to save current filter values
+        function saveFilters() {
+            const formData = new FormData(searchForm);
+            const formValues = {};
+            for (let [key, value] of formData.entries()) {
+                formValues[key] = value;
+            }
+            sessionStorage.setItem('searchFilters', JSON.stringify(formValues));
         }
-        sessionStorage.setItem('searchFilters', JSON.stringify(formValues));
-    }
 
-    // Load saved filters when page loads
-    loadSavedFilters();
+        // Load saved filters when page loads
+        loadSavedFilters();
 
-    // Save filters whenever any filter value changes
-    const filterInputs = document.querySelectorAll('#searchForm input, #searchForm select');
-    filterInputs.forEach(input => {
-        input.addEventListener('change', saveFilters);
-        // Also save on input for better responsiveness
-        input.addEventListener('input', saveFilters);
+        // Save filters whenever any filter value changes
+        const filterInputs = document.querySelectorAll('#searchForm input, #searchForm select');
+        filterInputs.forEach(input => {
+            input.addEventListener('change', saveFilters);
+            // Also save on input for better responsiveness
+            input.addEventListener('input', saveFilters);
+        });
+
+        // Handle form submission
+        searchForm.addEventListener('submit', function () {
+            const btn = document.getElementById('searchBtn');
+            const text = document.getElementById('searchText');
+            const spinner = document.getElementById('searchSpinner');
+
+            btn.disabled = true;
+            text.textContent = 'Loading...';
+            spinner.classList.remove('d-none');
+
+            // Save current filters
+            saveFilters();
+        });
+
+        // Handle details modal show event
+        detailsModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            currentInvoiceId = button.getAttribute('data-sales-id');
+
+            // Populate details modal
+            document.getElementById('detail_invoice_date').textContent = button.getAttribute('data-invoice-date');
+            document.getElementById('detail_invoice_no').textContent = button.getAttribute('data-invoice-no');
+            document.getElementById('detail_customer_name').textContent = button.getAttribute('data-customer-name');
+            document.getElementById('detail_product').textContent = button.getAttribute('data-product');
+            document.getElementById('detail_quantity').textContent = button.getAttribute('data-quantity');
+            document.getElementById('detail_price').textContent = button.getAttribute('data-price');
+            document.getElementById('detail_total').textContent = "Ksh " + parseFloat(button.getAttribute('data-total')).toLocaleString('en-KE', {minimumFractionDigits: 2});
+            document.getElementById('detail_category').textContent = button.getAttribute('data-category');
+            document.getElementById('detail_account_owner').textContent = button.getAttribute('data-account-owner');
+            document.getElementById('detail_bank_account').textContent = button.getAttribute('data-bank-account');
+            document.getElementById('detail_status').textContent = button.getAttribute('data-status');
+        });
+
+        // Handle edit button click
+        editInvoiceBtn.addEventListener('click', function() {
+            // Close details modal
+            const detailsModalInstance = bootstrap.Modal.getInstance(detailsModal);
+            detailsModalInstance.hide();
+
+            // Open edit modal and populate data
+            const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+
+            // Find the select button that was clicked
+            const selectButton = document.querySelector(`.select-btn[data-sales-id="${currentInvoiceId}"]`);
+
+            // Populate edit modal
+            document.getElementById('modalSalesId').value = currentInvoiceId;
+            document.getElementById('modal_invoice_date').value = selectButton.getAttribute('data-invoice-date');
+            document.getElementById('modal_invoice_no').value = selectButton.getAttribute('data-invoice-no');
+            document.getElementById('modal_customer_name').value = selectButton.getAttribute('data-customer-name');
+            document.getElementById('modal_product').value = selectButton.getAttribute('data-product');
+            document.getElementById('modal_quantity').value = selectButton.getAttribute('data-quantity');
+            document.getElementById('modal_price').value = selectButton.getAttribute('data-price');
+            document.getElementById('modal_category').value = selectButton.getAttribute('data-category');
+            document.getElementById('modal_account_owner').value = selectButton.getAttribute('data-account-owner');
+            document.getElementById('modal_bank_account').value = selectButton.getAttribute('data-bank-account');
+            //document.getElementById('modal_status').value = selectButton.getAttribute('data-status');
+
+            editModal.show();
+        });
+
+        // Handle delete button click
+        deleteInvoiceBtn.addEventListener('click', function() {
+            if (confirm("Are you sure you want to delete this invoice? This action cannot be undone.")) {
+                // Show loading state
+                deleteInvoiceBtn.disabled = true;
+                deleteInvoiceBtn.textContent = 'Deleting...';
+
+                // Send delete request
+                fetch(`/delete_invoice/${currentInvoiceId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data.status === "success") {
+                        alert("Invoice deleted successfully!");
+                        // Close the modal
+                        const detailsModalInstance = bootstrap.Modal.getInstance(detailsModal);
+                        detailsModalInstance.hide();
+                        // Refresh the page to update the results
+                        location.reload();
+                    } else {
+                        alert("Error: " + (data.message || 'Unknown error occurred'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error deleting invoice:', error);
+                    alert('Error deleting invoice');
+                })
+                .finally(() => {
+                    // Reset button state whether success or failure
+                    deleteInvoiceBtn.disabled = false;
+                    deleteInvoiceBtn.textContent = 'Delete';
+                });
+            }
+        });
     });
-
-    // Handle form submission
-    searchForm.addEventListener('submit', function () {
-        const btn = document.getElementById('searchBtn');
-        const text = document.getElementById('searchText');
-        const spinner = document.getElementById('searchSpinner');
-
-        btn.disabled = true;
-        text.textContent = 'Loading...';
-        spinner.classList.remove('d-none');
-
-        // Save current filters
-        saveFilters();
-    });
-
-    // Handle details modal show event
-    detailsModal.addEventListener('show.bs.modal', function (event) {
-        const button = event.relatedTarget;
-        currentInvoiceId = button.getAttribute('data-sales-id');
-
-        // Populate details modal
-        document.getElementById('detail_invoice_date').textContent = button.getAttribute('data-invoice-date');
-        document.getElementById('detail_invoice_no').textContent = button.getAttribute('data-invoice-no');
-        document.getElementById('detail_customer_name').textContent = button.getAttribute('data-customer-name');
-        document.getElementById('detail_product').textContent = button.getAttribute('data-product');
-        document.getElementById('detail_quantity').textContent = button.getAttribute('data-quantity');
-        document.getElementById('detail_price').textContent = button.getAttribute('data-price');
-        document.getElementById('detail_total').textContent = "Ksh " + parseFloat(button.getAttribute('data-total')).toLocaleString('en-KE', {minimumFractionDigits: 2});
-        document.getElementById('detail_category').textContent = button.getAttribute('data-category');
-        document.getElementById('detail_account_owner').textContent = button.getAttribute('data-account-owner');
-        document.getElementById('detail_bank_account').textContent = button.getAttribute('data-bank-account');
-        document.getElementById('detail_status').textContent = button.getAttribute('data-status');
-    });
-
-    // Handle edit button click
-    editInvoiceBtn.addEventListener('click', function() {
-        // Close details modal
-        const detailsModalInstance = bootstrap.Modal.getInstance(detailsModal);
-        detailsModalInstance.hide();
-
-        // Open edit modal and populate data
-        const editModal = new bootstrap.Modal(document.getElementById('editModal'));
-
-        // Find the select button that was clicked
-        const selectButton = document.querySelector(`.select-btn[data-sales-id="${currentInvoiceId}"]`);
-
-        // Populate edit modal
-        document.getElementById('modalSalesId').value = currentInvoiceId;
-        document.getElementById('modal_invoice_date').value = selectButton.getAttribute('data-invoice-date');
-        document.getElementById('modal_invoice_no').value = selectButton.getAttribute('data-invoice-no');
-        document.getElementById('modal_customer_name').value = selectButton.getAttribute('data-customer-name');
-        document.getElementById('modal_product').value = selectButton.getAttribute('data-product');
-        document.getElementById('modal_quantity').value = selectButton.getAttribute('data-quantity');
-        document.getElementById('modal_price').value = selectButton.getAttribute('data-price');
-        document.getElementById('modal_category').value = selectButton.getAttribute('data-category');
-        document.getElementById('modal_account_owner').value = selectButton.getAttribute('data-account-owner');
-        document.getElementById('modal_bank_account').value = selectButton.getAttribute('data-bank-account');
-        //document.getElementById('modal_status').value = selectButton.getAttribute('data-status');
-
-        editModal.show();
-    });
-
-    // Handle delete button click
-    deleteInvoiceBtn.addEventListener('click', function() {
-        if (confirm("Are you sure you want to delete this invoice? This action cannot be undone.")) {
-            // Show loading state
-            deleteInvoiceBtn.disabled = true;
-            deleteInvoiceBtn.textContent = 'Deleting...';
-
-            // Send delete request
-            fetch(`/delete_invoice/${currentInvoiceId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                }
-            })
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return res.json();
-            })
-            .then(data => {
-                if (data.status === "success") {
-                    alert("Invoice deleted successfully!");
-                    // Close the modal
-                    const detailsModalInstance = bootstrap.Modal.getInstance(detailsModal);
-                    detailsModalInstance.hide();
-                    // Refresh the page to update the results
-                    location.reload();
-                } else {
-                    alert("Error: " + (data.message || 'Unknown error occurred'));
-                }
-            })
-            .catch(error => {
-                console.error('Error deleting invoice:', error);
-                alert('Error deleting invoice');
-            })
-            .finally(() => {
-                // Reset button state whether success or failure
-                deleteInvoiceBtn.disabled = false;
-                deleteInvoiceBtn.textContent = 'Delete';
-            });
-        }
-    });
-});
 
 document.getElementById('editForm').addEventListener('submit', function (e) {
     e.preventDefault();
