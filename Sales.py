@@ -221,6 +221,8 @@ def onboard_superuser(token):
                                            org_name=org_name,
                                            contact_email=contact_email,
                                            token=token)
+                # Generate next org_id
+                org_id = generate_next_org_id()
 
                 # Check if email already exists before attempting insertion
                 cur.execute("SELECT user_id FROM organizations WHERE email = %s OR username = %s", (email, email))
@@ -240,13 +242,25 @@ def onboard_superuser(token):
 
                 # Create the user (for now, just in the main users table)
                 cur.execute("""
-                    INSERT INTO organizations (username, password, role, full_name, email, phone_number)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                    RETURNING user_id
-                """, (email, password_hash, 1, full_name, email, phone_number))  # role=1 for superuser
+                    INSERT INTO organizations (org_id, org_name, contact_email, created_at)
+                    VALUES (%s, %s, %s, %s)
+                """, (org_id, organization_name, email, datetime.utcnow()))
+
+                # Create the superuser in main users table
+                cur.execute("""
+                                    INSERT INTO org_users (username, password, role, full_name, email, phone_number, org_id)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                    RETURNING user_id
+                                """, (email, password_hash, 1, full_name, email, phone_number, org_id))
 
                 user_id = cur.fetchone()[0]
 
+                # Update organization with superuser_id
+                cur.execute("""
+                                    UPDATE organizations 
+                                    SET superuser_id = %s
+                                    WHERE org_id = %s
+                                """, (user_id, org_id))
                 # Mark the invite as used
                 cur.execute("""
                     UPDATE organization_invites 
@@ -260,6 +274,7 @@ def onboard_superuser(token):
                 session['user_id'] = user_id
                 session['username'] = email
                 session['role'] = 1
+                session['org_id'] = org_id
                 session['needs_subscription'] = True  # Flag to show subscription modal
 
                 flash(f"Welcome {full_name}! Please complete your subscription to access the dashboard.", "success")
@@ -286,6 +301,262 @@ def onboard_superuser(token):
                                        org_name=org_name,
                                        contact_email=contact_email,
                                        token=token)
+
+
+def generate_next_org_id():
+    """Generate next org_id in format aaaa, aaab, aaac, etc."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        # Get the last org_id
+        cur.execute("SELECT org_id FROM organizations ORDER BY org_id DESC LIMIT 1")
+        last_org_id = cur.fetchone()
+
+        if not last_org_id:
+            return 'aaaa'  # First org_id
+
+        last_id = last_org_id[0]
+
+        # Convert to list for manipulation
+        chars = list(last_id)
+
+        # Increment from right to left
+        for i in range(3, -1, -1):
+            if chars[i] < 'z':
+                chars[i] = chr(ord(chars[i]) + 1)
+                break
+            else:
+                chars[i] = 'a'
+
+        return ''.join(chars)
+
+
+def create_tenant_tables(org_id):
+    """
+    Create all tenant-specific tables based on the provided structures.
+    Each table name is prefixed with the tenant org_id.
+    """
+    table_definitions = {
+        "sales": f"""
+                CREATE TABLE IF NOT EXISTS {org_id}_sales (
+                    sales_id SERIAL PRIMARY KEY,
+                    invoice_date DATE NOT NULL,
+                    invoice_no VARCHAR(255) NOT NULL,
+                    customer_name VARCHAR(255) NOT NULL,
+                    product VARCHAR(255) NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    price INTEGER NOT NULL,
+                    total INTEGER NOT NULL,
+                    date_created DATE NOT NULL,
+                    category VARCHAR(255) NOT NULL,
+                    account_owner VARCHAR(255) NOT NULL,
+                    sales_acc_invoice_no VARCHAR(255),
+                    payment_status VARCHAR(255) NOT NULL DEFAULT 'Not Paid',
+                    bank_account VARCHAR(255) NOT NULL,
+                    status VARCHAR(255) NOT NULL DEFAULT 'Active'
+                )
+            """,
+        "sales_account": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_sales_account (
+                sales_acc_id SERIAL PRIMARY KEY,
+                invoice_date DATE NOT NULL,
+                invoice_number VARCHAR(255) NOT NULL,
+                customer_name VARCHAR(255) NOT NULL,
+                product VARCHAR(255) NOT NULL,
+                quantity INTEGER NOT NULL,
+                price INTEGER NOT NULL,
+                total INTEGER NOT NULL,
+                created_at DATE NOT NULL,
+                category VARCHAR(255) NOT NULL,
+                account_owner VARCHAR(255) NOT NULL,
+                frequency VARCHAR(255) NOT NULL,
+                status VARCHAR(255) NOT NULL DEFAULT 'Active',
+                bank_account VARCHAR(255) NOT NULL
+            )
+        """,
+
+        "sales_list": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_sales_list (
+                id SERIAL PRIMARY KEY,
+                customer_name VARCHAR(255) NOT NULL,
+                invoice_no VARCHAR(255) NOT NULL UNIQUE,
+                invoice_date DATE NOT NULL,
+                invoice_amount NUMERIC NOT NULL,
+                paid_amount NUMERIC NOT NULL,
+                balance NUMERIC NOT NULL,
+                payment_status VARCHAR(255) NOT NULL DEFAULT 'Not Paid',
+                notes VARCHAR(255) NOT NULL DEFAULT 'Active',
+                category VARCHAR(255),
+                account_owner VARCHAR(255) NOT NULL,
+                reference_no VARCHAR(255)
+            )
+        """,
+
+        "suppliers": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_suppliers (
+                supplier_id SERIAL PRIMARY KEY,
+                supplier VARCHAR(255) NOT NULL,
+                contact VARCHAR(255),
+                telephone VARCHAR(255),
+                email VARCHAR(255),
+                created_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                status VARCHAR(255) NOT NULL DEFAULT 'Active'
+            )
+        """,
+
+        "users": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_users (
+                user_id SERIAL PRIMARY KEY,
+                username VARCHAR(255) NOT NULL,
+                role INTEGER NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                status VARCHAR(255) NOT NULL DEFAULT 'Active',
+                org_id VARCHAR(4) REFERENCES organizations(org_id)
+            )
+        """,
+
+        "receipts": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_receipts (
+                receipt_id SERIAL PRIMARY KEY,
+                paid_date DATE NOT NULL,
+                invoice_number VARCHAR(255) NOT NULL,
+                invoice_date DATE NOT NULL,
+                customer_name VARCHAR(255) NOT NULL,
+                paid_amount NUMERIC NOT NULL,
+                balance NUMERIC NOT NULL,
+                receipt_invoice_number VARCHAR(255) NOT NULL,
+                category VARCHAR(255) NOT NULL,
+                account_owner VARCHAR(255) NOT NULL
+            )
+        """,
+
+        "products": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_products (
+                product_number SERIAL,
+                product VARCHAR(255) NOT NULL,
+                edition VARCHAR(255),
+                isbn VARCHAR(255) NOT NULL,
+                date_published VARCHAR(255),
+                publisher VARCHAR(255),
+                author VARCHAR(255),
+                date_created DATE NOT NULL,
+                frequency VARCHAR(255) NOT NULL,
+                status VARCHAR(255) NOT NULL DEFAULT 'Active',
+                PRIMARY KEY (isbn, product_number)
+            )
+        """,
+
+        "invoices": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_invoices (
+                id SERIAL PRIMARY KEY,
+                invoice_number VARCHAR(20) NOT NULL UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """,
+
+        "clients": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_clients (
+                customer_id SERIAL PRIMARY KEY,
+                customer_name VARCHAR(255) NOT NULL,
+                institution VARCHAR(255) NOT NULL,
+                phone_no VARCHAR(255) NOT NULL,
+                phone_no_2 VARCHAR(255),
+                email VARCHAR(255),
+                position VARCHAR(255),
+                id_no VARCHAR(255),
+                date_created DATE NOT NULL
+            )
+        """,
+
+        "bills": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_bills (
+                bill_id SERIAL PRIMARY KEY,
+                service_provider VARCHAR(255) NOT NULL,
+                account_name VARCHAR(255) NOT NULL,
+                account_number VARCHAR(100) NOT NULL,
+                category VARCHAR(100),
+                paybill_number VARCHAR(50),
+                ussd_number VARCHAR(50),
+                billing_date DATE,
+                bill_amount DOUBLE PRECISION,
+                account_owner VARCHAR(255),
+                created_date DATE DEFAULT CURRENT_DATE,
+                pay_status VARCHAR(50) DEFAULT 'Not Paid',
+                bill_invoice_number VARCHAR(50),
+                invoice_number VARCHAR(100),
+                status VARCHAR(100) DEFAULT 'Active',
+                bank_account VARCHAR(100)
+            )
+        """,
+
+        "billing_account": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_billing_account (
+                billing_account_id SERIAL PRIMARY KEY,
+                service_provider VARCHAR(255) NOT NULL,
+                account_name VARCHAR(255) NOT NULL,
+                account_number VARCHAR(100) NOT NULL,
+                category VARCHAR(100),
+                paybill_number VARCHAR(50),
+                ussd_number VARCHAR(50),
+                frequency VARCHAR(50),
+                billing_date DATE,
+                account_owner VARCHAR(255),
+                created_date DATE DEFAULT CURRENT_DATE,
+                invoice_number VARCHAR(100),
+                status VARCHAR(100),
+                bank_account VARCHAR(100),
+                bill_amount DOUBLE PRECISION
+            )
+        """,
+
+        "banks": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_banks (
+                bank_account_id SERIAL PRIMARY KEY,
+                account_name VARCHAR(255) NOT NULL,
+                bank_name VARCHAR(255) NOT NULL,
+                account_number VARCHAR(50) NOT NULL,
+                bank_code VARCHAR(50),
+                date_created DATE DEFAULT CURRENT_DATE
+            )
+        """,
+
+        "account_owner": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_account_owner (
+                account_type_id SERIAL PRIMARY KEY,
+                account_owner VARCHAR(255) NOT NULL,
+                created_date DATE DEFAULT CURRENT_DATE
+            )
+        """,
+
+        "payments": f"""
+            CREATE TABLE IF NOT EXISTS {org_id}_payments (
+                payment_id SERIAL PRIMARY KEY,
+                service_provider VARCHAR(255) NOT NULL,
+                account_name VARCHAR(255) NOT NULL,
+                account_number VARCHAR(255) NOT NULL,
+                category VARCHAR(255) NOT NULL,
+                paybill_number VARCHAR(255),
+                ussd_number VARCHAR(255),
+                due_date DATE NOT NULL,
+                bill_amount DOUBLE PRECISION NOT NULL,
+                balance DOUBLE PRECISION NOT NULL,
+                paid_amount DOUBLE PRECISION NOT NULL,
+                created_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                payment_reference_number VARCHAR(255) NOT NULL,
+                invoice_number VARCHAR(255) NOT NULL,
+                account_owner VARCHAR(255) NOT NULL,
+                paid_date DATE NOT NULL,
+                bank_account VARCHAR(255)
+            )
+        """
+    }
+
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        for table_name, create_sql in table_definitions.items():
+            cur.execute(create_sql)
+        conn.commit()
+        print(f"✅ Created tenant tables for org_id: {org_id}")
 
 
 @app.route('/subscription_required')
@@ -1025,6 +1296,19 @@ def mpesa_callback():
                             INSERT INTO subscriptions (user_id, product_id, start_date, end_date, amount, status)
                             VALUES (%s, %s, %s, %s, %s, 'active')
                         """, (user_id, product_id, start_date, end_date, amount))
+
+                    # ✅ Fetch org_id of this user
+                    cur.execute("""
+                                       SELECT org_id FROM org_users WHERE user_id = %s
+                                   """, (user_id,))
+                    org_row = cur.fetchone()
+
+                    if org_row:
+                        org_id = org_row[0]
+                        print(f"Creating tenant tables for org_id: {org_id}")
+                        create_tenant_tables(org_id)  # ✅ Create tenant-specific tables
+                    else:
+                        print(f"No org_id found for user_id {user_id}")
 
                     print(f"Subscription updated for user {user_id}, product {product_id}")
                 else:
