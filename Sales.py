@@ -174,133 +174,150 @@ def show_invite_form():
     return render_template('/organizations/create_invite.html')
 
 
+ERROR_LOG_FILE = os.path.join(os.path.dirname(__file__), "error_log.txt")
+
+def log_error_to_file(error_message):
+    """Append error details with a timestamp to error_log.txt"""
+    with open(ERROR_LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.utcnow().isoformat()}] {error_message}\n")
+
 @app.route('/onboard/<token>', methods=['GET', 'POST'])
 def onboard_superuser(token):
     with get_db_connection2() as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT invite_id, org_name, contact_email, expires_at, used
-            FROM organization_invites
-            WHERE token = %s
-        """, (token,))
-        invite = cur.fetchone()
+        try:
+            cur.execute("""
+                SELECT invite_id, org_name, contact_email, expires_at, used
+                FROM organization_invites
+                WHERE token = %s
+            """, (token,))
+            invite = cur.fetchone()
 
-        if not invite:
-            return "Invalid invite link.", 400
+            if not invite:
+                msg = "Invalid invite link."
+                log_error_to_file(f"{msg} Token: {token}")
+                return msg, 400
 
-        invite_id, org_name, contact_email, expires_at, used = invite
+            invite_id, org_name, contact_email, expires_at, used = invite
 
-        # Check if invite is expired or already used
-        if used:
-            return "This invite has already been used.", 400
+            # Check if invite is expired or already used
+            if used:
+                msg = "This invite has already been used."
+                log_error_to_file(f"{msg} Token: {token}")
+                return msg, 400
 
-        if expires_at < datetime.utcnow():
-            return "This invite has expired.", 400
+            if expires_at < datetime.utcnow():
+                msg = "This invite has expired."
+                log_error_to_file(f"{msg} Token: {token}")
+                return msg, 400
 
-        if request.method == 'GET':
-            # Show the registration form
-            return render_template('organizations/onboard_form.html',
-                                   org_name=org_name,
-                                   contact_email=contact_email,
-                                   token=token)
-
-        elif request.method == 'POST':
-            # Process the registration
-            try:
-                # Get form data
-                full_name = request.form.get('full_name', '').strip()
-                email = request.form.get('email', '').strip().lower()  # Normalize to lowercase
-                phone_number = request.form.get('phone_number', '').strip()
-                organization_name = request.form.get('organization_name', '').strip()
-                password = request.form.get('password', '')
-
-                # Simple validation
-                if not all([full_name, email, organization_name, password]):
-                    flash("All required fields must be filled", "error")
-                    return render_template('organizations/onboard_form.html',
-                                           org_name=org_name,
-                                           contact_email=contact_email,
-                                           token=token)
-                # Generate next org_id
-                org_id = generate_next_org_id()
-
-                # Check if email already exists before attempting insertion
-                cur.execute("SELECT user_id FROM org_users WHERE email = %s OR username = %s", (email, email))
-                existing_user = cur.fetchone()
-
-                if existing_user:
-                    flash(
-                        "An account with this email address already exists. Please use a different email or try logging in.",
-                        "error")
-                    return render_template('organizations/onboard_form.html',
-                                           org_name=org_name,
-                                           contact_email=contact_email,
-                                           token=token)
-
-                # Hash the password
-                password_hash = generate_password_hash(password)
-
-                cur.execute("""
-                    INSERT INTO organizations (org_id, org_name, contact_email, created_at)
-                    VALUES (%s, %s, %s, %s)
-                """, (org_id, organization_name, email, datetime.utcnow()))
-
-                # Create the superuser in main users table
-                cur.execute("""
-                                    INSERT INTO org_users (user_id, username, password, role, full_name, email, phone_number, org_id)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                                    RETURNING user_id
-                                """, (email, password_hash, 1, full_name, email, phone_number, org_id))
-
-                user_id = cur.fetchone()[0]
-
-                # Update organization with superuser_id
-                cur.execute("""
-                                    UPDATE organizations 
-                                    SET superuser_id = %s
-                                    WHERE org_id = %s
-                                """, (user_id, org_id))
-                # Mark the invite as used
-                cur.execute("""
-                    UPDATE organization_invites 
-                    SET used = TRUE
-                    WHERE invite_id = %s
-                """, (invite_id,))
-
-                conn.commit()
-
-                # Set up session for the new user
-                session['user_id'] = user_id
-                session['username'] = email
-                session['role'] = 1
-                session['org_id'] = org_id
-                session['needs_subscription'] = True  # Flag to show subscription modal
-
-                flash(f"Welcome {full_name}! Please complete your subscription to access the dashboard.", "success")
-
-                # Redirect to subscription page instead of dashboard
-                return redirect(url_for('subscription_required'))
-
-            except Exception as e:
-                conn.rollback()
-
-                # Handle specific database errors with user-friendly messages
-                error_message = str(e)
-                if "organizations_username_key" in error_message or "duplicate key" in error_message.lower():
-                    flash(
-                        "An account with this email address already exists. Please use a different email or try logging in.",
-                        "error")
-                elif "organizations_email_key" in error_message:
-                    flash("This email address is already registered. Please use a different email address.", "error")
-                else:
-                    # Generic error message for other database errors
-                    flash("Registration failed. Please try again or contact support if the problem persists.", "error")
-
+            if request.method == 'GET':
+                # Show the registration form
                 return render_template('organizations/onboard_form.html',
                                        org_name=org_name,
                                        contact_email=contact_email,
                                        token=token)
 
+            elif request.method == 'POST':
+                try:
+                    # Get form data
+                    full_name = request.form.get('full_name', '').strip()
+                    email = request.form.get('email', '').strip().lower()
+                    phone_number = request.form.get('phone_number', '').strip()
+                    organization_name = request.form.get('organization_name', '').strip()
+                    password = request.form.get('password', '')
+
+                    # Simple validation
+                    if not all([full_name, email, organization_name, password]):
+                        msg = "All required fields must be filled"
+                        flash(msg, "error")
+                        log_error_to_file(f"{msg} Token: {token}")
+                        return render_template('organizations/onboard_form.html',
+                                               org_name=org_name,
+                                               contact_email=contact_email,
+                                               token=token)
+
+                    # Generate next org_id
+                    org_id = generate_next_org_id()
+
+                    # Check if email already exists before attempting insertion
+                    cur.execute("SELECT user_id FROM org_users WHERE email = %s OR username = %s",
+                                (email, email))
+                    existing_user = cur.fetchone()
+
+                    if existing_user:
+                        msg = ("An account with this email address already exists. "
+                               "Please use a different email or try logging in.")
+                        flash(msg, "error")
+                        log_error_to_file(f"{msg} Email: {email}")
+                        return render_template('organizations/onboard_form.html',
+                                               org_name=org_name,
+                                               contact_email=contact_email,
+                                               token=token)
+
+                    # Hash the password
+                    password_hash = generate_password_hash(password)
+
+                    cur.execute("""
+                        INSERT INTO organizations (org_id, org_name, contact_email, created_at)
+                        VALUES (%s, %s, %s, %s)
+                    """, (org_id, organization_name, email, datetime.utcnow()))
+
+                    # Create the superuser in main users table
+                    cur.execute("""
+                        INSERT INTO org_users (username, password, role, full_name, email, phone_number, org_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        RETURNING user_id
+                    """, (email, password_hash, 1, full_name, email, phone_number, org_id))
+
+                    user_id = cur.fetchone()[0]
+
+                    # Update organization with superuser_id
+                    cur.execute("""
+                        UPDATE organizations
+                        SET superuser_id = %s
+                        WHERE org_id = %s
+                    """, (user_id, org_id))
+
+                    # Mark the invite as used
+                    cur.execute("""
+                        UPDATE organization_invites
+                        SET used = TRUE
+                        WHERE invite_id = %s
+                    """, (invite_id,))
+
+                    conn.commit()
+
+                    # Set up session for the new user
+                    session['user_id'] = user_id
+                    session['username'] = email
+                    session['role'] = 1
+                    session['org_id'] = org_id
+                    session['needs_subscription'] = True
+
+                    flash(f"Welcome {full_name}! Please complete your subscription to access the dashboard.", "success")
+                    return redirect(url_for('subscription_required'))
+
+                except Exception as e:
+                    conn.rollback()
+                    log_error_to_file(f"Database/Processing Error: {str(e)} Token: {token}")
+                    error_message = str(e)
+                    if "organizations_username_key" in error_message or "duplicate key" in error_message.lower():
+                        flash("An account with this email address already exists. "
+                              "Please use a different email or try logging in.", "error")
+                    elif "organizations_email_key" in error_message:
+                        flash("This email address is already registered. Please use a different email address.", "error")
+                    else:
+                        flash("Registration failed. Please try again or contact support if the problem persists.", "error")
+
+                    return render_template('organizations/onboard_form.html',
+                                           org_name=org_name,
+                                           contact_email=contact_email,
+                                           token=token)
+
+        except Exception as e:
+            log_error_to_file(f"Outer Block Error: {str(e)} Token: {token}")
+            return "An unexpected error occurred. Please try again later.", 500
 
 def generate_next_org_id():
     """Generate next org_id in format aaaa, aaab, aaac, etc."""
