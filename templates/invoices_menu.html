@@ -35,7 +35,7 @@
 
         /* Back button positioning */
         .back-button-container {
-            text-align: center;
+            text-align: left;
             margin-bottom: 15px;
         }
 
@@ -174,6 +174,8 @@
             background-color: #212529;
             color: white;
             z-index: 10;
+            font-weight: 500;
+            font-size: 14px;
         }
 
         .results-count {
@@ -458,16 +460,18 @@
 
         <!-- Create Invoice Section -->
         <div id="create-section" class="content-section active">
+            <!--
             <div class="section-header">
                 <p>Generate Invoice</p>
             </div>
+            -->
 
             <!-- Client Search Section -->
             <div id="clientSearchSection" class="form-section active">
                 <div class="row mb-3">
                     <div class="col-md-8">
                         <div class="input-group">
-                            <input type="text" class="form-control form-control-lg" id="clientName" placeholder="Type client name...">
+                            <input type="text" class="form-control" id="clientName" placeholder="Type client name">
                             <button class="btn btn-primary d-flex align-items-center gap-1" type="button" id="searchClientBtn">
                                 <i class="bi bi-search"></i>
                                 Search
@@ -520,14 +524,15 @@
                             <span id="selectedClientFormDisplay">No client selected</span>
                         </div>
                         <div class="col-md-6">
-                            <strong>Invoice No:</strong> <span id="invoiceNumberDisplay"></span>
+                            <p>Invoice No:</p><span id="invoiceNumberDisplay"></span>
                         </div>
                     </div>
                 </div>
 
                 <div class="row g-4">
                     <div class="col-md-4">
-                        <label for="invoiceDate" class="form-label">Invoice Date</label>
+                        <!--<label for="invoiceDate" class="form-label">Invoice Date</label>-->
+                        <label for="invoiceDate" class="form-label"></label>
                         <input type="date" class="form-control" id="invoiceDate">
                     </div>
 
@@ -535,7 +540,8 @@
                     <input type="hidden" id="invoiceNumber">
 
                     <div class="col-md-4">
-                        <label for="product" class="form-label">Product</label>
+                        <!--<label for="product" class="form-label">Product</label>-->
+                            <label for="product" class="form-label"></label>
                             <select class="form-select" id="product">
                                 <option value="">Select a product</option>
                                 {% for product in product_names %}
@@ -555,7 +561,8 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label for="category" class="form-label">Category</label>
+                        <!--<label for="category" class="form-label">Category</label>-->
+                            <label for="category" class="form-label"></label>
                             <select class="form-select" id="category">
                                 <option value=""> Select a Category</option>
                                 {% for category in categories %}
@@ -565,7 +572,8 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label for="account" class="form-label">Account Owner</label>
+                        <!--<label for="account" class="form-label">Account Owner</label>-->
+                            <label for="account" class="form-label"></label>
                             <select class="form-select" id="account">
                                 <option value=""> Select an Account Owner</option>
                                 {% for account in account_owners %}
@@ -575,7 +583,8 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label for="bank_account" class="form-label">Bank Account</label>
+                        <!--<label for="bank_account" class="form-label">Bank Account</label>-->
+                            <label for="bank_account" class="form-label"></label>
                             <select class="form-select" id="bank_account">
                                 <option value=""> Select a Bank Account</option>
                                 {% for bank_account in bank_accounts %}
@@ -585,9 +594,11 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label">Transaction Type</label>
-                        <input type="text" class="form-control" id="transactionTypeDisplay" readonly>
+                        <!--<label class="form-label">Transaction Type</label>-->
+                        <label class="form-label"></label>
+                        <input type="text" class="form-control" id="transactionTypeDisplay" hidden>
                     </div>
+
 
                     <div class="col-12">
                         <label for="notes" class="form-label">Notes</label>
@@ -715,10 +726,10 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>Invoice Date/Invoice No</th>
-                                <th>Customer Name</th>
+                                <th>Inv Date/No</th>
+                                <th>Client</th>
                                 <!--<th>Invoice Number</th>-->
-                                <th>Invoice Amount</th>
+                                <th>Amount</th>
                             </tr>
                         </thead>
                         <tbody id="resultsBody">
@@ -812,10 +823,10 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>Invoice Date/Invoice No</th>
+                                <th>Inv Date/No</th>
                                 <!--<th>Invoice Number</th>-->
-                                <th>Customer Name</th>
-                                <th>Invoice Amount</th>
+                                <th>Client</th>
+                                <th>Amount</th>
                                 <th>Balance</th>
                             </tr>
                         </thead>
