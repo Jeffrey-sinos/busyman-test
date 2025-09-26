@@ -2576,10 +2576,38 @@ def record_payment(sales_list_id):
         invoice_no = data.get('invoice_no')
         customer_name = data.get('customer_name')
         invoice_amount = float(data.get('invoice_amount'))
-        paid_amount = float(data.get('paid_amount'))
-        balance = float(max(0, invoice_amount - paid_amount))
+
+        # Get the payment amount from the correct field
+        new_payment = float(data.get('payment_now', 0))  # This is the key fix
+
+        if new_payment <= 0:
+            return jsonify({'success': False, 'message': 'Payment must be greater than 0'}), 400
+
         category = data.get('category')
         account_owner = data.get('account_owner')
+
+        # Get current totals from sales_list
+        cur.execute("""
+            SELECT paid_amount, invoice_amount
+            FROM sales_list
+            WHERE id = %s
+        """, (sales_list_id,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'success': False, 'message': 'Invoice not found'}), 404
+
+        current_paid, invoice_amount_db = row
+        current_paid = float(current_paid or 0)
+        invoice_amount = float(invoice_amount_db)
+
+        # Calculate new totals
+        total_paid = current_paid + new_payment
+
+        if total_paid > invoice_amount:
+            return jsonify({'success': False,
+                            'message': 'Total paid cannot exceed invoice amount'}), 400
+
+        balance = invoice_amount - total_paid
         payment_status = 'Paid' if balance == 0 else 'Not Paid'
 
         # Get all products for this invoice along with their frequencies
@@ -2617,8 +2645,10 @@ def record_payment(sales_list_id):
             frequency_result = cur.fetchone()
             if frequency_result:
                 frequency = frequency_result[0]
+
         receipt_invoice_number = generate_next_invoice_number()
 
+        # Insert receipt record
         cur.execute("""
             INSERT INTO receipts (
                 paid_date, invoice_number, invoice_date, customer_name,
@@ -2628,7 +2658,7 @@ def record_payment(sales_list_id):
             RETURNING receipt_id
         """, (
             datetime.now().date(), invoice_no, invoice_date, customer_name,
-            paid_amount, balance, receipt_invoice_number,
+            new_payment, balance, receipt_invoice_number,
             category, account_owner
         ))
         receipt_id = cur.fetchone()[0]
@@ -2649,7 +2679,7 @@ def record_payment(sales_list_id):
                 balance = %s,
                 payment_status = %s
             WHERE id = %s
-        """, (paid_amount, balance, payment_status, sales_list_id))
+        """, (total_paid, balance, payment_status, sales_list_id))
 
         # Update sales records
         cur.execute("""
@@ -2665,7 +2695,7 @@ def record_payment(sales_list_id):
             'invoice_no': invoice_no,
             'customer_name': customer_name,
             'invoice_date': invoice_date,
-            'amount_paid': float(paid_amount),
+            'amount_paid': new_payment,  # Fixed: use new_payment instead of paid_amount
             'new_bal': float(balance),
             'payment_date': datetime.now().date(),
             'receipt_invoice_number': receipt_invoice_number,
