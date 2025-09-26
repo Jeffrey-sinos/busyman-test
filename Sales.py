@@ -449,7 +449,7 @@ def create_tenant_tables(org_id):
                 user_id SERIAL PRIMARY KEY,
                 username VARCHAR(255) NOT NULL,
                 full_name VARCHAR(255) NOT NULL,
-                full_name VARCHAR(255) NOT NULL,
+                email VARCHAR(255) NOT NULL,
                 role INTEGER NOT NULL,
                 password VARCHAR(255) NOT NULL,
                 status VARCHAR(255) NOT NULL DEFAULT 'Active',
@@ -3661,13 +3661,13 @@ def user_details(user_id):
         try:
             if session.get('role') == 1 or session.get('role') == 2:
                 cur.execute(f"""
-                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.phone_number, u.is_active
+                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.status
                     FROM {org_id}_users u
                     WHERE u.user_id = %s
                 """, (user_id,))
             else:
                 cur.execute(f"""
-                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.phone_number, u.is_active
+                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.status
                     FROM {org_id}_users u
                     WHERE u.user_id = %s AND u.user_id = %s
                 """, (user_id, session['user_id']))
@@ -3687,8 +3687,7 @@ def user_details(user_id):
                 'role_name': role_names.get(user[2], 'Unknown'),
                 'full_name': user[3],
                 'email': user[4],
-                'phone_number': user[5],
-                'is_active': user[6]
+                'status': user[5]
             }
 
             return render_template('user_details.html', user=user_dict, org_id=org_id)
@@ -3720,18 +3719,17 @@ def edit_users(user_id):
         role_id = request.form.get('role')
         full_name = request.form.get('full_name')
         email = request.form.get('email')
-        phone_number = request.form.get('phone_number')
-        is_active = request.form.get('is_active') == 'on'
+        # phone_number = request.form.get('phone_number')
+        status = request.form.get('status') == 'on'
 
         try:
             with get_db_connection() as conn:
                 cur = conn.cursor()
                 cur.execute(f"""
                     UPDATE {org_id}_users
-                    SET username = %s, role = %s, full_name = %s, email = %s, 
-                        phone_number = %s, is_active = %s
+                    SET username = %s, role = %s, full_name = %s, email = %s, status = %s
                     WHERE user_id = %s
-                """, (username, role_id, full_name, email, phone_number, is_active, user_id))
+                """, (username, role_id, full_name, email, status, user_id))
 
             flash("User updated successfully", "success")
             return redirect(url_for('manage_users'))
@@ -3743,7 +3741,7 @@ def edit_users(user_id):
             with get_db_connection() as conn:
                 cur = conn.cursor()
                 cur.execute(f""" 
-                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.phone_number, u.is_active 
+                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.status
                     FROM {org_id}_users u 
                     WHERE u.user_id = %s
                 """, (user_id,))
@@ -3759,8 +3757,7 @@ def edit_users(user_id):
                 'role': user[2],
                 'full_name': user[3],
                 'email': user[4],
-                'phone_number': user[5],
-                'is_active': user[6]
+                'status': user[5]
             }
 
             return render_template('edit_users.html', user=user_dict, roles=roles, org_id=org_id)
