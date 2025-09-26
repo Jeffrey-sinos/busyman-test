@@ -1775,87 +1775,87 @@ def invoices_menu():
     # Generate next invoice number
     next_invoice_number = generate_next_invoice_number()
 
-    # Initialize invoices variable for search results
+    # Initialize variables for search results
     invoices = None
+    sales = None
 
     # Handle search form submission
     if request.method == 'POST':
+        # Get the section from which the search was performed
+        section = request.form.get('section', 'edit')  # Default to 'edit' for backward compatibility
+
         # Get search parameters from form
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
         category = request.form.get('category')
         account_owner = request.form.get('account_owner')
 
-        # Perform search
         try:
             conn = get_db_connection()
             cur = conn.cursor()
 
-            query = """
-                SELECT sales_id, invoice_date, invoice_no, customer_name, product, 
-                       quantity, price, total, category, account_owner,sales_acc_invoice_no, status, bank_account
-                FROM sales 
-                WHERE status = 'Active'
-            """
-            params = []
+            # Only search invoices if the request came from the edit section
+            if section == 'edit':
+                # Search invoices from sales table
+                invoices_query = """
+                    SELECT sales_id, invoice_date, invoice_no, customer_name, product, 
+                           quantity, price, total, category, account_owner, sales_acc_invoice_no, status, bank_account
+                    FROM sales 
+                    WHERE status = 'Active'
+                """
+                invoices_params = []
 
-            if start_date:
-                query += " AND invoice_date >= %s"
-                params.append(start_date)
-            if end_date:
-                query += " AND invoice_date <= %s"
-                params.append(end_date)
-            if category:
-                query += " AND category = %s"
-                params.append(category)
-            if account_owner:
-                query += " AND account_owner = %s"
-                params.append(account_owner)
+                if start_date:
+                    invoices_query += " AND invoice_date >= %s"
+                    invoices_params.append(start_date)
+                if end_date:
+                    invoices_query += " AND invoice_date <= %s"
+                    invoices_params.append(end_date)
+                if category:
+                    invoices_query += " AND category = %s"
+                    invoices_params.append(category)
+                if account_owner:
+                    invoices_query += " AND account_owner = %s"
+                    invoices_params.append(account_owner)
 
-            query += " ORDER BY invoice_date DESC"
+                invoices_query += " ORDER BY invoice_date DESC"
+                cur.execute(invoices_query, invoices_params)
+                invoices = cur.fetchall()
 
-            cur.execute(query, params)
-            invoices = cur.fetchall()
+            # Only search sales if the request came from the receive section
+            elif section == 'receive':
+                # Search sales from sales_list table
+                sales_query = """
+                    SELECT id, customer_name, invoice_no, invoice_date, invoice_amount,
+                        paid_amount, balance, payment_status, category, account_owner, reference_no
+                    FROM sales_list
+                    WHERE 1=1  
+                """
+                sales_params = []
+
+                if start_date:
+                    sales_query += " AND invoice_date >= %s"
+                    sales_params.append(start_date)
+                if end_date:
+                    sales_query += " AND invoice_date <= %s"
+                    sales_params.append(end_date)
+                if category:
+                    sales_query += " AND category = %s"
+                    sales_params.append(category)
+                if account_owner:
+                    sales_query += " AND account_owner = %s"
+                    sales_params.append(account_owner)
+
+                sales_query += " ORDER BY invoice_date DESC"
+                cur.execute(sales_query, sales_params)
+                sales = cur.fetchall()
 
             cur.close()
             conn.close()
 
         except Exception as e:
-            print(f"Error searching invoices: {e}")
-            flash('Error searching invoices', 'error')
-
-    # Pre-load initial data for edit and receive sections (your existing code)
-    recent_invoices = []
-    recent_sales = []
-
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        # Get recent invoices for edit section
-        cur.execute("""
-            SELECT sales_id, invoice_date, invoice_no, customer_name, product, 
-                   quantity, price, total, category, account_owner, bank_account
-            FROM sales 
-            WHERE status = 'Active' 
-            ORDER BY invoice_date DESC 
-        """)
-        recent_invoices = cur.fetchall()
-
-        # Get recent sales for receive payments section
-        cur.execute("""
-            SELECT id, invoice_date, invoice_no, customer_name, invoice_amount,
-                   paid_amount, balance, payment_status, category, account_owner
-            FROM sales_list 
-            ORDER BY invoice_date DESC 
-        """)
-        recent_sales = cur.fetchall()
-
-        cur.close()
-        conn.close()
-
-    except Exception as e:
-        print(f"Error loading initial data: {e}")
+            print(f"Error searching data: {e}")
+            flash('Error searching data', 'error')
 
     return render_template('invoices_menu.html',
                            client_names=client_names,
@@ -1867,9 +1867,8 @@ def invoices_menu():
                            current_date=current_date,
                            default_start_date=default_start_date,
                            default_end_date=default_end_date,
-                           recent_invoices=recent_invoices,
-                           recent_sales=recent_sales,
-                           invoices=invoices)
+                           invoices=invoices,
+                           sales=sales)
 
 
 # Search invoices route
@@ -2273,7 +2272,7 @@ def receipts_menu():
 def view_sales():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    invoices = []
+    sales = []
     categories = read_categories()
     account_owners = read_account_owners()
 
@@ -2321,9 +2320,9 @@ def view_sales():
             query += " ORDER BY invoice_date DESC"
 
             cur.execute(query, tuple(params))
-            invoices = cur.fetchall()
+            sales = cur.fetchall()
 
-            if not invoices:
+            if not sales:
                 flash('No invoices found matching the selected filters.', 'info')
 
         cur.close()
@@ -2332,14 +2331,14 @@ def view_sales():
     except Exception as e:
         return render_template('view_sales.html',
                                error=f"Database error: {str(e)}",
-                               invoices=invoices,
+                               sales=sales,
                                account_owners=account_owners,
                                categories=categories,
                                default_start_date=default_start_date,
                                default_end_date=default_end_date)
 
     return render_template('view_sales.html',
-                           invoices=invoices,
+                           sales=sales,
                            account_owners=account_owners,
                            categories=categories,
                            default_start_date=default_start_date,
