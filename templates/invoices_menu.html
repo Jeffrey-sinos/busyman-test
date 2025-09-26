@@ -322,6 +322,9 @@
             .main-container {
                 padding: 0 10px;
             }
+            .date-group {
+                flex-wrap: wrap;
+            }
 
             .filter-bar {
                 flex-direction: column;
@@ -343,6 +346,15 @@
                 font-size: 0.9rem;
                 line-height: 1.5;
                 padding-bottom: 2px;
+            }
+
+            .date-group {
+                display: flex;
+                gap: 8px;
+                flex-wrap: nowrap;        /* prevent stacking */
+            }
+            .date-group .filter-item {
+                flex: 1;                  /* equal width */
             }
 
             .filter-item .form-control,
@@ -371,6 +383,9 @@
                 font-size: 0.85rem;
                 line-height: 1.6;
                 padding-bottom: 3px;
+            }
+            .date-group {
+                flex-wrap: wrap;
             }
 
             .filter-item .form-control,
@@ -403,6 +418,7 @@
             font-size: 0.8em;
             color: #6c757d !important;
         }
+
     </style>
 </head>
 <body>
@@ -684,6 +700,7 @@
             <form method="POST" action="{{ url_for('invoices_menu') }}" id="editSearchForm">
                 <input type="hidden" name="section" value="edit">
                 <div class="filter-bar">
+                    <div class="date-group">
                     <div class="filter-item">
                         <label for="edit_start_date" class="form-label">Start Date</label>
                         <input type="date" class="form-control" id="edit_start_date" name="start_date" value="{{ default_start_date }}">
@@ -692,10 +709,11 @@
                         <label for="edit_end_date" class="form-label">End Date</label>
                         <input type="date" class="form-control" id="edit_end_date" name="end_date" value="{{ default_end_date }}">
                     </div>
+                    </div>
                     <div class="filter-item">
                         <label for="edit_category" class="form-label">Category</label>
                         <select class="form-control" id="edit_category" name="category">
-                            <option value="">All Categories</option>
+                            <option value="">Select Categories</option>
                                 {% for category in categories %}
                             <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
                                 {% endfor %}
@@ -704,7 +722,7 @@
                     <div class="filter-item">
                         <label for="edit_account_owner" class="form-label">Account Owner</label>
                         <select class="form-control" id="edit_account_owner" name="account_owner">
-                            <option value="">All Account Owners</option>
+                            <option value="">Select Account Owners</option>
                                 {% for account_owner in account_owners %}
                             <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
                                 {% endfor %}
@@ -790,7 +808,7 @@
                     <div class="filter-item">
                         <label for="receive_category" class="form-label">Category</label>
                         <select class="form-control" id="receive_category" name="category">
-                            <option value="">All Categories</option>
+                            <option value="">Select Categories</option>
                                 {% for category in categories %}
                             <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
                                 {% endfor %}
@@ -799,7 +817,7 @@
                     <div class="filter-item">
                         <label for="receive_account_owner" class="form-label">Account Owner</label>
                         <select class="form-control" id="receive_account_owner" name="account_owner">
-                            <option value="">All Account Owners</option>
+                            <option value="">Select Account Owners</option>
                                 {% for account_owner in account_owners %}
                             <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
                                 {% endfor %}
@@ -1094,6 +1112,7 @@
                                 <label class="form-label">Invoice Amount</label>
                                 <input type="number" class="form-control" name="invoice_amount" id="receive_modal_invoice_amount" readonly>
                             </div>
+                            <!--
                             <div class="col-md-6">
                                 <label class="form-label">Paid amount</label>
                                 <input type="number" step="0.01" min="0" class="form-control editable-field" name="paid_amount" id="receive_modal_paid_amount">
@@ -1101,6 +1120,20 @@
                                     Paid amount cannot exceed the invoice amount (Ksh <span id="invoiceAmountDisplay">0.00</span>)
                                 </div>
                             </div>
+                            -->
+                            <div class="col-md-6">
+                                <label class="form-label">Amount Paid already</label>
+                                <input type="number" class="form-control" id="receive_modal_total_paid" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Pay amount</label>
+                                <input type="number" step="0.01" min="0" class="form-control editable-field"
+                                       id="receive_modal_payment_now">
+                                <div id="paymentNowError" class="invalid-feedback" style="display: none;">
+                                    Payment exceeds remaining balance (Ksh <span id="remainingBalanceDisplay">0.00</span>)
+                                </div>
+                            </div>
+
                             <div class="col-md-6">
                                 <label class="form-label">Balance</label>
                                 <input type="number" class="form-control" name="balance" id="receive_modal_balance" readonly>
@@ -2104,163 +2137,172 @@
                 document.getElementById('receive_detail_status').textContent = clickableRow.getAttribute('data-status');
             });
 
-            receiveInvoiceBtn.addEventListener('click', function() {
-                // Close details modal
-                const receiveDetailsModalInstance = bootstrap.Modal.getInstance(receiveDetailsModal);
-                receiveDetailsModalInstance.hide();
+            // Receive payment functionality
+receiveInvoiceBtn.addEventListener('click', function() {
+    // Close details modal
+    const receiveDetailsModalInstance = bootstrap.Modal.getInstance(receiveDetailsModal);
+    receiveDetailsModalInstance.hide();
 
-                // Open edit modal and populate data
-                const receiveModal = new bootstrap.Modal(document.getElementById('receiveModal'));
+    // Open edit modal and populate data
+    const receiveModal = new bootstrap.Modal(document.getElementById('receiveModal'));
 
-                // Find the row that was clicked
-                const clickableRow = document.querySelector(`.clickable-row[data-sales-list-id="${currentInvoiceId}"]`);
+    // Find the row that was clicked
+    const clickableRow = document.querySelector(`.clickable-row[data-sales-list-id="${currentInvoiceId}"]`);
 
-                // Populate edit modal
-                document.getElementById('modalSalesListId').value = currentInvoiceId;
-                document.getElementById('receive_modal_invoice_date').value = clickableRow.getAttribute('data-invoice-date');
-                document.getElementById('receive_modal_invoice_no').value = clickableRow.getAttribute('data-invoice-no');
-                document.getElementById('receive_modal_customer_name').value = clickableRow.getAttribute('data-customer-name');
-                document.getElementById('receive_modal_invoice_amount').value = clickableRow.getAttribute('data-invoice-amount');
-                document.getElementById('receive_modal_paid_amount').value = clickableRow.getAttribute('data-paid-amount');
-                document.getElementById('receive_modal_balance').value = clickableRow.getAttribute('data-balance');
-                document.getElementById('receive_modal_category').value = clickableRow.getAttribute('data-category');
-                document.getElementById('receive_modal_account_owner').value = clickableRow.getAttribute('data-account-owner');
-                document.getElementById('receive_modal_status').value = clickableRow.getAttribute('data-status');
+    // Populate edit modal
+    document.getElementById('modalSalesListId').value = currentInvoiceId;
+    document.getElementById('receive_modal_invoice_date').value = clickableRow.getAttribute('data-invoice-date');
+    document.getElementById('receive_modal_invoice_no').value = clickableRow.getAttribute('data-invoice-no');
+    document.getElementById('receive_modal_customer_name').value = clickableRow.getAttribute('data-customer-name');
+    document.getElementById('receive_modal_invoice_amount').value = clickableRow.getAttribute('data-invoice-amount');
+    document.getElementById('receive_modal_total_paid').value = clickableRow.getAttribute('data-paid-amount');
+    document.getElementById('receive_modal_payment_now').value = 0;
+    document.getElementById('receive_modal_balance').value = clickableRow.getAttribute('data-balance');
+    document.getElementById('receive_modal_category').value = clickableRow.getAttribute('data-category');
+    document.getElementById('receive_modal_account_owner').value = clickableRow.getAttribute('data-account-owner');
+    document.getElementById('receive_modal_status').value = clickableRow.getAttribute('data-status');
 
-                receiveModal.show();
-            });
+    receiveModal.show();
+});
 
-            // Calculate balance when paid amount changes
-            document.getElementById('receive_modal_paid_amount').addEventListener('input', function() {
-                const paidAmountError = document.getElementById('paidAmountError');
-                const invoiceAmountDisplay = document.getElementById('invoiceAmountDisplay');
-                const invoiceAmount = parseFloat(document.getElementById('receive_modal_invoice_amount').value) || 0;
-                const paidAmount = parseFloat(this.value) || 0;
-                const balance = Math.max(0, invoiceAmount - paidAmount);
+// Real-time payment validation
+const paymentNowInput = document.getElementById('receive_modal_payment_now');
+paymentNowInput.addEventListener('input', function () {
+    const totalPaid = parseFloat(document.getElementById('receive_modal_total_paid').value) || 0;
+    const invoiceAmount = parseFloat(document.getElementById('receive_modal_invoice_amount').value) || 0;
+    const paymentNow = parseFloat(this.value) || 0;
 
-                invoiceAmountDisplay.textContent = invoiceAmount.toLocaleString('en-US', {
-                    minimumFractionDigits: 2
-                });
-                document.getElementById('receive_modal_balance').value = balance.toFixed(2);
-                const statusField = document.getElementById('receive_modal_status');
-                statusField.value = balance === 0 ? 'Paid' : 'Not Paid';
+    const newTotal = totalPaid + paymentNow;
+    const remaining = Math.max(0, invoiceAmount - newTotal);
 
-                const paidAmountInput = document.getElementById('receive_modal_paid_amount');
-                if (paidAmount > invoiceAmount) {
-                    paidAmountInput.classList.add('is-invalid');
-                    paidAmountError.style.display = 'block';
-                    return false;
-                } else {
-                    paidAmountInput.classList.remove('is-invalid');
-                    paidAmountError.style.display = 'none';
-                    return true;
-                }
-            });
+    document.getElementById('remainingBalanceDisplay').textContent =
+        (invoiceAmount - totalPaid).toLocaleString('en-US', { minimumFractionDigits: 2 });
 
-            document.getElementById('receiveForm').addEventListener('submit', function(e) {
-                e.preventDefault();
+    document.getElementById('receive_modal_balance').value = remaining.toFixed(2);
+    document.getElementById('receive_modal_status').value = remaining === 0 ? 'Paid' : 'Not Paid';
 
-                document.getElementById('fullPageLoader').style.display = 'flex';
-                const btn = document.getElementById('saveReceiveChangesBtn');
-                const text = document.getElementById('saveReceiveChangesText');
-                const spinner = document.getElementById('saveReceiveChangesSpinner');
+    if (newTotal > invoiceAmount) {
+        paymentNowInput.classList.add('is-invalid');
+        document.getElementById('paymentNowError').style.display = 'block';
+    } else {
+        paymentNowInput.classList.remove('is-invalid');
+        document.getElementById('paymentNowError').style.display = 'none';
+    }
+});
 
-                btn.disabled = true;
-                text.textContent = 'Saving...';
-                spinner.classList.remove('d-none');
+// Form submission
+document.getElementById('receiveForm').addEventListener('submit', function(e) {
+    e.preventDefault();
 
-                const formData = {
-                    sales_list_id: document.getElementById('modalSalesListId').value,
-                    invoice_date: document.getElementById('receive_modal_invoice_date').value,
-                    invoice_no: document.getElementById('receive_modal_invoice_no').value,
-                    customer_name: document.getElementById('receive_modal_customer_name').value,
-                    invoice_amount: document.getElementById('receive_modal_invoice_amount').value,
-                    paid_amount: document.getElementById('receive_modal_paid_amount').value,
-                    balance: document.getElementById('receive_modal_balance').value,
-                    category: document.getElementById('receive_modal_category').value,
-                    account_owner: document.getElementById('receive_modal_account_owner').value,
-                    status: document.getElementById('receive_modal_status').value
-                };
+    document.getElementById('fullPageLoader').style.display = 'flex';
+    const btn = document.getElementById('saveReceiveChangesBtn');
+    const text = document.getElementById('saveReceiveChangesText');
+    const spinner = document.getElementById('saveReceiveChangesSpinner');
 
-                const salesListId = document.getElementById('modalSalesListId').value;
+    btn.disabled = true;
+    text.textContent = 'Saving...';
+    spinner.classList.remove('d-none');
 
-                fetch(`/record_payment/${salesListId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(formData)
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    // Success handling - show download button and let user decide when to refresh
-                    if (data.success) {
-                        // Create success message with download button
-                        const successMessage = `
-                            ${data.message}
-                            <button onclick="downloadAndRefresh('${data.download_url}')"
-                                    class="btn btn-sm btn-success ms-2">
-                                <i class="bi bi-download"></i> Download Receipt
-                            </button>
-                        `;
+    const formData = {
+        sales_list_id: document.getElementById('modalSalesListId').value,
+        invoice_date: document.getElementById('receive_modal_invoice_date').value,
+        invoice_no: document.getElementById('receive_modal_invoice_no').value,
+        customer_name: document.getElementById('receive_modal_customer_name').value,
+        invoice_amount: parseFloat(document.getElementById('receive_modal_invoice_amount').value),
+        payment_now: parseFloat(document.getElementById('receive_modal_payment_now').value), // Key field
+        balance: parseFloat(document.getElementById('receive_modal_balance').value),
+        category: document.getElementById('receive_modal_category').value,
+        account_owner: document.getElementById('receive_modal_account_owner').value,
+        status: document.getElementById('receive_modal_status').value
+    };
 
-                        // Create and show Bootstrap alert
-                        const alertDiv = document.createElement('div');
-                        alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                        alertDiv.role = 'alert';
-                        alertDiv.innerHTML = `
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>${successMessage}</div>
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        `;
+    const salesListId = document.getElementById('modalSalesListId').value;
 
-                        // Insert the alert at the top of the container
-                        const container = document.querySelector('.main-container');
-                        container.insertBefore(alertDiv, container.firstChild);
+    fetch(`/record_payment/${salesListId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            // Create success message with download button
+            const successMessage = `
+                ${data.message}
+                <button onclick="downloadAndRefresh('${data.download_url}')"
+                        class="btn btn-sm btn-success ms-2">
+                    <i class="bi bi-download"></i> Download Receipt
+                </button>
+            `;
 
-                        // Close the modal
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('receiveModal'));
-                        modal.hide();
-
-                        // Hide the full page loader
-                        document.getElementById('fullPageLoader').style.display = 'none';
-
-                        // Auto-trigger download and refresh (optional - uncomment if you want automatic download)
-                        // downloadAndRefresh(data.download_url);
-                    } else {
-                        showErrorAlert(data.message || 'An error occurred');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showErrorAlert(error.message || 'An error occurred while saving changes');
-                })
-                .finally(() => {
-                    btn.disabled = false;
-                    text.textContent = 'Save Changes';
-                    spinner.classList.add('d-none');
-                });
-            });
-
-            // Helper function to show error alerts
-            function showErrorAlert(message) {
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-                alertDiv.role = 'alert';
-                alertDiv.innerHTML = `
-                    ${message}
+            // Create and show Bootstrap alert
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.role = 'alert';
+            alertDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>${successMessage}</div>
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                `;
+                </div>
+            `;
 
-                const container = document.querySelector('.main-container');
-                container.insertBefore(alertDiv, container.firstChild);
-            }
+            // Insert the alert at the top of the container
+            const container = document.querySelector('.main-container');
+            container.insertBefore(alertDiv, container.firstChild);
+
+            // Close the modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('receiveModal'));
+            modal.hide();
+
+            // Hide the full page loader
+            document.getElementById('fullPageLoader').style.display = 'none';
+        } else {
+            showErrorAlert(data.message || 'An error occurred');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showErrorAlert(error.message || 'An error occurred while saving changes');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        text.textContent = 'Save Changes';
+        spinner.classList.add('d-none');
+        document.getElementById('fullPageLoader').style.display = 'none';
+    });
+});
+
+// Helper function to show error alerts
+function showErrorAlert(message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+    alertDiv.role = 'alert';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+
+    const container = document.querySelector('.main-container');
+    container.insertBefore(alertDiv, container.firstChild);
+}
+
+// Download and refresh function
+function downloadAndRefresh(downloadUrl) {
+    // Download the receipt
+    window.open(downloadUrl, '_blank');
+
+    // Refresh the page after a short delay
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
 
 
             // Optional: Add event listener for download buttons if they exist on page load
