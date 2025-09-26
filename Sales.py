@@ -31,6 +31,7 @@ from email.utils import formataddr
 from psycopg2 import pool
 import threading
 from contextlib import contextmanager
+import traceback
 # Load environment variables
 load_dotenv()
 
@@ -58,6 +59,14 @@ GMAIL_PASS = os.getenv("GMAIL_PASS")
 # Database connection pool (at the module level, not inside any function)
 connection_pool = None
 pool_lock = threading.Lock()
+
+ERROR_LOG_FILE = "error_log.txt"
+
+
+def log_error_to_file(error_message):
+    """Append error details with a timestamp to error_log.txt"""
+    with open(ERROR_LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.utcnow().isoformat()}] {error_message}\n")
 
 
 def initialize_db_pool():
@@ -87,14 +96,35 @@ def get_db_connection2():
     try:
         with pool_lock:
             connection = connection_pool.getconn()
+
+        # Check if the connection is alive
+        with connection.cursor() as cur:
+            cur.execute("SELECT 1")
+
         yield connection
-    except Exception as e:
+
+        # Only commit if no exception occurred
+        connection.commit()
+
+    except psycopg2.OperationalError as e:
+        # Connection dropped; log and re-raise
+        log_error_to_file("Database OperationalError", e)
         if connection:
-            connection.rollback()
-        raise e
+            try:
+                connection.rollback()
+            except Exception:
+                pass
+        raise
+    except Exception as e:
+        log_error_to_file("Database Error", e)
+        if connection:
+            try:
+                connection.rollback()
+            except Exception:
+                pass
+        raise
     finally:
         if connection:
-            connection.commit()
             with pool_lock:
                 connection_pool.putconn(connection)
 
@@ -105,7 +135,7 @@ initialize_db_pool()
 
 @app.route('/admin')
 def admin_menu():
-    return render_template('/admin/admin_menu.html')
+    return render_template('/admin/acc_admin_menu.html')
 
 
 @app.route('/admin/create_invite', methods=['POST'])
@@ -174,15 +204,8 @@ def show_invite_form():
     return render_template('/organizations/create_invite.html')
 
 
-ERROR_LOG_FILE = os.path.join(os.path.dirname(__file__), "error_log.txt")
-
-def log_error_to_file(error_message):
-    """Append error details with a timestamp to error_log.txt"""
-    with open(ERROR_LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"[{datetime.utcnow().isoformat()}] {error_message}\n")
-
 @app.route('/onboard/<token>', methods=['GET', 'POST'])
-def onboard_superuser(token):
+def onboard_admin(token):
     with get_db_connection2() as conn:
         cur = conn.cursor()
         try:
@@ -268,7 +291,7 @@ def onboard_superuser(token):
                         INSERT INTO org_users (username, password, role, full_name, email, phone_number, org_id)
                         VALUES (%s, %s, %s, %s, %s, %s, %s)
                         RETURNING user_id
-                    """, (email, password_hash, 1, full_name, email, phone_number, org_id))
+                    """, (email, password_hash, 2, full_name, email, phone_number, org_id))
 
                     user_id = cur.fetchone()[0]
 
@@ -291,7 +314,7 @@ def onboard_superuser(token):
                     # Set up session for the new user
                     session['user_id'] = user_id
                     session['username'] = email
-                    session['role'] = 1
+                    session['role'] = 2
                     session['org_id'] = org_id
                     session['needs_subscription'] = True
 
@@ -318,6 +341,7 @@ def onboard_superuser(token):
         except Exception as e:
             log_error_to_file(f"Outer Block Error: {str(e)} Token: {token}")
             return "An unexpected error occurred. Please try again later.", 500
+
 
 def generate_next_org_id():
     """Generate next org_id in format aaaa, aaab, aaac, etc."""
@@ -424,6 +448,8 @@ def create_tenant_tables(org_id):
             CREATE TABLE IF NOT EXISTS {org_id}_users (
                 user_id SERIAL PRIMARY KEY,
                 username VARCHAR(255) NOT NULL,
+                full_name VARCHAR(255) NOT NULL,
+                full_name VARCHAR(255) NOT NULL,
                 role INTEGER NOT NULL,
                 password VARCHAR(255) NOT NULL,
                 status VARCHAR(255) NOT NULL DEFAULT 'Active',
@@ -578,10 +604,15 @@ def create_tenant_tables(org_id):
 @app.route('/subscription_required')
 def subscription_required():
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('org_login'))
+
+    # Only superusers can access this page
+    if session.get('role') != 2:
+        flash('Only organization owners can manage subscriptions.', 'warning')
+        return redirect(url_for('org_login'))
 
     # Get available subscription products
-    with get_db_connection2() as conn:
+    with get_db_connection() as conn:
         cur = conn.cursor()
         cur.execute("""
             SELECT product_id, product_name, description, price_per_unit, duration_days
@@ -591,7 +622,9 @@ def subscription_required():
         """)
         products = cur.fetchall()
 
-    return render_template('subscription/subscription_required.html', products=products)
+    return render_template('subscriptions/subscription_required.html',
+                           products=products,
+                           org_id=session.get('org_id'))
 
 
 # MPESA API Configuration
@@ -994,77 +1027,135 @@ def generate_receipt(receipt_data, filename):
 
 
 @app.route('/', methods=['GET', 'POST'])
-def login():
+def org_login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        with get_db_connection2() as conn:
-            cur = conn.cursor()
 
-        # conn = get_db_connection()
-        # cur = conn.cursor()
-            cur.execute("SELECT user_id, username, password, role FROM users WHERE username = %s", (username,))
-            user = cur.fetchone()
-        # cur.close()
-        # conn.close()
+        try:
+            with get_db_connection2() as conn:
+                cur = conn.cursor()
+                # Get user with org_id
+                cur.execute("""
+                    SELECT user_id, username, password, role, org_id 
+                    FROM org_users 
+                    WHERE username = %s
+                """, (username,))
+                user = cur.fetchone()
+        except Exception as e:
+            # Log full traceback for diagnosis
+            log_error_to_file(
+                f"org_login DB query failed: {str(e)}\n{traceback.format_exc()}"
+            )
+            flash("Database error occurred. Please try again later.", "danger")
+            return render_template("login.html")
 
-        if user and check_password_hash(user[2], password):
-            session['user_id'] = user[0]
-            session['username'] = user[1]
-            session['role'] = user[3]
+        try:
+            if user and check_password_hash(user[2], password):
+                user_id, username, password_hash, role, org_id = user
 
-            # # Check subscription status
-            # subscription_status = check_user_subscription(user[0])
+                # Set up session
+                session['user_id'] = user_id
+                session['username'] = username
+                session['role'] = role
+                session['org_id'] = org_id
 
-            # # Store subscription status in session
-            # session['subscription_active'] = subscription_status['active']
+                if role != 1:
+                    subscription_status = check_org_subscription(org_id)
+                    session['subscription_active'] = subscription_status['active']
 
-            # Redirect based on role
-            if user[3] == 1:
-                return redirect(url_for('superuser_dashboard'))
-            elif user[3] == 2:
-                return redirect(url_for('admin_dashboard'))
+                    if not subscription_status['active']:
+                        flash(
+                            'Your organization subscription has expired. Please renew to continue.',
+                            'warning'
+                        )
+                        return redirect(url_for('subscription_required'))
+                else:
+                    # For Super User, always mark subscription as active
+                    session['subscription_active'] = True
+
+                # Redirect based on role
+                if role == 1:
+                    return redirect(url_for('superuser_dashboard'))
+                elif role == 2:
+                    return redirect(url_for('admin_dashboard'))
+                else:
+                    return redirect(url_for('user_dashboard'))
             else:
-                return redirect(url_for('user_dashboard'))
-        else:
-            flash('Invalid username or password', 'danger')
+                flash('Invalid username or password', 'danger')
+        except Exception as e:
+            log_error_to_file(
+                f"org_login authentication/logic error: {str(e)}\n{traceback.format_exc()}"
+            )
+            flash("Unexpected error during login. Please try again later.", "danger")
 
     return render_template('login.html')
 
 
-# User dashboard route
-@app.route('/user_dashboard')
-def user_dashboard():
-    # Redirect if user is not logged in or not role 3
-    if 'user_id' not in session or session.get('role') != 3:
-        return redirect(url_for('login'))
+def check_org_subscription(org_id):
+    """Check if organization has an active subscription"""
+    try:
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
 
-    # # Code below now runs only if the user is valid
-    # subscription_status = check_user_subscription(session['user_id'])
-    # products = get_active_products()
+            # Get the superuser for this organization
+            cur.execute("""
+                SELECT superuser_id FROM organizations WHERE org_id = %s
+            """, (org_id,))
+            org_result = cur.fetchone()
+            if not org_result:
+                return {'active': False, 'message': 'Organization not found'}
 
-    return render_template('user_dashboard.html')
-    # return render_template(
-    #     'user_dashboard.html',
-    #     subscription_status=subscription_status,
-    #     products=products
-    # )
+            superuser_id = org_result[0]
+
+            # Check subscription for the superuser (organization owner)
+            cur.execute("""
+                SELECT subscription_id, start_date, end_date, status 
+                FROM subscriptions 
+                WHERE user_id = %s 
+                ORDER BY end_date DESC 
+                LIMIT 1
+            """, (superuser_id,))
+            subscription = cur.fetchone()
+
+            if not subscription:
+                return {'active': False, 'message': 'No subscription found for organization'}
+
+            subscription_id, start_date, end_date, status = subscription
+            current_date = datetime.now().date()
+
+            if status == 'active' and end_date >= current_date:
+                return {'active': True, 'end_date': end_date, 'org_id': org_id}
+            else:
+                return {'active': False, 'message': 'Organization subscription expired', 'end_date': end_date}
+
+    except Exception as e:
+        log_error_to_file(
+            f"check_org_subscription error (org_id={org_id}): {str(e)}\n{traceback.format_exc()}"
+        )
+        return {'active': False, 'message': f'Error checking subscription: {str(e)}'}
 
 
-# Admin dashboard route
-@app.route('/admin_dashboard')
-def admin_dashboard():
-    if 'user_id' not in session or session.get('role') != 2:
-        return redirect(url_for('login'))
-
-    # # Check subscription status for admin too (if needed)
-    # subscription_status = check_user_subscription(session['user_id'])
-    # products = get_active_products()
-    return render_template('admin_dashboard.html')
-    # return render_template('admin_dashboard.html', subscription_status=subscription_status,
-    #     products=products)
-
-
+# Superuser dashboard route
+# @app.route('/superuser_dashboard')
+# def superuser_dashboard():
+#     if 'user_id' not in session or session.get('role') != 1:
+#         return redirect(url_for('org_login'))
+#
+#     # Check if user has org_id in session
+#     if 'org_id' not in session:
+#         flash('Session expired. Please login again.', 'warning')
+#         return redirect(url_for('org_login'))
+#
+#     # Double-check subscription status
+#     subscription_status = check_org_subscription(session['org_id'])
+#     if not subscription_status['active']:
+#         flash('Your subscription has expired. Please renew to continue.', 'warning')
+#         return redirect(url_for('subscription_required'))
+#
+#     return render_template('superuser_dashboard.html',
+#                            org_id=session['org_id'],
+#                            subscription_status=subscription_status)
 # Superuser dashboard route
 @app.route('/superuser_dashboard')
 def superuser_dashboard():
@@ -1077,6 +1168,123 @@ def superuser_dashboard():
     # return render_template('superuser_dashboard.html', subscription_status=subscription_status,
     #                        products=products)
 
+
+# Admin dashboard route
+@app.route('/admin_dashboard')
+def admin_dashboard():
+    if 'user_id' not in session or session.get('role') != 2:
+        return redirect(url_for('org_login'))
+
+    # Check if user has org_id in session
+    if 'org_id' not in session:
+        flash('Session expired. Please login again.', 'warning')
+        return redirect(url_for('org_login'))
+
+    # Check subscription status
+    subscription_status = check_org_subscription(session['org_id'])
+    if not subscription_status['active']:
+        flash('Your organization subscription has expired. Please contact your administrator.', 'warning')
+        return redirect(url_for('org_login'))  # Admins can't renew, redirect to login
+
+    return render_template('admin_dashboard.html',
+                           org_id=session['org_id'],
+                           subscription_status=subscription_status)
+
+
+# User dashboard route
+@app.route('/user_dashboard')
+def user_dashboard():
+    if 'user_id' not in session or session.get('role') != 3:
+        return redirect(url_for('org_login'))
+
+    # Check if user has org_id in session
+    if 'org_id' not in session:
+        flash('Session expired. Please login again.', 'warning')
+        return redirect(url_for('org_login'))
+
+    # Check subscription status
+    subscription_status = check_org_subscription(session['org_id'])
+    if not subscription_status['active']:
+        flash('Your organization subscription has expired. Please contact your administrator.', 'warning')
+        return redirect(url_for('org_login'))
+
+    return render_template('user_dashboard.html',
+                           org_id=session['org_id'],
+                           subscription_status=subscription_status)
+
+
+# @app.route('/', methods=['GET', 'POST'])
+# def login():
+#     if request.method == 'POST':
+#         username = request.form['username']
+#         password = request.form['password']
+#         with get_db_connection2() as conn:
+#             cur = conn.cursor()
+#
+#         # conn = get_db_connection()
+#         # cur = conn.cursor()
+#             cur.execute("SELECT user_id, username, password, role FROM users WHERE username = %s", (username,))
+#             user = cur.fetchone()
+#         # cur.close()
+#         # conn.close()
+#
+#         if user and check_password_hash(user[2], password):
+#             session['user_id'] = user[0]
+#             session['username'] = user[1]
+#             session['role'] = user[3]
+#
+#             # # Check subscription status
+#             # subscription_status = check_user_subscription(user[0])
+#
+#             # # Store subscription status in session
+#             # session['subscription_active'] = subscription_status['active']
+#
+#             # Redirect based on role
+#             if user[3] == 1:
+#                 return redirect(url_for('superuser_dashboard'))
+#             elif user[3] == 2:
+#                 return redirect(url_for('admin_dashboard'))
+#             else:
+#                 return redirect(url_for('user_dashboard'))
+#         else:
+#             flash('Invalid username or password', 'danger')
+#
+#     return render_template('login.html')
+
+
+# User dashboard route
+# @app.route('/user_dashboard')
+# def user_dashboard():
+#     # Redirect if user is not logged in or not role 3
+#     if 'user_id' not in session or session.get('role') != 3:
+#         return redirect(url_for('login'))
+#
+#     # # Code below now runs only if the user is valid
+#     # subscription_status = check_user_subscription(session['user_id'])
+#     # products = get_active_products()
+#
+#     return render_template('user_dashboard.html')
+#     # return render_template(
+#     #     'user_dashboard.html',
+#     #     subscription_status=subscription_status,
+#     #     products=products
+#     # )
+#
+#
+# # Admin dashboard route
+# @app.route('/admin_dashboard')
+# def admin_dashboard():
+#     if 'user_id' not in session or session.get('role') != 2:
+#         return redirect(url_for('login'))
+#
+#     # # Check subscription status for admin too (if needed)
+#     # subscription_status = check_user_subscription(session['user_id'])
+#     # products = get_active_products()
+#     return render_template('admin_dashboard.html')
+#     # return render_template('admin_dashboard.html', subscription_status=subscription_status,
+#     #     products=products)
+#
+#
 
 # @app.route('/check_subscription_status')
 # def check_subscription_status():
@@ -3028,104 +3236,362 @@ def view_sales(sales_id):
 """
 
 
+# # Manage users route
+# @app.route('/manage_users')
+# def manage_users():
+#     if 'user_id' not in session:
+#         return redirect(url_for('login'))
+#
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+#
+#     # If user has role 3, only fetch their own information
+#     if session.get('role') == 3:
+#         cur.execute("""
+#             SELECT u.user_id, u.username, r.role_name, u.status
+#             FROM users u
+#                 JOIN roles r ON u.role = r.role_id
+#             WHERE u.user_id = %s
+#         """, (session['user_id'],))
+#     # For roles 1 and 2, fetch all users as before
+#     elif session.get('role') in [1, 2]:
+#         cur.execute("""
+#             SELECT u.user_id, u.username, r.role_name, u.status
+#             FROM users u
+#                 JOIN roles r ON u.role = r.role_id
+#             ORDER BY u.user_id ASC
+#         """)
+#     # If role is not 1, 2, or 3, redirect (or handle as you prefer)
+#     else:
+#         cur.close()
+#         conn.close()
+#         return redirect(url_for('login'))  # or some other page
+#
+#     users = cur.fetchall()
+#     cur.close()
+#     conn.close()
+#
+#     return render_template('manage_users.html', users=users)
+#
+#
+# # Add users route
+# @app.route('/add_user', methods=['GET', 'POST'])
+# def add_user():
+#     if 'user_id' not in session:
+#         return redirect(url_for('login'))
+#
+#     if session.get('role') not in [1, 2]:
+#         flash('Access denied', 'danger')
+#         return redirect(url_for('manage_users'))
+#
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+#
+#     cur.execute("SELECT role_id, role_name FROM roles")
+#     roles = cur.fetchall()
+#
+#     if request.method == 'POST':
+#         username = request.form['username']
+#         role_id = request.form['role']
+#         password = request.form['password']
+#         confirm_password = request.form['confirm_password']
+#
+#         error = validate_password(password)
+#         if error:
+#             flash(error, "danger")
+#             selected_role = int(role_id)
+#             return render_template('add_users.html', roles=roles, username=username, selected_role=selected_role)
+#
+#         if password != confirm_password:
+#             flash("Passwords do not match!", "danger")
+#             selected_role = int(role_id)
+#             return render_template('add_users.html', roles=roles, username=username, selected_role=selected_role)
+#
+#         hashed_password = generate_password_hash(password)
+#
+#         try:
+#             cur.execute("""
+#                 INSERT INTO users (username, role, password)
+#                 VALUES (%s, %s, %s)
+#             """, (username, role_id, hashed_password))
+#             conn.commit()
+#             flash('User added successfully!', 'success')
+#
+#             # Redirect to manage users page
+#             return redirect(url_for('manage_users'))
+#
+#         except Exception as e:
+#             conn.rollback()
+#             flash(f'Error: {str(e)}', 'danger')
+#             return render_template('add_users.html', roles=roles, username=username, selected_role=role_id)
+#
+#         finally:
+#             cur.close()
+#             conn.close()
+#     else:
+#         # GET: fetch roles for dropdown
+#         cur.execute("SELECT role_id, role_name FROM roles")
+#         roles = cur.fetchall()
+#         cur.close()
+#         conn.close()
+#         return render_template('add_users.html', roles=roles)
+#
+#
+# # Change Password Route
+# @app.route('/change_password/<int:user_id>', methods=['GET', 'POST'])
+# def change_password(user_id):
+#     if 'user_id' not in session:
+#         return redirect(url_for('login'))
+#
+#     if session['user_id'] != user_id:
+#         flash("You can only change your own password.", "danger")
+#         return redirect(url_for('manage_users'))
+#
+#     if request.method == 'POST':
+#         user_id = session['user_id']
+#         old_password = request.form['old_password']
+#         new_password = request.form['new_password']
+#         confirm_password = request.form['confirm_password']
+#
+#         error = validate_password(new_password)
+#         if error:
+#             flash(error, "danger")
+#             return redirect(url_for('change_password'))
+#         if new_password != confirm_password:
+#             flash("Passwords do not match!", "danger")
+#             return redirect(url_for('change_password', user_id=user_id))
+#
+#         conn = get_db_connection()
+#         cur = conn.cursor()
+#
+#         cur.execute("SELECT password FROM users WHERE user_id = %s", (user_id,))
+#         user = cur.fetchone()
+#
+#         if user and check_password_hash(user[0], old_password):
+#             hashed_password = generate_password_hash(new_password)
+#             cur.execute("UPDATE users SET password = %s WHERE user_id = %s", (hashed_password, user_id))
+#             conn.commit()
+#             flash('Password changed successfully!', 'success')
+#         else:
+#             flash('Old password is incorrect!', 'danger')
+#
+#         cur.close()
+#         conn.close()
+#
+#         return redirect(url_for('change_password', user_id=user_id))
+#
+#     return render_template('change_password.html')
+#
+#
+# # User details route
+# @app.route('/user_details/<int:user_id>')
+# def user_details(user_id):
+#     if 'user_id' not in session:
+#         flash("Please log in first.", "warning")
+#         return redirect(url_for('org_login'))
+#
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+#
+#     try:
+#         if session.get('role') == 1 or session.get('role') == 2:
+#             cur.execute("""
+#             SELECT u.user_id, u.username, r.role_name FROM users u
+#             JOIN roles r
+#             ON u.role = r.role_id
+#             WHERE u.user_id = %s
+#             """, (user_id,))
+#         else:
+#             cur.execute("""
+#             SELECT u.user_id, u.username, r.role_name FROM users u
+#             JOIN roles r
+#             ON u.role = r.role_id
+#             WHERE u.user_id = %s
+#             AND u.user_id = %s
+#             """, (user_id, session['user_id']))
+#
+#         user = cur.fetchone()
+#
+#         if not user:
+#             flash("User not found or access denied.", "danger")
+#             return redirect(url_for('manage_users'))
+#
+#         return render_template('user_details.html', user=user)
+#
+#     except Exception as e:
+#         flash(f"Error: {str(e)}", "danger")
+#         return redirect(url_for('manage_users'))
+#     finally:
+#         cur.close()
+#         conn.close()
+#
+#
+# # Edit User information route
+# @app.route('/edit_users/<int:user_id>', methods=['GET', 'POST'])
+# def edit_users(user_id):
+#     if 'user_id' not in session:
+#         return redirect(url_for('login'))
+#
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+#
+#     if session.get('role') not in [1, 2]:
+#         flash('Access denied', 'danger')
+#         return redirect(url_for('manage_users'))
+#
+#     if request.method == 'POST':
+#         # Get data from form
+#         username = request.form.get('username')
+#         role_id = request.form.get('role')
+#         status = request.form.get('status')
+#
+#         try:
+#             # Update user in the database
+#             cur.execute("""
+#                 UPDATE users
+#                 SET username = %s, role = %s, status = %s
+#                 WHERE user_id = %s
+#             """, (username, role_id, status, user_id))
+#             conn.commit()
+#             flash("User updated successfully", "success")
+#             return redirect(url_for('manage_users'))
+#         except Exception as e:
+#             conn.rollback()
+#             flash(f"Failed to update user: {e}", "danger")
+#         finally:
+#             cur.close()
+#             conn.close()
+#     else:
+#         try:
+#             # Fetch user details
+#             cur.execute("""
+#                 SELECT u.user_id, u.username, r.role_id, r.role_name, u.status
+#                 FROM users u
+#                 JOIN roles r ON u.role = r.role_id
+#                 WHERE u.user_id = %s
+#             """, (user_id,))
+#             user = cur.fetchone()
+#
+#             # Fetch all roles for the dropdown
+#             cur.execute("SELECT role_id, role_name FROM roles")
+#             roles = cur.fetchall()
+#
+#             if not user:
+#                 flash("User not found or access denied", "danger")
+#                 return redirect(url_for('manage_users'))
+#
+#             return render_template('edit_users.html', user=user, roles=roles)
+#
+#         except Exception as e:
+#             flash(f"Error fetching user: {e}", "danger")
+#             return redirect(url_for('manage_users'))
+#         finally:
+#             cur.close()
+#             conn.close()
 # Manage users route
 @app.route('/manage_users')
 def manage_users():
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('org_login'))
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    # Check org_id exists in session
+    if 'org_id' not in session:
+        flash('Session expired. Please login again.', 'warning')
+        return redirect(url_for('org_login'))
 
-    # If user has role 3, only fetch their own information
-    if session.get('role') == 3:
-        cur.execute("""
-            SELECT u.user_id, u.username, r.role_name, u.status
-            FROM users u
-                JOIN roles r ON u.role = r.role_id
-            WHERE u.user_id = %s
-        """, (session['user_id'],))
-    # For roles 1 and 2, fetch all users as before
-    elif session.get('role') in [1, 2]:
-        cur.execute("""
-            SELECT u.user_id, u.username, r.role_name, u.status
-            FROM users u
-                JOIN roles r ON u.role = r.role_id
-            ORDER BY u.user_id ASC
-        """)
-    # If role is not 1, 2, or 3, redirect (or handle as you prefer)
-    else:
-        cur.close()
-        conn.close()
-        return redirect(url_for('login'))  # or some other page
+    org_id = session['org_id']
 
-    users = cur.fetchall()
-    cur.close()
-    conn.close()
+    with get_db_connection() as conn:
+        cur = conn.cursor()
 
-    return render_template('manage_users.html', users=users)
+        # If user has role 3, only fetch their own information from tenant table
+        if session.get('role') == 3:
+            cur.execute(f"""
+                SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.status
+                FROM {org_id}_users u
+                WHERE u.user_id = %s
+            """, (session['user_id'],))
+        # For roles 1 and 2, fetch all users from their org tenant table
+        elif session.get('role') in [1, 2]:
+            cur.execute(f"""
+                SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.status
+                FROM {org_id}_users u
+                ORDER BY u.user_id ASC
+            """)
+        else:
+            return redirect(url_for('org_login'))
+
+        users = cur.fetchall()
+
+    return render_template('manage_users.html', users=users, org_id=org_id)
 
 
 # Add users route
 @app.route('/add_user', methods=['GET', 'POST'])
 def add_user():
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('org_login'))
 
     if session.get('role') not in [1, 2]:
         flash('Access denied', 'danger')
         return redirect(url_for('manage_users'))
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    # Check org_id exists in session
+    if 'org_id' not in session:
+        flash('Session expired. Please login again.', 'warning')
+        return redirect(url_for('org_login'))
 
-    cur.execute("SELECT role_id, role_name FROM roles")
-    roles = cur.fetchall()
+    org_id = session['org_id']
+
+    # Define roles (since we're not using a roles table in tenant structure)
+    roles = [
+        (2, 'Admin'),
+        (3, 'User')
+    ]
 
     if request.method == 'POST':
         username = request.form['username']
         role_id = request.form['role']
         password = request.form['password']
         confirm_password = request.form['confirm_password']
+        full_name = request.form.get('full_name', '')
+        email = request.form.get('email', '')
+        # phone_number = request.form.get('phone_number', '')
 
         error = validate_password(password)
         if error:
             flash(error, "danger")
             selected_role = int(role_id)
-            return render_template('add_users.html', roles=roles, username=username, selected_role=selected_role)
+            return render_template('add_users.html', roles=roles, username=username,
+                                   selected_role=selected_role, full_name=full_name,
+                                   email=email)
 
         if password != confirm_password:
             flash("Passwords do not match!", "danger")
             selected_role = int(role_id)
-            return render_template('add_users.html', roles=roles, username=username, selected_role=selected_role)
+            return render_template('add_users.html', roles=roles, username=username,
+                                   selected_role=selected_role, full_name=full_name,
+                                   email=email)
 
         hashed_password = generate_password_hash(password)
 
         try:
-            cur.execute("""
-                INSERT INTO users (username, role, password) 
-                VALUES (%s, %s, %s)
-            """, (username, role_id, hashed_password))
-            conn.commit()
-            flash('User added successfully!', 'success')
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(f"""
+                    INSERT INTO {org_id}_users (username, role, password, full_name, email,  org_id) 
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (username, role_id, hashed_password, full_name, email, org_id))
 
-            # Redirect to manage users page
+            flash('User added successfully!', 'success')
             return redirect(url_for('manage_users'))
 
         except Exception as e:
-            conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
-            return render_template('add_users.html', roles=roles, username=username, selected_role=role_id)
-
-        finally:
-            cur.close()
-            conn.close()
+            return render_template('add_users.html', roles=roles, username=username,
+                                   selected_role=role_id, full_name=full_name,
+                                   email=email)
     else:
-        # GET: fetch roles for dropdown
-        cur.execute("SELECT role_id, role_name FROM roles")
-        roles = cur.fetchall()
-        cur.close()
-        conn.close()
         return render_template('add_users.html', roles=roles)
 
 
@@ -3133,14 +3599,19 @@ def add_user():
 @app.route('/change_password/<int:user_id>', methods=['GET', 'POST'])
 def change_password(user_id):
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('org_login'))
 
     if session['user_id'] != user_id:
         flash("You can only change your own password.", "danger")
         return redirect(url_for('manage_users'))
 
+    if 'org_id' not in session:
+        flash('Session expired. Please login again.', 'warning')
+        return redirect(url_for('login'))
+
+    org_id = session['org_id']
+
     if request.method == 'POST':
-        user_id = session['user_id']
         old_password = request.form['old_password']
         new_password = request.form['new_password']
         confirm_password = request.form['confirm_password']
@@ -3148,27 +3619,24 @@ def change_password(user_id):
         error = validate_password(new_password)
         if error:
             flash(error, "danger")
-            return redirect(url_for('change_password'))
+            return redirect(url_for('change_password', user_id=user_id))
+
         if new_password != confirm_password:
             flash("Passwords do not match!", "danger")
             return redirect(url_for('change_password', user_id=user_id))
 
-        conn = get_db_connection()
-        cur = conn.cursor()
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(f"SELECT password FROM {org_id}_users WHERE user_id = %s", (user_id,))
+            user = cur.fetchone()
 
-        cur.execute("SELECT password FROM users WHERE user_id = %s", (user_id,))
-        user = cur.fetchone()
-
-        if user and check_password_hash(user[0], old_password):
-            hashed_password = generate_password_hash(new_password)
-            cur.execute("UPDATE users SET password = %s WHERE user_id = %s", (hashed_password, user_id))
-            conn.commit()
-            flash('Password changed successfully!', 'success')
-        else:
-            flash('Old password is incorrect!', 'danger')
-
-        cur.close()
-        conn.close()
+            if user and check_password_hash(user[0], old_password):
+                hashed_password = generate_password_hash(new_password)
+                cur.execute(f"UPDATE {org_id}_users SET password = %s WHERE user_id = %s",
+                            (hashed_password, user_id))
+                flash('Password changed successfully!', 'success')
+            else:
+                flash('Old password is incorrect!', 'danger')
 
         return redirect(url_for('change_password', user_id=user_id))
 
@@ -3180,106 +3648,127 @@ def change_password(user_id):
 def user_details(user_id):
     if 'user_id' not in session:
         flash("Please log in first.", "warning")
+        return redirect(url_for('org_login'))
+
+    if 'org_id' not in session:
+        flash('Session expired. Please login again.', 'warning')
         return redirect(url_for('login'))
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    org_id = session['org_id']
 
-    try:
-        if session.get('role') == 1 or session.get('role') == 2:
-            cur.execute("""
-            SELECT u.user_id, u.username, r.role_name FROM users u
-            JOIN roles r
-            ON u.role = r.role_id
-            WHERE u.user_id = %s
-            """, (user_id,))
-        else:
-            cur.execute("""
-            SELECT u.user_id, u.username, r.role_name FROM users u
-            JOIN roles r
-            ON u.role = r.role_id
-            WHERE u.user_id = %s
-            AND u.user_id = %s
-            """, (user_id, session['user_id']))
+    with get_db_connection() as conn:
+        cur = conn.cursor()
 
-        user = cur.fetchone()
+        try:
+            if session.get('role') == 1 or session.get('role') == 2:
+                cur.execute(f"""
+                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.phone_number, u.is_active
+                    FROM {org_id}_users u
+                    WHERE u.user_id = %s
+                """, (user_id,))
+            else:
+                cur.execute(f"""
+                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.phone_number, u.is_active
+                    FROM {org_id}_users u
+                    WHERE u.user_id = %s AND u.user_id = %s
+                """, (user_id, session['user_id']))
 
-        if not user:
-            flash("User not found or access denied.", "danger")
+            user = cur.fetchone()
+
+            if not user:
+                flash("User not found or access denied.", "danger")
+                return redirect(url_for('manage_users'))
+
+            # Convert role number to name
+            role_names = {2: 'Admin', 3: 'User'}
+            user_dict = {
+                'user_id': user[0],
+                'username': user[1],
+                'role': user[2],
+                'role_name': role_names.get(user[2], 'Unknown'),
+                'full_name': user[3],
+                'email': user[4],
+                'phone_number': user[5],
+                'is_active': user[6]
+            }
+
+            return render_template('user_details.html', user=user_dict, org_id=org_id)
+
+        except Exception as e:
+            flash(f"Error: {str(e)}", "danger")
             return redirect(url_for('manage_users'))
-
-        return render_template('user_details.html', user=user)
-
-    except Exception as e:
-        flash(f"Error: {str(e)}", "danger")
-        return redirect(url_for('manage_users'))
-    finally:
-        cur.close()
-        conn.close()
 
 
 # Edit User information route
 @app.route('/edit_users/<int:user_id>', methods=['GET', 'POST'])
 def edit_users(user_id):
     if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    conn = get_db_connection()
-    cur = conn.cursor()
+        return redirect(url_for('org_login'))
 
     if session.get('role') not in [1, 2]:
         flash('Access denied', 'danger')
         return redirect(url_for('manage_users'))
 
+    if 'org_id' not in session:
+        flash('Session expired. Please login again.', 'warning')
+        return redirect(url_for('org_login'))
+
+    org_id = session['org_id']
+    roles = [(2, 'Admin'), (3, 'User')]
+
     if request.method == 'POST':
-        # Get data from form
         username = request.form.get('username')
         role_id = request.form.get('role')
-        status = request.form.get('status')
+        full_name = request.form.get('full_name')
+        email = request.form.get('email')
+        phone_number = request.form.get('phone_number')
+        is_active = request.form.get('is_active') == 'on'
 
         try:
-            # Update user in the database
-            cur.execute("""
-                UPDATE users
-                SET username = %s, role = %s, status = %s
-                WHERE user_id = %s
-            """, (username, role_id, status, user_id))
-            conn.commit()
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(f"""
+                    UPDATE {org_id}_users
+                    SET username = %s, role = %s, full_name = %s, email = %s, 
+                        phone_number = %s, is_active = %s
+                    WHERE user_id = %s
+                """, (username, role_id, full_name, email, phone_number, is_active, user_id))
+
             flash("User updated successfully", "success")
             return redirect(url_for('manage_users'))
+
         except Exception as e:
-            conn.rollback()
             flash(f"Failed to update user: {e}", "danger")
-        finally:
-            cur.close()
-            conn.close()
     else:
         try:
-            # Fetch user details
-            cur.execute(""" 
-                SELECT u.user_id, u.username, r.role_id, r.role_name, u.status 
-                FROM users u 
-                JOIN roles r ON u.role = r.role_id
-                WHERE u.user_id = %s
-            """, (user_id,))
-            user = cur.fetchone()
-
-            # Fetch all roles for the dropdown
-            cur.execute("SELECT role_id, role_name FROM roles")
-            roles = cur.fetchall()
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute(f""" 
+                    SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.phone_number, u.is_active 
+                    FROM {org_id}_users u 
+                    WHERE u.user_id = %s
+                """, (user_id,))
+                user = cur.fetchone()
 
             if not user:
                 flash("User not found or access denied", "danger")
                 return redirect(url_for('manage_users'))
 
-            return render_template('edit_users.html', user=user, roles=roles)
+            user_dict = {
+                'user_id': user[0],
+                'username': user[1],
+                'role': user[2],
+                'full_name': user[3],
+                'email': user[4],
+                'phone_number': user[5],
+                'is_active': user[6]
+            }
+
+            return render_template('edit_users.html', user=user_dict, roles=roles, org_id=org_id)
 
         except Exception as e:
             flash(f"Error fetching user: {e}", "danger")
             return redirect(url_for('manage_users'))
-        finally:
-            cur.close()
-            conn.close()
 
 
 # Manage Clients
@@ -4119,7 +4608,7 @@ def stores_menu():
 def logout():
     session.clear()
     flash("Logged out successfully.", "info")
-    return redirect(url_for('login'))
+    return redirect(url_for('org_login'))
 
 
 @app.route('/payments')

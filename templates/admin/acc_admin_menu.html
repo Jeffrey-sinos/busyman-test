@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Busyman - Admin Menu</title>
+    <title>Shughuli Pap - Admin Menu</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap CSS -->
@@ -60,7 +60,6 @@
     <div class="top-space"></div>
 
     <div class="d-flex flex-column">
-        <a href="{{ url_for('create_invite') if session.get('role') == 1 or 2 }}" class="btn btn-block mb-2">Create Organization</a>
         <a href="{{ url_for('manage_users') }}" class="btn btn-outline-info">Manage Users</a>
         <a href="{{ url_for('superuser_dashboard') if session.get('role') == 1 else url_for('admin_dashboard') if session.get('role') == 2 else url_for('user_dashboard') }}"
                class="btn btn-block mt-3">Back</a>
