@@ -295,6 +295,11 @@ def onboard_admin(token):
 
                     user_id = cur.fetchone()[0]
 
+                    cur.execute(f"""
+                        INSERT INTO {org_id}_users (username, password, role, full_name, email, phone_number, org_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """, (email, password_hash, 2, full_name, email, phone_number, org_id))
+
                     # Update organization with superuser_id
                     cur.execute("""
                         UPDATE organizations
@@ -345,7 +350,7 @@ def onboard_admin(token):
 
 def generate_next_org_id():
     """Generate next org_id in format aaaa, aaab, aaac, etc."""
-    with get_db_connection() as conn:
+    with get_db_connection2() as conn:
         cur = conn.cursor()
 
         # Get the last org_id
@@ -1032,27 +1037,20 @@ def org_login():
         username = request.form['username']
         password = request.form['password']
 
-        try:
-            with get_db_connection2() as conn:
-                cur = conn.cursor()
-                # Get user with org_id
-                cur.execute("""
-                    SELECT user_id, username, password, role, org_id 
-                    FROM org_users 
-                    WHERE username = %s
-                """, (username,))
-                user = cur.fetchone()
-        except Exception as e:
-            # Log full traceback for diagnosis
-            log_error_to_file(
-                f"org_login DB query failed: {str(e)}\n{traceback.format_exc()}"
-            )
-            flash("Database error occurred. Please try again later.", "danger")
-            return render_template("login.html")
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
 
-        try:
-            if user and check_password_hash(user[2], password):
-                user_id, username, password_hash, role, org_id = user
+            # First, check if user is a superuser in org_users table
+            cur.execute("""
+                SELECT user_id, username, password, role, org_id 
+                FROM org_users 
+                WHERE username = %s
+            """, (username,))
+            admin = cur.fetchone()
+
+            if admin and check_password_hash(admin[2], password):
+                # This is a superuser
+                user_id, username, password_hash, role, org_id = admin
 
                 # Set up session
                 session['user_id'] = user_id
@@ -1060,34 +1058,69 @@ def org_login():
                 session['role'] = role
                 session['org_id'] = org_id
 
-                if role != 1:
-                    subscription_status = check_org_subscription(org_id)
+                # Check subscription and redirect
+                subscription_status = check_org_subscription(org_id)
+                session['subscription_active'] = subscription_status['active']
+
+                if not subscription_status['active']:
+                    flash('Your organization subscription has expired. Please renew to continue.', 'warning')
+                    return redirect(url_for('subscription_required'))
+
+                return redirect(url_for('admin_dashboard'))
+
+            else:
+                # Not a superuser, search in all tenant users tables
+                cur.execute("SELECT org_id FROM organizations WHERE is_active = TRUE")
+                org_ids = cur.fetchall()
+
+                user_found = None
+                user_org_id = None
+
+                for (org_id,) in org_ids:
+                    try:
+                        cur.execute(f"""
+                            SELECT user_id, username, full_name, email, role, password, status, org_id
+                            FROM {org_id}_users 
+                            WHERE username = %s AND status = 'Active'
+                        """, (username,))
+                        tenant_user = cur.fetchone()
+
+                        if tenant_user and check_password_hash(tenant_user[5], password):
+                            user_found = tenant_user
+                            user_org_id = org_id
+                            break
+
+                    except Exception as e:
+                        # Skip if tenant table doesn't exist or other error
+                        continue
+
+                if user_found:
+                    user_id, username, full_name, email, role, password_hash, status, org_id = user_found
+
+                    # Set up session
+                    session['user_id'] = user_id
+                    session['username'] = username
+                    session['role'] = role
+                    session['org_id'] = user_org_id
+
+                    # Check subscription status
+                    subscription_status = check_org_subscription(user_org_id)
                     session['subscription_active'] = subscription_status['active']
 
                     if not subscription_status['active']:
-                        flash(
-                            'Your organization subscription has expired. Please renew to continue.',
-                            'warning'
-                        )
-                        return redirect(url_for('subscription_required'))
-                else:
-                    # For Super User, always mark subscription as active
-                    session['subscription_active'] = True
+                        flash('Your organization subscription has expired. Please contact your administrator.',
+                              'warning')
+                        return redirect(url_for('org_login'))
 
-                # Redirect based on role
-                if role == 1:
-                    return redirect(url_for('superuser_dashboard'))
-                elif role == 2:
-                    return redirect(url_for('admin_dashboard'))
+                    # Redirect based on role
+                    if role == 1:
+                        return redirect(url_for('superuser_dashboard'))
+                    elif role == 2:
+                        return redirect(url_for('admin_dashboard'))
+                    else:
+                        return redirect(url_for('user_dashboard'))
                 else:
-                    return redirect(url_for('user_dashboard'))
-            else:
-                flash('Invalid username or password', 'danger')
-        except Exception as e:
-            log_error_to_file(
-                f"org_login authentication/logic error: {str(e)}\n{traceback.format_exc()}"
-            )
-            flash("Unexpected error during login. Please try again later.", "danger")
+                    flash('Invalid username or password', 'danger')
 
     return render_template('login.html')
 
@@ -3530,7 +3563,7 @@ def manage_users():
 
     org_id = session['org_id']
 
-    with get_db_connection() as conn:
+    with get_db_connection2() as conn:
         cur = conn.cursor()
 
         # If user has role 3, only fetch their own information from tenant table
@@ -3654,7 +3687,7 @@ def change_password(user_id):
             flash("Passwords do not match!", "danger")
             return redirect(url_for('change_password', user_id=user_id))
 
-        with get_db_connection() as conn:
+        with get_db_connection2() as conn:
             cur = conn.cursor()
             cur.execute(f"SELECT password FROM {org_id}_users WHERE user_id = %s", (user_id,))
             user = cur.fetchone()
@@ -3685,7 +3718,7 @@ def user_details(user_id):
 
     org_id = session['org_id']
 
-    with get_db_connection() as conn:
+    with get_db_connection2() as conn:
         cur = conn.cursor()
 
         try:
@@ -3753,7 +3786,7 @@ def edit_users(user_id):
         status = request.form.get('status') == 'on'
 
         try:
-            with get_db_connection() as conn:
+            with get_db_connection2() as conn:
                 cur = conn.cursor()
                 cur.execute(f"""
                     UPDATE {org_id}_users
@@ -3768,7 +3801,7 @@ def edit_users(user_id):
             flash(f"Failed to update user: {e}", "danger")
     else:
         try:
-            with get_db_connection() as conn:
+            with get_db_connection2() as conn:
                 cur = conn.cursor()
                 cur.execute(f""" 
                     SELECT u.user_id, u.username, u.role, u.full_name, u.email, u.status
