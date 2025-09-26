@@ -33,50 +33,23 @@
             margin-bottom: 10px;
         }
 
+        /* Back button positioning */
+        .back-button-container {
+            text-align: left;
+            margin-bottom: 15px;
+        }
+
         /* Horizontal Navigation */
         .nav-buttons {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: 10px;
             margin-bottom: 30px;
             background: white;
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
             flex-wrap: wrap;
-        }
-
-        .nav-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white !important;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            min-width: 140px;
-            text-align: center;
-        }
-
-        .nav-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-            color: white !important;
-        }
-
-        .nav-btn.active {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
-        }
-
-        .nav-btn.back-btn {
-            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
-        }
-
-        .nav-btn.back-btn:hover {
-            box-shadow: 0 8px 25px rgba(108, 117, 125, 0.4);
         }
 
         /* Content Sections */
@@ -201,6 +174,8 @@
             background-color: #212529;
             color: white;
             z-index: 10;
+            font-weight: 500;
+            font-size: 14px;
         }
 
         .results-count {
@@ -348,17 +323,6 @@
                 padding: 0 10px;
             }
 
-            .nav-buttons {
-                flex-direction: column;
-                align-items: center;
-                gap: 10px;
-            }
-
-            .nav-btn {
-                width: 100%;
-                max-width: 300px;
-            }
-
             .filter-bar {
                 flex-direction: column;
                 align-items: stretch;
@@ -422,6 +386,23 @@
             color: #ccc !important;
             opacity: 1;
         }
+        input[readonly] {
+            background-color: #BCB8B1;
+            cursor: not-allowed;
+        }
+        .invoice-details {
+            line-height: 1.3;
+        }
+
+        .invoice-details strong {
+            font-size: 0.95em;
+            color: #2c3e50;
+        }
+
+        .invoice-details small {
+            font-size: 0.8em;
+            color: #6c757d !important;
+        }
     </style>
 </head>
 <body>
@@ -446,50 +427,51 @@
     </div>
 
     <div class="main-container">
+        <!-- Back Button (above page header) -->
+        <div class="back-button-container">
+            <a href="/sales" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-2"></i>Back
+            </a>
+        </div>
+
         <!-- Page Header -->
         <div class="page-header">
             <h1>Invoices Menu</h1>
             <!--<p class="text-muted">Create, Edit, and Manage Invoices & Payments</p>-->
         </div>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+
+        <!-- Flash Messages -->
+        <div id="flash-messages">
+            <!-- Flash messages would go here in the actual template -->
+        </div>
 
         <!-- Navigation Buttons -->
         <div class="nav-buttons">
-            <button class="nav-btn active" data-section="create">
+            <button class="btn btn-outline-primary btn-sm nav-btn" data-section="create">
                 Create
             </button>
-            <button class="nav-btn" data-section="edit">
+            <button class="btn btn-outline-primary btn-sm nav-btn" data-section="edit">
                 Edit
             </button>
-            <button class="nav-btn" data-section="receive">
+            <button class="btn btn-outline-primary btn-sm nav-btn" data-section="receive">
                 Receive
             </button>
-            <a href="/sales" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left me-2"></i>Back
-            </a>
         </div>
 
         <!-- Create Invoice Section -->
         <div id="create-section" class="content-section active">
+            <!--
             <div class="section-header">
                 <p>Generate Invoice</p>
             </div>
+            -->
 
             <!-- Client Search Section -->
             <div id="clientSearchSection" class="form-section active">
                 <div class="row mb-3">
                     <div class="col-md-8">
                         <div class="input-group">
-                            <input type="text" class="form-control form-control-lg" id="clientName" placeholder="Type client name...">
+                            <input type="text" class="form-control" id="clientName" placeholder="Type client name">
                             <button class="btn btn-primary d-flex align-items-center gap-1" type="button" id="searchClientBtn">
                                 <i class="bi bi-search"></i>
                                 Search
@@ -542,14 +524,15 @@
                             <span id="selectedClientFormDisplay">No client selected</span>
                         </div>
                         <div class="col-md-6">
-                            <strong>Invoice No:</strong> <span id="invoiceNumberDisplay"></span>
+                            <p>Invoice No:</p><span id="invoiceNumberDisplay"></span>
                         </div>
                     </div>
                 </div>
 
                 <div class="row g-4">
                     <div class="col-md-4">
-                        <label for="invoiceDate" class="form-label">Invoice Date</label>
+                        <!--<label for="invoiceDate" class="form-label">Invoice Date</label>-->
+                        <label for="invoiceDate" class="form-label"></label>
                         <input type="date" class="form-control" id="invoiceDate">
                     </div>
 
@@ -557,7 +540,8 @@
                     <input type="hidden" id="invoiceNumber">
 
                     <div class="col-md-4">
-                        <label for="product" class="form-label">Product</label>
+                        <!--<label for="product" class="form-label">Product</label>-->
+                            <label for="product" class="form-label"></label>
                             <select class="form-select" id="product">
                                 <option value="">Select a product</option>
                                 {% for product in product_names %}
@@ -577,7 +561,8 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label for="category" class="form-label">Category</label>
+                        <!--<label for="category" class="form-label">Category</label>-->
+                            <label for="category" class="form-label"></label>
                             <select class="form-select" id="category">
                                 <option value=""> Select a Category</option>
                                 {% for category in categories %}
@@ -587,7 +572,8 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label for="account" class="form-label">Account Owner</label>
+                        <!--<label for="account" class="form-label">Account Owner</label>-->
+                            <label for="account" class="form-label"></label>
                             <select class="form-select" id="account">
                                 <option value=""> Select an Account Owner</option>
                                 {% for account in account_owners %}
@@ -597,7 +583,8 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label for="bank_account" class="form-label">Bank Account</label>
+                        <!--<label for="bank_account" class="form-label">Bank Account</label>-->
+                            <label for="bank_account" class="form-label"></label>
                             <select class="form-select" id="bank_account">
                                 <option value=""> Select a Bank Account</option>
                                 {% for bank_account in bank_accounts %}
@@ -607,9 +594,11 @@
                     </div>
 
                     <div class="col-md-4">
-                        <label class="form-label">Transaction Type</label>
-                        <input type="text" class="form-control" id="transactionTypeDisplay" readonly>
+                        <!--<label class="form-label">Transaction Type</label>-->
+                        <label class="form-label"></label>
+                        <input type="text" class="form-control" id="transactionTypeDisplay" hidden>
                     </div>
+
 
                     <div class="col-12">
                         <label for="notes" class="form-label">Notes</label>
@@ -693,6 +682,7 @@
             </div>
 
             <form method="POST" action="{{ url_for('invoices_menu') }}" id="editSearchForm">
+                <input type="hidden" name="section" value="edit">
                 <div class="filter-bar">
                     <div class="filter-item">
                         <label for="edit_start_date" class="form-label">Start Date</label>
@@ -736,37 +726,41 @@
                     <table class="table table-striped table-hover">
                         <thead class="table-dark">
                             <tr>
-                                <th>Invoice Date</th>
-                                <th>Customer Name</th>
-                                <th>Invoice Number</th>
-                                <th>Invoice Amount</th>
-                                <th>Actions</th>
+                                <th>Inv Date/No</th>
+                                <th>Client</th>
+                                <!--<th>Invoice Number</th>-->
+                                <th>Amount</th>
                             </tr>
                         </thead>
                         <tbody id="resultsBody">
                             {% for invoice in invoices %}
-                            <tr>
-                                <td>{{ invoice[1].strftime('%d-%m-%Y') }}</td>
-                                <td>{{ invoice[3] }}</td>
-                                <td>{{ invoice[2] }}</td>
-                                <td>{{ "Ksh {:,.2f}".format(invoice[7])}}</td>
+                            <tr class="clickable-row"
+                                data-bs-toggle="modal"
+                                data-bs-target="#detailsModal"
+                                data-sales-id="{{ invoice[0] }}"
+                                data-invoice-date="{{ invoice[1].strftime('%Y-%m-%d') }}"
+                                data-invoice-no="{{ invoice[2] }}"
+                                data-customer-name="{{ invoice[3] }}"
+                                data-product="{{ invoice[4] }}"
+                                data-quantity="{{ invoice[5] }}"
+                                data-price="{{ invoice[6] }}"
+                                data-total="{{ invoice[7] }}"
+                                data-category="{{ invoice[8] }}"
+                                data-account-owner="{{ invoice[9] }}"
+                                data-status="{{ invoice[11] }}"
+                                data-bank-account="{{ invoice[12] }}"
+                                style="cursor: pointer;">
+                                <!--<td>{{ invoice[1].strftime('%d-%m-%Y') }}</td>-->
                                 <td>
-                                    <button type="button" class="btn btn-sm btn-info select-btn" data-bs-toggle="modal" data-bs-target="#detailsModal"
-                                        data-sales-id="{{ invoice[0] }}"
-                                        data-invoice-date="{{ invoice[1].strftime('%Y-%m-%d') }}"
-                                        data-invoice-no="{{ invoice[2] }}"
-                                        data-customer-name="{{ invoice[3] }}"
-                                        data-product="{{ invoice[4] }}"
-                                        data-quantity="{{ invoice[5] }}"
-                                        data-price="{{ invoice[6] }}"
-                                        data-total="{{ invoice[7] }}"
-                                        data-category="{{ invoice[8] }}"
-                                        data-account-owner="{{ invoice[9] }}"
-                                        data-status="{{ invoice[11] }}"
-                                        data-bank-account="{{ invoice[12] }}">
-                                        Select
-                                    </button>
+                                    <div class="invoice-details">
+                                        <strong>{{ invoice[1].strftime('%d-%m-%Y') }}</strong>
+                                        <br>
+                                        <p>{{ invoice[2] }}</p>
+                                    </div>
                                 </td>
+                                <td>{{ invoice[3] }}</td>
+                                <!--<td>{{ invoice[2] }}</td>-->
+                                <td>{{ "Ksh {:,.2f}".format(invoice[7])}}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -782,35 +776,37 @@
                 <h3>Receive</h3>
             </div>
 
-            <form id="receiveSearchForm">
+            <form method="POST" action="{{ url_for('invoices_menu') }}" id="receiveSearchForm">
+                <input type="hidden" name="section" value="receive">
                 <div class="filter-bar">
                     <div class="filter-item">
                         <label for="receive_start_date" class="form-label">Start Date</label>
-                        <input type="date" class="form-control" id="receive_start_date" name="start_date">
+                        <input type="date" class="form-control" id="receive_start_date" name="start_date" value="{{ default_start_date }}">
                     </div>
                     <div class="filter-item">
                         <label for="receive_end_date" class="form-label">End Date</label>
-                        <input type="date" class="form-control" id="receive_end_date" name="end_date">
+                        <input type="date" class="form-control" id="receive_end_date" name="end_date" value="{{ default_end_date }}">
                     </div>
                     <div class="filter-item">
                         <label for="receive_category" class="form-label">Category</label>
                         <select class="form-control" id="receive_category" name="category">
                             <option value="">All Categories</option>
-                            <option value="Electronics">Electronics</option>
-                            <option value="Clothing">Clothing</option>
-                            <option value="Books">Books</option>
+                                {% for category in categories %}
+                            <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
+                                {% endfor %}
                         </select>
                     </div>
                     <div class="filter-item">
                         <label for="receive_account_owner" class="form-label">Account Owner</label>
                         <select class="form-control" id="receive_account_owner" name="account_owner">
                             <option value="">All Account Owners</option>
-                            <option value="John Doe">John Doe</option>
-                            <option value="Jane Smith">Jane Smith</option>
+                                {% for account_owner in account_owners %}
+                            <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
+                                {% endfor %}
                         </select>
                     </div>
                     <div class="search-controls">
-                        <button type="button" class="btn btn-primary" id="receiveSearchBtn">
+                        <button type="submit" class="btn btn-primary" id="receiveSearchBtn">
                             <span id="receiveSearchText">Search</span>
                             <span id="receiveSearchSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
                         </button>
@@ -818,12 +814,56 @@
                 </div>
             </form>
 
-            <div id="receive-results-container">
-                <div class="text-center text-muted py-4">
-                    <i class="bi bi-search display-1"></i>
-                    <p>Use the filters above to search for sales to receive payments</p>
+            {% if sales %}
+            <div class="invoice-table">
+                <p class="results-count">Found {{ sales|length }} invoices</p>
+
+                <!-- Scrollable Results Container -->
+                <div class="scrollable-results">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Inv Date/No</th>
+                                <!--<th>Invoice Number</th>-->
+                                <th>Client</th>
+                                <th>Amount</th>
+                                <th>Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in sales %}
+                            <tr class="clickable-row"
+                                data-bs-toggle="modal"
+                                data-bs-target="#receiveDetailsModal"
+                                data-sales-list-id="{{ sale[0] }}"
+                                data-invoice-date="{{ sale[3].strftime('%Y-%m-%d') }}"
+                                data-invoice-no="{{ sale[2] }}"
+                                data-customer-name="{{ sale[1] }}"
+                                data-invoice-amount="{{ sale[4] }}"
+                                data-paid-amount="{{ sale[5] }}"
+                                data-balance="{{ sale[6] }}"
+                                data-reference-no="{{ sale[10] }}"
+                                data-category="{{ sale[8] }}"
+                                data-account-owner="{{ sale[9] }}"
+                                data-status="{{ sale[7] }}"
+                                style="cursor: pointer;">
+                                <td>
+                                    <div class="invoice-details">
+                                        <strong>{{ sale[3].strftime('%d-%m-%Y') }}</strong>
+                                        <br>
+                                        <p>{{ sale[2] }}</p>
+                                    </div>
+                                </td>
+                                <td>{{ sale[1] }}</td>
+                                <td>{{ "Ksh {:,.2f}".format(sale[4])}}</td>
+                                <td>{{ "Ksh {:,.2f}".format(sale[6])}}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
+        {% endif %}
         </div>
     </div>
 
@@ -959,6 +999,134 @@
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receive details modal -->
+    <div class="modal fade" id="receiveDetailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Invoice Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body modal-body-scrollable">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="invoice-detail">
+                                <label>Invoice Date:</label>
+                                <span id="receive_detail_invoice_date"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Invoice Number:</label>
+                                <span id="receive_detail_invoice_no"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Customer Name:</label>
+                                <span id="receive_detail_customer_name"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Invoice Amount:</label>
+                                <span id="receive_detail_invoice_amount"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="invoice-detail">
+                                <label>Paid Amount:</label>
+                                <span id="receive_detail_paid_amount"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Balance:</label>
+                                <span id="receive_detail_balance"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Category:</label>
+                                <span id="receive_detail_category"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Account Owner:</label>
+                                <span id="receive_detail_account_owner"></span>
+                            </div>
+                            <div class="invoice-detail">
+                                <label>Status:</label>
+                                <span id="receive_detail_status"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-warning" id="receiveInvoiceBtn">Receive</button>
+                        <button type="button" class="btn btn-danger" id="deleteSaleBtn">Delete</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Receive Modal -->
+    <div class="modal fade" id="receiveModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Receive</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="receiveForm">
+                    <div class="modal-body modal-body-scrollable">
+                        <input type="hidden" id="modalSalesListId">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Invoice Date</label>
+                                <input type="date" class="form-control" name="invoice_date" id="receive_modal_invoice_date" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Invoice No</label>
+                                <input type="text" class="form-control" name="invoice_no" id="receive_modal_invoice_no" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Customer Name</label>
+                                <input type="text" class="form-control" name="customer_name" id="receive_modal_customer_name" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Invoice Amount</label>
+                                <input type="number" class="form-control" name="invoice_amount" id="receive_modal_invoice_amount" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Paid amount</label>
+                                <input type="number" step="0.01" min="0" class="form-control editable-field" name="paid_amount" id="receive_modal_paid_amount">
+                                <div id="paidAmountError" class="invalid-feedback" style="display: none;">
+                                    Paid amount cannot exceed the invoice amount (Ksh <span id="invoiceAmountDisplay">0.00</span>)
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Balance</label>
+                                <input type="number" class="form-control" name="balance" id="receive_modal_balance" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Category</label>
+                                <input type="text" class="form-control" name="category" id="receive_modal_category" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Account Owner</label>
+                                <input type="text" class="form-control" name="account_owner" id="receive_modal_account_owner" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <input type="text" class="form-control" name="status" id="receive_modal_status" readonly>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary" id="saveReceiveChangesBtn">
+                            <span id="saveReceiveChangesText">Save Changes</span>
+                            <span id="saveReceiveChangesSpinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -1750,8 +1918,8 @@
 
                 // Handle form submission
                 editSearchForm.addEventListener('submit', function () {
-                    const btn = document.getElementById('searchBtn');
-                    const text = document.getElementById('searchText');
+                    const btn = document.getElementById('editSearchBtn');
+                    const text = document.getElementById('editSearchText');
                     const spinner = document.getElementById('editSearchSpinner');
 
                     btn.disabled = true;
@@ -1764,21 +1932,21 @@
             });
 
             detailsModal.addEventListener('show.bs.modal', function (event) {
-                const button = event.relatedTarget;
-                currentInvoiceId = button.getAttribute('data-sales-id');
+                const clickableRow = event.relatedTarget;
+                currentInvoiceId = clickableRow.getAttribute('data-sales-id');
 
                 // Populate details modal
-                document.getElementById('detail_invoice_date').textContent = button.getAttribute('data-invoice-date');
-                document.getElementById('detail_invoice_no').textContent = button.getAttribute('data-invoice-no');
-                document.getElementById('detail_customer_name').textContent = button.getAttribute('data-customer-name');
-                document.getElementById('detail_product').textContent = button.getAttribute('data-product');
-                document.getElementById('detail_quantity').textContent = button.getAttribute('data-quantity');
-                document.getElementById('detail_price').textContent = button.getAttribute('data-price');
-                document.getElementById('detail_total').textContent = "Ksh " + parseFloat(button.getAttribute('data-total')).toLocaleString('en-KE', {minimumFractionDigits: 2});
-                document.getElementById('detail_category').textContent = button.getAttribute('data-category');
-                document.getElementById('detail_account_owner').textContent = button.getAttribute('data-account-owner');
-                document.getElementById('detail_bank_account').textContent = button.getAttribute('data-bank-account');
-                document.getElementById('detail_status').textContent = button.getAttribute('data-status');
+                document.getElementById('detail_invoice_date').textContent = clickableRow.getAttribute('data-invoice-date');
+                document.getElementById('detail_invoice_no').textContent = clickableRow.getAttribute('data-invoice-no');
+                document.getElementById('detail_customer_name').textContent = clickableRow.getAttribute('data-customer-name');
+                document.getElementById('detail_product').textContent = clickableRow.getAttribute('data-product');
+                document.getElementById('detail_quantity').textContent = clickableRow.getAttribute('data-quantity');
+                document.getElementById('detail_price').textContent = clickableRow.getAttribute('data-price');
+                document.getElementById('detail_total').textContent = "Ksh " + parseFloat(clickableRow.getAttribute('data-total')).toLocaleString('en-KE', {minimumFractionDigits: 2});
+                document.getElementById('detail_category').textContent = clickableRow.getAttribute('data-category');
+                document.getElementById('detail_account_owner').textContent = clickableRow.getAttribute('data-account-owner');
+                document.getElementById('detail_bank_account').textContent = clickableRow.getAttribute('data-bank-account');
+                document.getElementById('detail_status').textContent = clickableRow.getAttribute('data-status');
             });
             editInvoiceBtn.addEventListener('click', function() {
                 // Close details modal
@@ -1787,22 +1955,22 @@
 
                 // Open edit modal and populate data
                 const editModal = new bootstrap.Modal(document.getElementById('editModal'));
-
+                const clickableRow = document.querySelector(`.clickable-row[data-sales-id="${currentInvoiceId}"]`);
                 // Find the select button that was clicked
-                const selectButton = document.querySelector(`.select-btn[data-sales-id="${currentInvoiceId}"]`);
+                currentInvoiceId = clickableRow.getAttribute('data-sales-id');
 
                 // Populate edit modal
                 document.getElementById('modalSalesId').value = currentInvoiceId;
-                document.getElementById('modal_invoice_date').value = selectButton.getAttribute('data-invoice-date');
-                document.getElementById('modal_invoice_no').value = selectButton.getAttribute('data-invoice-no');
-                document.getElementById('modal_customer_name').value = selectButton.getAttribute('data-customer-name');
-                document.getElementById('modal_product').value = selectButton.getAttribute('data-product');
-                document.getElementById('modal_quantity').value = selectButton.getAttribute('data-quantity');
-                document.getElementById('modal_price').value = selectButton.getAttribute('data-price');
-                document.getElementById('modal_category').value = selectButton.getAttribute('data-category');
-                document.getElementById('modal_account_owner').value = selectButton.getAttribute('data-account-owner');
-                document.getElementById('modal_bank_account').value = selectButton.getAttribute('data-bank-account');
-                //document.getElementById('modal_status').value = selectButton.getAttribute('data-status');
+                document.getElementById('modal_invoice_date').value = clickableRow.getAttribute('data-invoice-date');
+                document.getElementById('modal_invoice_no').value = clickableRow.getAttribute('data-invoice-no');
+                document.getElementById('modal_customer_name').value = clickableRow.getAttribute('data-customer-name');
+                document.getElementById('modal_product').value = clickableRow.getAttribute('data-product');
+                document.getElementById('modal_quantity').value = clickableRow.getAttribute('data-quantity');
+                document.getElementById('modal_price').value = clickableRow.getAttribute('data-price');
+                document.getElementById('modal_category').value = clickableRow.getAttribute('data-category');
+                document.getElementById('modal_account_owner').value = clickableRow.getAttribute('data-account-owner');
+                document.getElementById('modal_bank_account').value = clickableRow.getAttribute('data-bank-account');
+                //document.getElementById('modal_status').value = clickableRow.getAttribute('data-status');
 
                 editModal.show();
             });
@@ -1863,77 +2031,270 @@
 
             // Receive section search
             document.getElementById('receiveSearchBtn').addEventListener('click', function() {
-                simulateSearch('receive');
+                 const receiveSearchForm = document.getElementById('receiveSearchForm');
+                 const receiveDetailsModal = document.getElementById('receiveDetailsModal');
+                 const receiveInvoiceBtn = document.getElementById('receiveInvoiceBtn');
+                 const deleteSaleBtn = document.getElementById('deleteSaleBtn');
+
+                 let currentInvoiceId = null;
+
+                 // Function to load saved filter values
+                 function loadSavedFilters() {
+                     const savedFilters = sessionStorage.getItem('searchFilters');
+                     if (savedFilters) {
+                         const filters = JSON.parse(savedFilters);
+
+                         // Apply saved values to form fields
+                         if (filters.start_date) document.getElementById('receive_start_date').value = filters.start_date;
+                         if (filters.end_date) document.getElementById('receive_end_date').value = filters.end_date;
+                         if (filters.category) document.getElementById('receive_category').value = filters.category;
+                         if (filters.account_owner) document.getElementById('receive_account_owner').value = filters.account_owner;
+                     }
+                 }
+
+                 // Function to save current filter values
+                 function saveFilters() {
+                     const formData = new FormData(receiveSearchForm);
+                     const formValues = {};
+                     for (let [key, value] of formData.entries()) {
+                         formValues[key] = value;
+                     }
+                     sessionStorage.setItem('searchFilters', JSON.stringify(formValues));
+                 }
+
+                 // Load saved filters when page loads
+                 loadSavedFilters();
+
+                 // Save filters whenever any filter value changes
+                 const filterInputs = document.querySelectorAll('#receiveSearchForm input, #searchForm select');
+                 filterInputs.forEach(input => {
+                     input.addEventListener('change', saveFilters);
+                     // Also save on input for better responsiveness
+                     input.addEventListener('input', saveFilters);
+                 });
+
+                 // Handle form submission
+                receiveSearchForm.addEventListener('submit', function () {
+                    const btn = document.getElementById('receiveSearchBtn');
+                    const text = document.getElementById('receiveSearchText');
+                    const spinner = document.getElementById('receiveSearchSpinner');
+
+                    btn.disabled = true;
+                    text.textContent = 'Loading...';
+                    spinner.classList.remove('d-none');
+
+                    // Save current filters
+                    saveFilters();
+                });
             });
 
-            function simulateSearch(section) {
-                const spinner = document.getElementById(`${section}SearchSpinner`);
-                const text = document.getElementById(`${section}SearchText`);
-                const resultsContainer = document.getElementById(`${section}-results-container`);
+            receiveDetailsModal.addEventListener('show.bs.modal', function (event) {
+                 const clickableRow = event.relatedTarget;
+                 currentInvoiceId = clickableRow.getAttribute('data-sales-list-id');
 
-                // Show loading
-                text.textContent = 'Searching...';
+                // Populate details modal
+                document.getElementById('receive_detail_invoice_date').textContent = clickableRow.getAttribute('data-invoice-date');
+                document.getElementById('receive_detail_invoice_no').textContent = clickableRow.getAttribute('data-invoice-no');
+                document.getElementById('receive_detail_customer_name').textContent = clickableRow.getAttribute('data-customer-name');
+                document.getElementById('receive_detail_invoice_amount').textContent = "Ksh " + parseFloat(clickableRow.getAttribute('data-invoice-amount')).toLocaleString('en-KE', {minimumFractionDigits: 2});
+                document.getElementById('receive_detail_paid_amount').textContent = "Ksh " + parseFloat(clickableRow.getAttribute('data-paid-amount')).toLocaleString('en-KE', {minimumFractionDigits: 2});
+                document.getElementById('receive_detail_balance').textContent = "Ksh " + parseFloat(clickableRow.getAttribute('data-balance')).toLocaleString('en-KE', {minimumFractionDigits: 2});
+                document.getElementById('receive_detail_category').textContent = clickableRow.getAttribute('data-category');
+                document.getElementById('receive_detail_account_owner').textContent = clickableRow.getAttribute('data-account-owner');
+                document.getElementById('receive_detail_status').textContent = clickableRow.getAttribute('data-status');
+            });
+
+            receiveInvoiceBtn.addEventListener('click', function() {
+                // Close details modal
+                const receiveDetailsModalInstance = bootstrap.Modal.getInstance(receiveDetailsModal);
+                receiveDetailsModalInstance.hide();
+
+                // Open edit modal and populate data
+                const receiveModal = new bootstrap.Modal(document.getElementById('receiveModal'));
+
+                // Find the row that was clicked
+                const clickableRow = document.querySelector(`.clickable-row[data-sales-list-id="${currentInvoiceId}"]`);
+
+                // Populate edit modal
+                document.getElementById('modalSalesListId').value = currentInvoiceId;
+                document.getElementById('receive_modal_invoice_date').value = clickableRow.getAttribute('data-invoice-date');
+                document.getElementById('receive_modal_invoice_no').value = clickableRow.getAttribute('data-invoice-no');
+                document.getElementById('receive_modal_customer_name').value = clickableRow.getAttribute('data-customer-name');
+                document.getElementById('receive_modal_invoice_amount').value = clickableRow.getAttribute('data-invoice-amount');
+                document.getElementById('receive_modal_paid_amount').value = clickableRow.getAttribute('data-paid-amount');
+                document.getElementById('receive_modal_balance').value = clickableRow.getAttribute('data-balance');
+                document.getElementById('receive_modal_category').value = clickableRow.getAttribute('data-category');
+                document.getElementById('receive_modal_account_owner').value = clickableRow.getAttribute('data-account-owner');
+                document.getElementById('receive_modal_status').value = clickableRow.getAttribute('data-status');
+
+                receiveModal.show();
+            });
+
+            // Calculate balance when paid amount changes
+            document.getElementById('receive_modal_paid_amount').addEventListener('input', function() {
+                const paidAmountError = document.getElementById('paidAmountError');
+                const invoiceAmountDisplay = document.getElementById('invoiceAmountDisplay');
+                const invoiceAmount = parseFloat(document.getElementById('receive_modal_invoice_amount').value) || 0;
+                const paidAmount = parseFloat(this.value) || 0;
+                const balance = Math.max(0, invoiceAmount - paidAmount);
+
+                invoiceAmountDisplay.textContent = invoiceAmount.toLocaleString('en-US', {
+                    minimumFractionDigits: 2
+                });
+                document.getElementById('receive_modal_balance').value = balance.toFixed(2);
+                const statusField = document.getElementById('receive_modal_status');
+                statusField.value = balance === 0 ? 'Paid' : 'Not Paid';
+
+                const paidAmountInput = document.getElementById('receive_modal_paid_amount');
+                if (paidAmount > invoiceAmount) {
+                    paidAmountInput.classList.add('is-invalid');
+                    paidAmountError.style.display = 'block';
+                    return false;
+                } else {
+                    paidAmountInput.classList.remove('is-invalid');
+                    paidAmountError.style.display = 'none';
+                    return true;
+                }
+            });
+
+            document.getElementById('receiveForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                document.getElementById('fullPageLoader').style.display = 'flex';
+                const btn = document.getElementById('saveReceiveChangesBtn');
+                const text = document.getElementById('saveReceiveChangesText');
+                const spinner = document.getElementById('saveReceiveChangesSpinner');
+
+                btn.disabled = true;
+                text.textContent = 'Saving...';
                 spinner.classList.remove('d-none');
-                this.disabled = true;
 
-                // Simulate API call
-                setTimeout(() => {
-                    // Sample results data
-                    const sampleResults = `
-                        <div class="results-count">Found 5 invoices</div>
-                        <div class="scrollable-results">
-                            <table class="table table-striped table-hover">
-                                <thead class="table-dark">
-                                    <tr>
-                                        <th>Invoice Date</th>
-                                        <th>Invoice Number</th>
-                                        <th>Customer Name</th>
-                                        <th>Invoice Amount</th>
-                                        <th>${section === 'receive' ? 'Balance' : 'Actions'}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td>15-12-2023</td>
-                                        <td>INV-001</td>
-                                        <td>Client A</td>
-                                        <td>Ksh 10,000.00</td>
-                                        <td>
-                                            ${section === 'receive' ?
-                                                'Ksh 5,000.00' :
-                                                '<button class="btn btn-sm btn-info">Select</button>'
-                                            }
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>20-12-2023</td>
-                                        <td>INV-002</td>
-                                        <td>Client B</td>
-                                        <td>Ksh 15,000.00</td>
-                                        <td>
-                                            ${section === 'receive' ?
-                                                'Ksh 0.00' :
-                                                '<button class="btn btn-sm btn-info">Select</button>'
-                                            }
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
+                const formData = {
+                    sales_list_id: document.getElementById('modalSalesListId').value,
+                    invoice_date: document.getElementById('receive_modal_invoice_date').value,
+                    invoice_no: document.getElementById('receive_modal_invoice_no').value,
+                    customer_name: document.getElementById('receive_modal_customer_name').value,
+                    invoice_amount: document.getElementById('receive_modal_invoice_amount').value,
+                    paid_amount: document.getElementById('receive_modal_paid_amount').value,
+                    balance: document.getElementById('receive_modal_balance').value,
+                    category: document.getElementById('receive_modal_category').value,
+                    account_owner: document.getElementById('receive_modal_account_owner').value,
+                    status: document.getElementById('receive_modal_status').value
+                };
 
-                    resultsContainer.innerHTML = sampleResults;
+                const salesListId = document.getElementById('modalSalesListId').value;
 
-                    // Reset button
-                    text.textContent = 'Search';
+                fetch(`/record_payment/${salesListId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Success handling - show download button and let user decide when to refresh
+                    if (data.success) {
+                        // Create success message with download button
+                        const successMessage = `
+                            ${data.message}
+                            <button onclick="downloadAndRefresh('${data.download_url}')"
+                                    class="btn btn-sm btn-success ms-2">
+                                <i class="bi bi-download"></i> Download Receipt
+                            </button>
+                        `;
+
+                        // Create and show Bootstrap alert
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                        alertDiv.role = 'alert';
+                        alertDiv.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>${successMessage}</div>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        `;
+
+                        // Insert the alert at the top of the container
+                        const container = document.querySelector('.main-container');
+                        container.insertBefore(alertDiv, container.firstChild);
+
+                        // Close the modal
+                        const modal = bootstrap.Modal.getInstance(document.getElementById('receiveModal'));
+                        modal.hide();
+
+                        // Hide the full page loader
+                        document.getElementById('fullPageLoader').style.display = 'none';
+
+                        // Auto-trigger download and refresh (optional - uncomment if you want automatic download)
+                        // downloadAndRefresh(data.download_url);
+                    } else {
+                        showErrorAlert(data.message || 'An error occurred');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showErrorAlert(error.message || 'An error occurred while saving changes');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    text.textContent = 'Save Changes';
                     spinner.classList.add('d-none');
-                    this.disabled = false;
-                }, 1500);
+                });
+            });
+
+            // Helper function to show error alerts
+            function showErrorAlert(message) {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+                alertDiv.role = 'alert';
+                alertDiv.innerHTML = `
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+
+                const container = document.querySelector('.main-container');
+                container.insertBefore(alertDiv, container.firstChild);
             }
+
+
+            // Optional: Add event listener for download buttons if they exist on page load
+            document.querySelectorAll('.download-receipt-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const receiptUrl = this.getAttribute('data-receipt-url');
+                    window.open(receiptUrl, '_blank');
+                });
+            });
         }
 
+        function downloadAndRefresh(downloadUrl) {
+                // Create a hidden iframe for download
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = downloadUrl;
+                document.body.appendChild(iframe);
 
-        // Add Client Form Submission
+                // Wait for download to initiate
+                iframe.onload = function() {
+                    setTimeout(() => {
+                        document.body.removeChild(iframe);
+                        window.location.reload();
+                    }, 1000);
+                };
+
+                // Fallback
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                    window.location.reload();
+                }, 3000);
+            }
 
     </script>
 </body>
