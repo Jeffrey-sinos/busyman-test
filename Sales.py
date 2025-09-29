@@ -2025,8 +2025,8 @@ def invoices_menu():
         section = request.form.get('section', 'edit')  # Default to 'edit' for backward compatibility
 
         # Get search parameters from form
-        start_date = request.form.get('start_date')
-        end_date = request.form.get('end_date')
+        start_date = request.form.get('start_date') or default_start_date
+        end_date = request.form.get('end_date') or default_end_date
         category = request.form.get('category')
         account_owner = request.form.get('account_owner')
 
