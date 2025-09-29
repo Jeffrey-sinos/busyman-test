@@ -190,3 +190,4 @@ cython_debug/
 /.idea
 
 /payments/
+/error_log.txt
