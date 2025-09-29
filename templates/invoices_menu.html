@@ -345,10 +345,7 @@
             }
 
             /* Date filters on same line */
-            .filter-item:has(#edit_start_date),
-            .filter-item:has(#edit_end_date),
-            .filter-item:has(#receive_start_date),
-            .filter-item:has(#receive_end_date) {
+            .filter-item.date-filter {
                 flex: 1 1 calc(50% - 3px);
                 min-width: calc(50% - 3px);
             }
@@ -374,8 +371,8 @@
 
             .filter-item .form-control,
             .filter-item .form-select {
-                height: 28px;
-                font-size: 0.75rem;
+                height: 30px;
+                font-size: 0.8rem;
                 padding: 3px 5px;
                 min-height: 28px;
                 box-sizing: border-box;
@@ -740,11 +737,11 @@
             <form method="POST" action="{{ url_for('invoices_menu') }}" id="editSearchForm">
                 <input type="hidden" name="section" value="edit">
                 <div class="filter-bar">
-                    <div class="filter-item">
+                    <div class="filter-item date-filter">
                         <!--<label for="edit_start_date" class="form-label">Start Date</label>-->
                         <input type="text" class="form-control form-control-sm" id="edit_start_date" name="start_date"  placeholder="Start Date">
                     </div>
-                    <div class="filter-item">
+                    <div class="filter-item date-filter">
                         <!--<label for="edit_end_date" class="form-label">End Date</label>-->
                         <input type="text" class="form-control form-control-sm" id="edit_end_date" name="end_date" placeholder="End Date">
                     </div>
@@ -837,11 +834,11 @@
             <form method="POST" action="{{ url_for('invoices_menu') }}" id="receiveSearchForm">
                 <input type="hidden" name="section" value="receive">
                 <div class="filter-bar">
-                    <div class="filter-item">
+                    <div class="filter-item date-filter">
                         <!--<label for="receive_start_date" class="form-label">Start Date</label>-->
                         <input type="text" class="form-control form-control-sm" id="receive_start_date" name="start_date"  placeholder="Start Date">
                     </div>
-                    <div class="filter-item">
+                    <div class="filter-item date-filter">
                         <!--<label for="receive_end_date" class="form-label">End Date</label>-->
                         <input type="text" class="form-control form-control-sm" id="receive_end_date" name="end_date"  placeholder="End Date">
                     </div>
