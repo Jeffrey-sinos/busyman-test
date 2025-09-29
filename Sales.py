@@ -815,76 +815,168 @@ def get_current_datetime():
     return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
-# Display products function
 def read_product_names():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT DISTINCT product FROM products ORDER BY product;")
-        return [row[0] for row in cursor.fetchall()]
-    except Exception as e:
-        print(f"Error reading product names: {e}")
-        return []
-    finally:
-        cursor.close()
-        conn.close()
+    if 'org_id' not in session:
+        raise ValueError("No organization ID found in session")
+
+    org_id = session['org_id']
+
+    with get_db_connection2() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SELECT DISTINCT product_name FROM {org_id}_products ORDER BY product_name;")
+            return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error reading product names: {e}")
+            return []
 
 
-# Display categories function
 def read_categories():
+    if 'org_id' not in session:
+        raise ValueError("No organization ID found in session")
+
+    org_id = session['org_id']
+
+    # You can either return static categories or make them tenant-specific
+    # Option 1: Static categories (same for all organizations)
     return [
         "Books",
         "Consultancy",
         "Rent",
     ]
 
+    # Option 2: Tenant-specific categories from database
+    # with get_db_connection() as conn:
+    #     cursor = conn.cursor()
+    #     try:
+    #         cursor.execute(f"SELECT DISTINCT category FROM {org_id}_categories ORDER BY category;")
+    #         return [row[0] for row in cursor.fetchall()]
+    #     except Exception as e:
+    #         print(f"Error reading categories: {e}")
+    #         return []
 
-# Display account owners function
+
 def read_account_owners():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    if 'org_id' not in session:
+        raise ValueError("No organization ID found in session")
 
-    try:
-        cursor.execute("SELECT DISTINCT account_owner FROM account_owner ORDER BY account_owner;")
-        return [row[0] for row in cursor.fetchall()]
-    except Exception as e:
-        print(f"Error reading client names: {e}")
-        return []
-    finally:
-        cursor.close
-        conn.close
+    org_id = session['org_id']
+
+    with get_db_connection2() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SELECT DISTINCT account_owner FROM {org_id}_account_owner ORDER BY account_owner;")
+            return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error reading account owners: {e}")
+            return []
 
 
-# Display clients function
 def read_client_names():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT customer_name FROM clients ORDER BY customer_name;")
-        return [row[0] for row in cursor.fetchall()]
-    except Exception as e:
-        print(f"Error reading client names: {e}")
-        return []
-    finally:
-        cursor.close()
-        conn.close()
+    if 'org_id' not in session:
+        raise ValueError("No organization ID found in session")
+
+    org_id = session['org_id']
+
+    with get_db_connection2() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SELECT client_name FROM {org_id}_clients ORDER BY client_name;")
+            return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error reading client names: {e}")
+            return []
 
 
-# Bank Accounts function
 def read_bank_accounts():
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    if 'org_id' not in session:
+        raise ValueError("No organization ID found in session")
 
-    try:
-        cursor.execute(
-            "SELECT account_name || '-' || bank_name FROM banks ORDER BY account_name;")  # Concatenation of the account name and bank name
-        return [row[0] for row in cursor.fetchall()]
-    except Exception as e:
-        print(f"Error reading bank accounts: {e}")
-        return []
-    finally:
-        cursor.close()
-        conn.close()
+    org_id = session['org_id']
+
+    with get_db_connection2() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"""
+                SELECT account_name || '-' || bank_name 
+                FROM {org_id}_banks 
+                ORDER BY account_name;
+            """)
+            return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error reading bank accounts: {e}")
+            return []
+
+# Display products function
+# def read_product_names():
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     try:
+#         cursor.execute("SELECT DISTINCT product FROM products ORDER BY product;")
+#         return [row[0] for row in cursor.fetchall()]
+#     except Exception as e:
+#         print(f"Error reading product names: {e}")
+#         return []
+#     finally:
+#         cursor.close()
+#         conn.close()
+#
+#
+# # Display categories function
+# def read_categories():
+#     return [
+#         "Books",
+#         "Consultancy",
+#         "Rent",
+#     ]
+#
+#
+# # Display account owners function
+# def read_account_owners():
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#
+#     try:
+#         cursor.execute("SELECT DISTINCT account_owner FROM account_owner ORDER BY account_owner;")
+#         return [row[0] for row in cursor.fetchall()]
+#     except Exception as e:
+#         print(f"Error reading client names: {e}")
+#         return []
+#     finally:
+#         cursor.close
+#         conn.close
+#
+#
+# # Display clients function
+# def read_client_names():
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     try:
+#         cursor.execute("SELECT customer_name FROM clients ORDER BY customer_name;")
+#         return [row[0] for row in cursor.fetchall()]
+#     except Exception as e:
+#         print(f"Error reading client names: {e}")
+#         return []
+#     finally:
+#         cursor.close()
+#         conn.close()
+#
+#
+# # Bank Accounts function
+# def read_bank_accounts():
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#
+#     try:
+#         cursor.execute(
+#             "SELECT account_name || '-' || bank_name FROM banks ORDER BY account_name;")  # Concatenation of the account name and bank name
+#         return [row[0] for row in cursor.fetchall()]
+#     except Exception as e:
+#         print(f"Error reading bank accounts: {e}")
+#         return []
+#     finally:
+#         cursor.close()
+#         conn.close()
 
 
 # Password validation page
