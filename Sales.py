@@ -872,20 +872,20 @@ def read_account_owners():
             return []
 
 
-# def read_client_names():
-#     if 'org_id' not in session:
-#         raise ValueError("No organization ID found in session")
-#
-#     org_id = session['org_id']
-#
-#     with get_db_connection2() as conn:
-#         cursor = conn.cursor()
-#         try:
-#             cursor.execute(f"SELECT client_name FROM {org_id}_clients ORDER BY client_name;")
-#             return [row[0] for row in cursor.fetchall()]
-#         except Exception as e:
-#             print(f"Error reading client names: {e}")
-#             return []
+def read_client_names():
+    if 'org_id' not in session:
+        raise ValueError("No organization ID found in session")
+
+    org_id = session['org_id']
+
+    with get_db_connection2() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SELECT client_name FROM {org_id}_clients ORDER BY client_name;")
+            return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error reading client names: {e}")
+            return []
 
 
 def read_bank_accounts():
@@ -948,18 +948,18 @@ def read_bank_accounts():
 #
 #
 # Display clients function
-def read_client_names():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT customer_name FROM clients ORDER BY customer_name;")
-        return [row[0] for row in cursor.fetchall()]
-    except Exception as e:
-        print(f"Error reading client names: {e}")
-        return []
-    finally:
-        cursor.close()
-        conn.close()
+# def read_client_names():
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     try:
+#         cursor.execute("SELECT customer_name FROM clients ORDER BY customer_name;")
+#         return [row[0] for row in cursor.fetchall()]
+#     except Exception as e:
+#         print(f"Error reading client names: {e}")
+#         return []
+#     finally:
+#         cursor.close()
+#         conn.close()
 #
 #
 # # Bank Accounts function
