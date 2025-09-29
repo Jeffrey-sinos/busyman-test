@@ -5086,7 +5086,7 @@ def generate_next_invoice_number():
         cur.execute(f"""
             SELECT invoice_number FROM {org_id}_invoices 
             WHERE invoice_number LIKE %s 
-            ORDER BY invoice_id DESC LIMIT 1
+            ORDER BY id DESC LIMIT 1
         """, (f"TKB/{month}%/{year_short}",))
 
         last_invoice = cur.fetchone()
