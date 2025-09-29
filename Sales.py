@@ -60,6 +60,14 @@ GMAIL_PASS = os.getenv("GMAIL_PASS")
 connection_pool = None
 pool_lock = threading.Lock()
 
+# MPESA API Configuration
+MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY')
+MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET')
+MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE')
+MPESA_TILL = os.getenv('MPESA_TILL')
+MPESA_PASSKEY = os.getenv('MPESA_PASSKEY')
+MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')
+
 ERROR_LOG_FILE = "error_log.txt"
 
 
@@ -617,7 +625,7 @@ def subscription_required():
         return redirect(url_for('org_login'))
 
     # Get available subscription products
-    with get_db_connection() as conn:
+    with get_db_connection2() as conn:
         cur = conn.cursor()
         cur.execute("""
             SELECT product_id, product_name, description, price_per_unit, duration_days
@@ -627,18 +635,9 @@ def subscription_required():
         """)
         products = cur.fetchall()
 
-    return render_template('subscriptions/subscription_required.html',
+    return render_template('subscription/subscription_required.html',
                            products=products,
                            org_id=session.get('org_id'))
-
-
-# MPESA API Configuration
-MPESA_CONSUMER_KEY = os.getenv('MPESA_CONSUMER_KEY')
-MPESA_CONSUMER_SECRET = os.getenv('MPESA_CONSUMER_SECRET')
-MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE')
-MPESA_TILL = os.getenv('MPESA_TILL')
-MPESA_PASSKEY = os.getenv('MPESA_PASSKEY')
-MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')
 
 
 # Database configuration
