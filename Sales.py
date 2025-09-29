@@ -5043,30 +5043,63 @@ def delete_billing_account():
         conn.close()
 
 
+# def generate_next_invoice_number():
+#     conn = get_db_connection()
+#     cur = conn.cursor()
+#
+#     now = datetime.now()
+#     month = f"{now.month:02d}"
+#     year_short = f"{now.year % 100:02d}"
+#
+#     cur.execute(
+#         sql.SQL("SELECT invoice_number FROM invoices WHERE invoice_number LIKE %s ORDER BY id DESC LIMIT 1"),
+#         [f"TKB/{month}%/{year_short}"]
+#     )
+#     last_invoice = cur.fetchone()
+#
+#     if last_invoice:
+#         last_seq = int(last_invoice[0].split("/")[1][2:])
+#         next_seq = last_seq + 1
+#     else:
+#         next_seq = 1
+#
+#     invoice_number = f"TKB/{month}{next_seq:03d}/{year_short}"
+#     cur.close()
+#     conn.close()
+#     return invoice_number
+
 def generate_next_invoice_number():
-    conn = get_db_connection()
-    cur = conn.cursor()
+    # Check if user has org_id in session
+    if 'org_id' not in session:
+        raise ValueError("No organization ID found in session")
 
-    now = datetime.now()
-    month = f"{now.month:02d}"
-    year_short = f"{now.year % 100:02d}"
+    org_id = session['org_id']
 
-    cur.execute(
-        sql.SQL("SELECT invoice_number FROM invoices WHERE invoice_number LIKE %s ORDER BY id DESC LIMIT 1"),
-        [f"TKB/{month}%/{year_short}"]
-    )
-    last_invoice = cur.fetchone()
+    with get_db_connection2() as conn:
+        cur = conn.cursor()
 
-    if last_invoice:
-        last_seq = int(last_invoice[0].split("/")[1][2:])
-        next_seq = last_seq + 1
-    else:
-        next_seq = 1
+        now = datetime.now()
+        month = f"{now.month:02d}"
+        year_short = f"{now.year % 100:02d}"
 
-    invoice_number = f"TKB/{month}{next_seq:03d}/{year_short}"
-    cur.close()
-    conn.close()
-    return invoice_number
+        # Query the tenant-specific invoices table
+        cur.execute(f"""
+            SELECT invoice_number FROM {org_id}_invoices 
+            WHERE invoice_number LIKE %s 
+            ORDER BY invoice_id DESC LIMIT 1
+        """, (f"TKB/{month}%/{year_short}",))
+
+        last_invoice = cur.fetchone()
+
+        if last_invoice:
+            # Extract sequence number from format: TKB/MM###/YY
+            last_seq = int(last_invoice[0].split("/")[1][2:])  # Get digits after MM
+            next_seq = last_seq + 1
+        else:
+            next_seq = 1
+
+        invoice_number = f"TKB/{month}{next_seq:03d}/{year_short}"
+        return invoice_number
 
 
 @app.route('/get_next_invoice_number')
