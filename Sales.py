@@ -1113,7 +1113,7 @@ def org_login():
 
                     # Redirect based on role
                     if role == 1:
-                        return redirect(url_for('superuser_dashboard'))
+                        return redirect(url_for('admin_dashboard'))
                     elif role == 2:
                         return redirect(url_for('admin_dashboard'))
                     else:
