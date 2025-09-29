@@ -881,6 +881,14 @@ def read_client_names():
     with get_db_connection2() as conn:
         cursor = conn.cursor()
         try:
+            # Check if the table has any rows
+            cursor.execute(f"SELECT EXISTS (SELECT 1 FROM {org_id}_clients);")
+            has_rows = cursor.fetchone()[0]
+
+            if not has_rows:
+                return []  # Return empty list if no data
+
+            # Fetch only if the table is not empty
             cursor.execute(f"SELECT customer_name FROM {org_id}_clients ORDER BY customer_name;")
             return [row[0] for row in cursor.fetchall()]
         except Exception as e:
@@ -2091,6 +2099,20 @@ def download_payment(filename):
 # Search Invoices Menu
 @app.route('/invoices_menu', methods=['GET', 'POST'])
 def invoices_menu():
+    if request.method == 'POST' and request.form.get('action') == 'get_all_clients':
+        try:
+            client_names = read_client_names()
+            return jsonify({
+                'status': 'success',
+                'clients': client_names
+            })
+        except Exception as e:
+            print(f"Error fetching clients: {e}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to fetch clients'
+            }), 500
+
     # Pre-load all necessary data for all sections
     client_names = read_client_names()
     product_names = read_product_names()

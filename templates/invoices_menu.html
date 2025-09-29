@@ -1374,6 +1374,40 @@
             initializeSearchFunctionality();
         });
 
+		function resetToClientSearch() {
+                // Reset all sections
+                salesFormSection.classList.remove('active');
+                transactionTypeSection.classList.remove('active');
+                clientSearchSection.classList.add('active');
+
+                //showBackToMenuButton();
+                // Reset form
+                resetFormForNewItem();
+                document.getElementById('account').value = '';
+                document.getElementById('bank_account').value = '';
+                clientNameInput.value = '';
+                selectedClientDisplay.textContent = 'No client selected';
+
+                // Reset state
+                currentItems = [];
+                currentInvoiceUrl = '';
+
+                // Hide sections
+                addAnotherSection.style.display = 'none';
+                document.getElementById('invoicePreview').style.display = 'none';
+                document.getElementById('pdfLinksContainer').style.display = 'none';
+
+                // Hide add client button and alert
+                addClientBtnContainer.style.display = 'none';
+                clientNotFoundAlert.style.display = 'none';
+
+                // Show save button
+                saveSaleBtn.style.display = 'block';
+
+                // Stop any loading
+                stopLoading();
+            }
+
         // Create Invoice Functionality
         function initializeCreateInvoice() {
             const downloadSuccessToast = new bootstrap.Toast(document.getElementById('downloadSuccessToast'), {autohide: true, delay: 3000});
@@ -1407,39 +1441,7 @@
             let currentInvoiceUrl = '';
             let currentTransactionType = 'sell';
 
-            function resetToClientSearch() {
-                // Reset all sections
-                salesFormSection.classList.remove('active');
-                transactionTypeSection.classList.remove('active');
-                clientSearchSection.classList.add('active');
 
-                //showBackToMenuButton();
-                // Reset form
-                resetFormForNewItem();
-                document.getElementById('account').value = '';
-                document.getElementById('bank_account').value = '';
-                clientNameInput.value = '';
-                selectedClientDisplay.textContent = 'No client selected';
-
-                // Reset state
-                currentItems = [];
-                currentInvoiceUrl = '';
-
-                // Hide sections
-                addAnotherSection.style.display = 'none';
-                document.getElementById('invoicePreview').style.display = 'none';
-                document.getElementById('pdfLinksContainer').style.display = 'none';
-
-                // Hide add client button and alert
-                addClientBtnContainer.style.display = 'none';
-                clientNotFoundAlert.style.display = 'none';
-
-                // Show save button
-                saveSaleBtn.style.display = 'block';
-
-                // Stop any loading
-                stopLoading();
-            }
             // Required fields configuration
             const requiredFields = {
                 'product': 'Product is required',
