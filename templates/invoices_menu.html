@@ -333,12 +333,13 @@
             }
 
             .filter-item {
-                flex-direction: row;
-                align-items: center;
+                flex-direction: column;
+                align-items: left;
                 gap: 6px;
                 padding: 4px 8px;
                 flex: 1 1 calc(50% - 3px);
                 min-width: calc(50% - 3px);
+                max-width: 100%;
             }
 
             /* Date filters on same line */
@@ -366,7 +367,7 @@
                 font-size: 0.75rem;
                 line-height: 1.1;
                 padding-bottom: 0;
-                white-space: nowrap;
+                white-space: normal;
             }
 
             .filter-item .form-control,
@@ -712,41 +713,43 @@
 
         <!-- Edit Invoices Section -->
         <div id="edit-section" class="content-section">
+            <!--
             <div class="section-header">
                 <h3>Invoices</h3>
             </div>
+            -->
 
             <form method="POST" action="{{ url_for('invoices_menu') }}" id="editSearchForm">
                 <input type="hidden" name="section" value="edit">
                 <div class="filter-bar">
                     <div class="filter-item">
                         <label for="edit_start_date" class="form-label">Start Date</label>
-                        <input type="date" class="form-control" id="edit_start_date" name="start_date" value="{{ default_start_date }}">
+                        <input type="date" class="form-control form-control-sm" id="edit_start_date" name="start_date" value="{{ default_start_date }}">
                     </div>
                     <div class="filter-item">
                         <label for="edit_end_date" class="form-label">End Date</label>
-                        <input type="date" class="form-control" id="edit_end_date" name="end_date" value="{{ default_end_date }}">
+                        <input type="date" class="form-control form-control-sm" id="edit_end_date" name="end_date" value="{{ default_end_date }}">
                     </div>
                     <div class="filter-item">
-                        <label for="edit_category" class="form-label">Category</label>
-                        <select class="form-control" id="edit_category" name="category">
-                            <option value="">Select Categories</option>
+                      <!--  <label for="edit_category" class="form-label">Category</label> -->
+                        <select class="form-control form-control-sm" id="edit_category" name="category">
+                            <option value="">Select Category</option>
                                 {% for category in categories %}
                             <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
                                 {% endfor %}
                         </select>
                     </div>
                     <div class="filter-item">
-                        <label for="edit_account_owner" class="form-label">Account Owner</label>
-                        <select class="form-control" id="edit_account_owner" name="account_owner">
-                            <option value="">Select Account Owners</option>
+                        <!--<label for="edit_account_owner" class="form-label">Account Owner</label>-->
+                        <select class="form-control form-control-sm" id="edit_account_owner" name="account_owner">
+                            <option value="">Select Account</option>
                                 {% for account_owner in account_owners %}
                             <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
                                 {% endfor %}
                         </select>
                     </div>
                     <div class="search-controls">
-                        <button type="submit" class="btn btn-primary" id="editSearchBtn">
+                        <button type="submit" class="btn btn-sm btn-primary" id="editSearchBtn">
                             <span id="editSearchText">Search</span>
                             <span id="editSearchSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
                         </button>
@@ -807,41 +810,43 @@
 
         <!-- Receive Payments Section -->
         <div id="receive-section" class="content-section">
+            <!--
             <div class="section-header">
                 <h3>Receive</h3>
             </div>
+            -->
 
             <form method="POST" action="{{ url_for('invoices_menu') }}" id="receiveSearchForm">
                 <input type="hidden" name="section" value="receive">
                 <div class="filter-bar">
                     <div class="filter-item">
                         <label for="receive_start_date" class="form-label">Start Date</label>
-                        <input type="date" class="form-control" id="receive_start_date" name="start_date" value="{{ default_start_date }}">
+                        <input type="date" class="form-control form-control-sm" id="receive_start_date" name="start_date" value="{{ default_start_date }}">
                     </div>
                     <div class="filter-item">
                         <label for="receive_end_date" class="form-label">End Date</label>
-                        <input type="date" class="form-control" id="receive_end_date" name="end_date" value="{{ default_end_date }}">
+                        <input type="date" class="form-control form-control-sm" id="receive_end_date" name="end_date" value="{{ default_end_date }}">
                     </div>
                     <div class="filter-item">
-                        <label for="receive_category" class="form-label">Category</label>
-                        <select class="form-control" id="receive_category" name="category">
-                            <option value="">Select Categories</option>
+                        <!--<label for="receive_category" class="form-label">Category</label>-->
+                        <select class="form-control form-control-sm" id="receive_category" name="category">
+                            <option value="">Select Category</option>
                                 {% for category in categories %}
                             <option value="{{ category }}" {% if request.args.get('category') == category %}selected{% endif %}>{{ category }}</option>
                                 {% endfor %}
                         </select>
                     </div>
                     <div class="filter-item">
-                        <label for="receive_account_owner" class="form-label">Account Owner</label>
-                        <select class="form-control" id="receive_account_owner" name="account_owner">
-                            <option value="">Select Account Owners</option>
+                        <!--<label for="receive_account_owner" class="form-label">Account Owner</label>-->
+                        <select class="form-control form-control-sm" id="receive_account_owner" name="account_owner">
+                            <option value="">Select Account</option>
                                 {% for account_owner in account_owners %}
                             <option value="{{ account_owner }}" {% if request.args.get('account_owner') == account_owner %}selected{% endif %}>{{ account_owner }}</option>
                                 {% endfor %}
                         </select>
                     </div>
                     <div class="search-controls">
-                        <button type="submit" class="btn btn-primary" id="receiveSearchBtn">
+                        <button type="submit" class="btn btn-sm btn-primary" id="receiveSearchBtn">
                             <span id="receiveSearchText">Search</span>
                             <span id="receiveSearchSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
                         </button>
@@ -987,7 +992,7 @@
                                 <span id="detail_invoice_no"></span>
                             </div>
                             <div class="invoice-detail">
-                                <label>Customer Name:</label>
+                                <label>Client:</label>
                                 <span id="detail_customer_name"></span>
                             </div>
                             <div class="invoice-detail">
@@ -1058,7 +1063,7 @@
                                 <span id="receive_detail_invoice_no"></span>
                             </div>
                             <div class="invoice-detail">
-                                <label>Customer Name:</label>
+                                <label>Client:</label>
                                 <span id="receive_detail_customer_name"></span>
                             </div>
                             <div class="invoice-detail">
@@ -1122,7 +1127,7 @@
                                 <input type="text" class="form-control" name="invoice_no" id="receive_modal_invoice_no" readonly>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Customer Name</label>
+                                <label class="form-label">Client</label>
                                 <input type="text" class="form-control" name="customer_name" id="receive_modal_customer_name" readonly>
                             </div>
                             <div class="col-md-6">
