@@ -824,7 +824,7 @@ def read_product_names():
     with get_db_connection2() as conn:
         cursor = conn.cursor()
         try:
-            cursor.execute(f"SELECT DISTINCT product_name FROM {org_id}_products ORDER BY product_name;")
+            cursor.execute(f"SELECT DISTINCT product FROM {org_id}_products ORDER BY product;")
             return [row[0] for row in cursor.fetchall()]
         except Exception as e:
             print(f"Error reading product names: {e}")
@@ -881,10 +881,10 @@ def read_client_names():
     with get_db_connection2() as conn:
         cursor = conn.cursor()
         try:
-            cursor.execute(f"SELECT client_name FROM {org_id}_clients ORDER BY client_name;")
+            cursor.execute(f"SELECT customer_name FROM {org_id}_clients ORDER BY customer_name;")
             return [row[0] for row in cursor.fetchall()]
         except Exception as e:
-            print(f"Error reading client names: {e}")
+            print(f"Error reading customer_name: {e}")
             return []
 
 
