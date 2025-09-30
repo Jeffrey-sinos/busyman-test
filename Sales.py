@@ -1809,7 +1809,7 @@ def sales_entry():
                 frequency = product_frequency[0] if product_frequency else 'Occasional'
                 sales_acc_invoice_no = None
 
-                if transaction_type == 'take_back':
+                if transaction_type == 'returned':
                     quantity = -abs(quantity)
 
                 total = round(quantity * price, 2)
@@ -2176,6 +2176,10 @@ def invoices_menu():
                 cur.execute(invoices_query, invoices_params)
                 invoices = cur.fetchall()
 
+                if not invoices:
+                    flash('No invoices matching the filters found', 'warning')
+
+
             # Only search sales if the request came from the receive section
             elif section == 'receive':
                 # Search sales from sales_list table
@@ -2203,6 +2207,9 @@ def invoices_menu():
                 sales_query += " ORDER BY invoice_date DESC"
                 cur.execute(sales_query, sales_params)
                 sales = cur.fetchall()
+
+                if not sales:
+                    flash('No invoices matching the filters found', 'warning')
 
             cur.close()
             conn.close()
