@@ -46,7 +46,7 @@
             display: flex;
             justify-content: center;
             gap: 10px;
-            margin-bottom: 30px;
+            margin-bottom: 0;
             background: white;
             padding: 20px;
             border-radius: 12px;
@@ -61,7 +61,11 @@
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
+            margin-bottom: 0;
+            margin-top: 0;
+        }
+        #edit-section {
+            padding: 10px 30px 30px 30px; /* No top padding */
         }
 
         .content-section.active {
@@ -125,24 +129,37 @@
             border: none;
             font-size: 0.875rem;
         }
+        /* Active nav button styling */
+        .nav-buttons .btn.active {
+            background-color: #000;
+            border-color: #000;
+            color: white;
+        }
+
+        .nav-buttons .btn:hover {
+            background-color: #000;
+            border-color: #000;
+            color: white;
+        }
 
         /* Filter styling */
         .filter-bar {
             display: flex;
             align-items: flex-end;
             gap: 8px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
+            margin-top: 0;
             flex-wrap: wrap;
         }
 
         .filter-item {
-            background-color: #8dec5e;
+            border: 1px solid #8dec5e;
             padding: 8px 12px;
             border-radius: 6px;
             color: white;
             display: flex;
             flex-direction: column;
-
+            background-color: transparent;
         }
 
         .filter-item .form-label {
@@ -174,7 +191,7 @@
         .table thead th {
             position: sticky;
             top: 0;
-            background-color: #212529;
+            background-color: #8dec5e;
             color: white;
             z-index: 10;
             font-weight: 500;
@@ -332,6 +349,7 @@
                 flex-wrap: wrap;
                 align-items: stretch;
                 gap: 6px;
+
             }
 
             .filter-item {
@@ -382,6 +400,8 @@
 
             .search-controls {
                 flex: 1 1 100%;
+                display: flex;
+                justify-content: flex-end;
             }
 
             .modal-actions {
@@ -462,7 +482,7 @@
 
         <!-- Page Header -->
         <div class="page-header">
-            <h1>Invoices Menu</h1>
+            <h1>Invoice Menu</h1>
             <!--<p class="text-muted">Create, Edit, and Manage Invoices & Payments</p>-->
         </div>
 
