@@ -193,3 +193,5 @@ cython_debug/
 /error_log.txt
 /aaab-data.xlsx
 /kis-kenglex-replace-db-excel.py
+/progress.txt
+/clients.txt
