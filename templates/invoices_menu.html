@@ -67,6 +67,9 @@
         #edit-section {
             padding: 10px 30px 30px 30px; /* No top padding */
         }
+        #receive-section {
+            padding: 10px 30px 30px 30px; /* No top padding */
+        }
 
         .content-section.active {
             display: block;
@@ -153,13 +156,12 @@
         }
 
         .filter-item {
-            border: 1px solid #8dec5e;
+            background-color: #8dec5e;
             padding: 8px 12px;
             border-radius: 6px;
             color: white;
             display: flex;
             flex-direction: column;
-            background-color: transparent;
         }
 
         .filter-item .form-label {
@@ -502,7 +504,7 @@
 
         <!-- Navigation Buttons -->
         <div class="nav-buttons">
-            <button class="btn btn-outline-primary btn-sm nav-btn" data-section="create">
+            <button class="btn btn-dark btn-sm nav-btn" data-section="create">
                 Sell
             </button>
             <!--
@@ -510,13 +512,13 @@
                 Create
             </button>
             -->
-            <button class="btn btn-outline-primary btn-sm nav-btn" data-section="edit">
+            <button class="btn btn-dark btn-sm nav-btn" data-section="edit">
                 Edit
             </button>
-            <button class="btn btn-outline-primary btn-sm nav-btn" data-section="receive">
+            <button class="btn btn-dark btn-sm nav-btn" data-section="receive">
                 Receive
             </button>
-            <button class="btn btn-outline-primary btn-sm nav-btn" data-section="create">
+            <button class="btn btn-dark btn-sm nav-btn" data-section="create">
                 Take Back
             </button>
         </div>
@@ -561,8 +563,8 @@
                    <span id="selectedClientDisplay">No client selected</span>
                 </div>
                 <div class="row">
-                    <div class="col-md-6">
-                        <div class="d-flex gap-2 w-50">
+                    <div class="col-md-6 text-md-end justify-content-end">
+                        <div class="d-flex gap-2 justify-content-end">
                             <!--
                             <button type="button" class="btn btn-outline-primary" id="sellBtn">
                                 Sell
@@ -595,7 +597,7 @@
                             <span id="selectedClientFormDisplay">No client selected</span>
                         </div>
                         <div class="col-md-6">
-                            <p>Invoice No:</p><span id="invoiceNumberDisplay"></span>
+                            <span>Inv No: </span><span id="invoiceNumberDisplay"></span>
                         </div>
                     </div>
                 </div>
@@ -677,15 +679,19 @@
                     </div>
 
                     <div class="col-12 mt-4">
-                        <button type="button" class="btn btn-success me-2" id="saveSaleBtn">
-                            <i class="bi bi-save me-2"></i>Save Transaction
-                        </button>
-                        <div id="saveLoader" class="spinner-border text-primary d-none" role="status">
-                            <span class="visually-hidden">Loading...</span>
+                        <div class="d-flex flex-column flex-md-row gap-2 align-items-md-start">
+                            <button type="button" class="btn btn-success" id="saveSaleBtn">
+                                <i class="bi bi-save me-2"></i>Save Transaction
+                            </button>
+                            <div class="d-flex align-items-center gap-2">
+                                <div id="saveLoader" class="spinner-border text-primary d-none align-self-center" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary" id="backToTransactionTypeBtn">
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
-                        <button type="button" class="btn btn-outline-secondary ms-2" id="backToTransactionTypeBtn">
-                            Cancel
-                        </button>
                     </div>
                 </div>
 
