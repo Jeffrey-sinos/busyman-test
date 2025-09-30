@@ -191,3 +191,5 @@ cython_debug/
 
 /payments/
 /error_log.txt
+/aaab-data.xlsx
+/kis-kenglex-replace-db-excel.py
