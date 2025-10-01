@@ -146,9 +146,17 @@
             font-size: 0.875rem;
         }
         .small-form {
-            max-width: 600px;   /* adjust as needed (400px, 500px, etc.) */
-            width: 100%;        /* makes it responsive */
-            padding: 15px;      /* optional, adds breathing room */
+            max-width: 800px;
+            width: 100%;
+            padding: 15px;
+        }
+        #salesFormSection .form-control {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        #salesFormSection input::placeholder,
+        #salesFormSection textarea::placeholder {
+            font-size: 14px;
         }
         /* Active nav button styling */
         .nav-buttons .btn.active {
@@ -635,7 +643,7 @@
             </div>
 
             <!-- Sales Form Section -->
-            <div id="salesFormSection" class="form-section small-form mx-auto">
+            <div id="salesFormSection" class="form-section small-form">
                 <div class="alert alert-info mb-4">
                     <div class="row">
                         <div class="col-md-6">
@@ -664,8 +672,8 @@
                     <div class="col-6 col-md-6">
                         <!--<label for="account" class="form-label">Account Owner</label>-->
                             <!--<label for="account" class="form-label"></label>-->
-                            <select class="form-select" id="account">
-                                <option value="" class="text-muted">Account Owner</option>
+                            <select class="form-control" id="account">
+                                <option value="">Account Owner</option>
                                 {% for account in account_owners %}
                                     <option value="{{ account }}">{{ account }}</option>
                                 {% endfor %}
@@ -675,7 +683,7 @@
                     <div class="col-6 col-md-6">
                         <!--<label for="product" class="form-label">Product</label>-->
                             <!--<label for="product" class="form-label"></label>-->
-                            <select class="form-select" id="product">
+                            <select class="form-control" id="product">
                                 <option value="">Select Product</option>
                                 {% for product in product_names %}
                                     <option value="{{ product }}">{{ product }}</option>
@@ -685,7 +693,7 @@
                     <div class="col-6 col-md-6">
                         <!--<label for="category" class="form-label">Category</label>-->
                             <!--<label for="category" class="form-label"></label>-->
-                            <select class="form-select" id="category">
+                            <select class="form-control" id="category">
                                 <option value=""> Select Category</option>
                                 {% for category in categories %}
                                     <option value="{{ category }}">{{ category }}</option>
@@ -706,7 +714,7 @@
                     <div class="col-12">
                         <!--<label for="bank_account" class="form-label">Bank Account</label>-->
                             <!--<label for="bank_account" class="form-label"></label>-->
-                            <select class="form-select" id="bank_account">
+                            <select class="form-control" id="bank_account">
                                 <option value="">Enter Payment Account</option>
                                 {% for bank_account in bank_accounts %}
                                     <option value="{{ bank_account }}">{{ bank_account }}</option>
@@ -714,7 +722,7 @@
                             </select>
                     </div>
                     <div class="col-12">
-                        <label for="notes" class="form-label">Notes</label>
+                        <!--<label for="notes" class="form-label">Notes</label>-->
                         <textarea class="form-control" id="notes" rows="2" placeholder="Optional notes..."></textarea>
                     </div>
                     <div class="col-12 mt-3 d-flex justify-content-end gap-2">
