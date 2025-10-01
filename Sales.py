@@ -155,22 +155,14 @@ def create_invite():
     token = secrets.token_urlsafe(32)
     expires_at = datetime.utcnow() + timedelta(days=7)
 
-    # # Save to database
-    # conn = get_db_connection()
-    # cur = conn.cursor()
     with get_db_connection2() as conn:
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO organization_invites (org_name, contact_email, token, expires_at)
             VALUES (%s, %s, %s, %s)
         """, (org_name, contact_email, token, expires_at))
-    # conn.commit()
-    # cur.close()
-    # conn.close()
 
     invite_link = f"https://test.busyman.ltd/onboard/{token}"
-    # invite_link = f"onboard/{token}"
-
     try:
         subject = f"Invitation to join {org_name}"
         sender_name = "Shughuli Pap Admin"
@@ -322,8 +314,6 @@ def onboard_admin(token):
                         WHERE invite_id = %s
                     """, (invite_id,))
 
-                    conn.commit()
-
                     # Set up session for the new user
                     session['user_id'] = user_id
                     session['username'] = email
@@ -335,7 +325,6 @@ def onboard_admin(token):
                     return redirect(url_for('subscription_required'))
 
                 except Exception as e:
-                    conn.rollback()
                     log_error_to_file(f"Database/Processing Error: {str(e)} Token: {token}")
                     error_message = str(e)
                     if "organizations_username_key" in error_message or "duplicate key" in error_message.lower():
@@ -350,7 +339,6 @@ def onboard_admin(token):
                                            org_name=org_name,
                                            contact_email=contact_email,
                                            token=token)
-
         except Exception as e:
             log_error_to_file(f"Outer Block Error: {str(e)} Token: {token}")
             return "An unexpected error occurred. Please try again later.", 500
@@ -610,7 +598,6 @@ def create_tenant_tables(org_id):
         cur = conn.cursor()
         for table_name, create_sql in table_definitions.items():
             cur.execute(create_sql)
-        conn.commit()
         print(f"✅ Created tenant tables for org_id: {org_id}")
 
 
@@ -641,20 +628,19 @@ def subscription_required():
 
 
 # Database configuration
-def get_db_connection():
-    return psycopg2.connect(
-        dbname=os.getenv('DB_NAME'),
-        user=os.getenv('DB_USERNAME'),
-        password=os.getenv('DB_PASSWORD'),
-        host=os.getenv('DB_HOST'),
-        port=os.getenv('DB_PORT')
-    )
+# def get_db_connection():
+#     return psycopg2.connect(
+#         dbname=os.getenv('DB_NAME'),
+#         user=os.getenv('DB_USERNAME'),
+#         password=os.getenv('DB_PASSWORD'),
+#         host=os.getenv('DB_HOST'),
+#         port=os.getenv('DB_PORT')
+#     )
 
 
 def get_mpesa_access_token():
     """Get M-Pesa access token"""
     api_url = "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
-    # api_url = "https://sandbox-api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
 
     credentials = f"{MPESA_CONSUMER_KEY}:{MPESA_CONSUMER_SECRET}"
     encoded_credentials = base64.b64encode(credentials.encode()).decode()
@@ -670,139 +656,127 @@ def get_mpesa_access_token():
 
 def get_active_products():
     """Get all active subscription products"""
-    conn = get_db_connection()
-    cur = conn.cursor()
-
     try:
-        cur.execute("""
-            SELECT product_id, product_name, description, price_per_unit, duration_days
-            FROM subscription_products 
-            WHERE is_active = true
-            ORDER BY duration_days ASC
-        """)
-        products = cur.fetchall()
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT product_id, product_name, description, price_per_unit, duration_days
+                FROM subscription_products 
+                WHERE is_active = true
+                ORDER BY duration_days ASC
+            """)
+            products = cur.fetchall()
 
-        return [
-            {
-                'product_id': p[0],
-                'product_name': p[1],
-                'description': p[2],
-                'price_per_unit': float(p[3]),
-                'duration_days': p[4]
-            }
-            for p in products
-        ]
+            return [
+                {
+                    'product_id': p[0],
+                    'product_name': p[1],
+                    'description': p[2],
+                    'price_per_unit': float(p[3]),
+                    'duration_days': p[4]
+                }
+                for p in products
+            ]
     except Exception as e:
         print(f"Error fetching products: {str(e)}")
         return []
-    finally:
-        cur.close()
-        conn.close()
 
 
 def check_user_subscription(user_id):
     """Check if user has an active subscription"""
-    conn = get_db_connection()
-    cur = conn.cursor()
-
     try:
-        cur.execute("""
-            SELECT subscription_id, start_date, end_date, status 
-            FROM subscriptions 
-            WHERE user_id = %s 
-            ORDER BY end_date DESC 
-            LIMIT 1
-        """, (user_id,))
-        subscription = cur.fetchone()
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT subscription_id, start_date, end_date, status 
+                FROM subscriptions 
+                WHERE user_id = %s 
+                ORDER BY end_date DESC 
+                LIMIT 1
+            """, (user_id,))
+            subscription = cur.fetchone()
 
-        if not subscription:
-            return {'active': False, 'message': 'No subscription found'}
+            if not subscription:
+                return {'active': False, 'message': 'No subscription found'}
 
-        subscription_id, start_date, end_date, status = subscription
-        current_date = datetime.now().date()
+            subscription_id, start_date, end_date, status = subscription
+            current_date = datetime.now().date()
 
-        if status == 'active' and end_date >= current_date:
-            return {'active': True, 'end_date': end_date}
-        else:
-            return {'active': False, 'message': 'Subscription expired', 'end_date': end_date}
+            if status == 'active' and end_date >= current_date:
+                return {'active': True, 'end_date': end_date}
+            else:
+                return {'active': False, 'message': 'Subscription expired', 'end_date': end_date}
 
     except Exception as e:
         return {'active': False, 'message': f'Error checking subscription: {str(e)}'}
-    finally:
-        cur.close()
-        conn.close()
 
 
 def create_subscription_tables():
     """Create subscription tables if they don't exist"""
-    conn = get_db_connection()
-    cur = conn.cursor()
+    with get_db_connection2() as conn:
+        cur = conn.cursor()
 
-    # Create subscription_products table
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS subscription_products (
-            product_id SERIAL PRIMARY KEY,
-            product_name VARCHAR(100) NOT NULL,
-            description TEXT,
-            price_per_unit DECIMAL(10,2) NOT NULL,
-            duration_days INTEGER NOT NULL,
-            is_active BOOLEAN DEFAULT true,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # Create subscriptions table
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS subscriptions (
-            subscription_id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(user_id),
-            product_id INTEGER REFERENCES subscription_products(product_id),
-            start_date DATE NOT NULL,
-            end_date DATE NOT NULL,
-            status VARCHAR(20) DEFAULT 'active',
-            amount DECIMAL(10,2),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # Create mpesa_transactions table
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS mpesa_transactions (
-            transaction_id SERIAL PRIMARY KEY,
-            user_id INTEGER REFERENCES users(user_id),
-            product_id INTEGER REFERENCES subscription_products(product_id),
-            merchant_request_id VARCHAR(100),
-            checkout_request_id VARCHAR(100),
-            phone_number VARCHAR(15),
-            amount DECIMAL(10,2),
-            status VARCHAR(20) DEFAULT 'pending',
-            mpesa_receipt_number VARCHAR(50),
-            transaction_date TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # Check if subscription_products table is empty before inserting default values
-    cur.execute("SELECT COUNT(*) FROM subscription_products")
-    count = cur.fetchone()[0]
-
-    if count == 0:
-        # Insert default subscription products only if table is empty
+        # Create subscription_products table
         cur.execute("""
-            INSERT INTO subscription_products (product_name, description, price_per_unit, duration_days, is_active)
-            VALUES 
-            ('Busyman Lite', 'One day subscription', 1.00, 1, true),
-            ('Weekly Plan', 'Seven days subscription', 50.00, 7, false),
-            ('Monthly Plan', 'Thirty days subscription', 100.00, 30, false),
-            ('Quarterly Plan', 'Ninety days subscription', 250.00, 90, false),
-            ('Yearly Plan', 'One Year subscription', 500.00, 365, false)
+            CREATE TABLE IF NOT EXISTS subscription_products (
+                product_id SERIAL PRIMARY KEY,
+                product_name VARCHAR(100) NOT NULL,
+                description TEXT,
+                price_per_unit DECIMAL(10,2) NOT NULL,
+                duration_days INTEGER NOT NULL,
+                is_active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
         """)
-        print("Default subscription products inserted.")
 
-    conn.commit()
-    cur.close()
-    conn.close()
+        # Create subscriptions table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS subscriptions (
+                subscription_id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(user_id),
+                product_id INTEGER REFERENCES subscription_products(product_id),
+                start_date DATE NOT NULL,
+                end_date DATE NOT NULL,
+                status VARCHAR(20) DEFAULT 'active',
+                amount DECIMAL(10,2),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Create mpesa_transactions table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS mpesa_transactions (
+                transaction_id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(user_id),
+                product_id INTEGER REFERENCES subscription_products(product_id),
+                merchant_request_id VARCHAR(100),
+                checkout_request_id VARCHAR(100),
+                phone_number VARCHAR(15),
+                amount DECIMAL(10,2),
+                status VARCHAR(20) DEFAULT 'pending',
+                mpesa_receipt_number VARCHAR(50),
+                transaction_date TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Check if subscription_products table is empty before inserting default values
+        cur.execute("SELECT COUNT(*) FROM subscription_products")
+        count = cur.fetchone()[0]
+
+        if count == 0:
+            # Insert default subscription products only if table is empty
+            cur.execute("""
+                INSERT INTO subscription_products (product_name, description, price_per_unit, duration_days, is_active)
+                VALUES 
+                ('Busyman Lite', 'One day subscription', 1.00, 1, true),
+                ('Weekly Plan', 'Seven days subscription', 50.00, 7, false),
+                ('Monthly Plan', 'Thirty days subscription', 100.00, 30, false),
+                ('Quarterly Plan', 'Ninety days subscription', 250.00, 90, false),
+                ('Yearly Plan', 'One Year subscription', 500.00, 365, false)
+            """)
+            print("Default subscription products inserted.")
 
 
 # Current date function
@@ -878,9 +852,9 @@ def read_client_names():
 
     org_id = session['org_id']
 
-    with get_db_connection2() as conn:
-        cursor = conn.cursor()
-        try:
+    try:
+        with get_db_connection2() as conn:
+            cursor = conn.cursor()
             # Check if the table has any rows
             cursor.execute(f"SELECT EXISTS (SELECT 1 FROM {org_id}_clients);")
             has_rows = cursor.fetchone()[0]
@@ -891,9 +865,9 @@ def read_client_names():
             # Fetch only if the table is not empty
             cursor.execute(f"SELECT customer_name FROM {org_id}_clients ORDER BY customer_name;")
             return [row[0] for row in cursor.fetchall()]
-        except Exception as e:
-            print(f"Error reading customer_name: {e}")
-            return []
+    except Exception as e:
+        print(f"Error reading customer_name: {e}")
+        return []
 
 
 def read_bank_accounts():
@@ -902,18 +876,18 @@ def read_bank_accounts():
 
     org_id = session['org_id']
 
-    with get_db_connection2() as conn:
-        cursor = conn.cursor()
-        try:
+    try:
+        with get_db_connection2() as conn:
+            cursor = conn.cursor()
             cursor.execute(f"""
                 SELECT account_name || '-' || bank_name 
                 FROM {org_id}_banks 
                 ORDER BY account_name;
             """)
             return [row[0] for row in cursor.fetchall()]
-        except Exception as e:
-            print(f"Error reading bank accounts: {e}")
-            return []
+    except Exception as e:
+        print(f"Error reading bank accounts: {e}")
+        return []
 
 # Display products function
 # def read_product_names():
@@ -1229,7 +1203,6 @@ def check_org_subscription(org_id):
     try:
         with get_db_connection2() as conn:
             cur = conn.cursor()
-
             # Get the superuser for this organization
             cur.execute("""
                 SELECT superuser_id FROM organizations WHERE org_id = %s
@@ -1345,88 +1318,6 @@ def user_dashboard():
                            subscription_status=subscription_status)
 
 
-# @app.route('/', methods=['GET', 'POST'])
-# def login():
-#     if request.method == 'POST':
-#         username = request.form['username']
-#         password = request.form['password']
-#         with get_db_connection2() as conn:
-#             cur = conn.cursor()
-#
-#         # conn = get_db_connection()
-#         # cur = conn.cursor()
-#             cur.execute("SELECT user_id, username, password, role FROM users WHERE username = %s", (username,))
-#             user = cur.fetchone()
-#         # cur.close()
-#         # conn.close()
-#
-#         if user and check_password_hash(user[2], password):
-#             session['user_id'] = user[0]
-#             session['username'] = user[1]
-#             session['role'] = user[3]
-#
-#             # # Check subscription status
-#             # subscription_status = check_user_subscription(user[0])
-#
-#             # # Store subscription status in session
-#             # session['subscription_active'] = subscription_status['active']
-#
-#             # Redirect based on role
-#             if user[3] == 1:
-#                 return redirect(url_for('superuser_dashboard'))
-#             elif user[3] == 2:
-#                 return redirect(url_for('admin_dashboard'))
-#             else:
-#                 return redirect(url_for('user_dashboard'))
-#         else:
-#             flash('Invalid username or password', 'danger')
-#
-#     return render_template('login.html')
-
-
-# User dashboard route
-# @app.route('/user_dashboard')
-# def user_dashboard():
-#     # Redirect if user is not logged in or not role 3
-#     if 'user_id' not in session or session.get('role') != 3:
-#         return redirect(url_for('login'))
-#
-#     # # Code below now runs only if the user is valid
-#     # subscription_status = check_user_subscription(session['user_id'])
-#     # products = get_active_products()
-#
-#     return render_template('user_dashboard.html')
-#     # return render_template(
-#     #     'user_dashboard.html',
-#     #     subscription_status=subscription_status,
-#     #     products=products
-#     # )
-#
-#
-# # Admin dashboard route
-# @app.route('/admin_dashboard')
-# def admin_dashboard():
-#     if 'user_id' not in session or session.get('role') != 2:
-#         return redirect(url_for('login'))
-#
-#     # # Check subscription status for admin too (if needed)
-#     # subscription_status = check_user_subscription(session['user_id'])
-#     # products = get_active_products()
-#     return render_template('admin_dashboard.html')
-#     # return render_template('admin_dashboard.html', subscription_status=subscription_status,
-#     #     products=products)
-#
-#
-
-# @app.route('/check_subscription_status')
-# def check_subscription_status():
-#     if 'user_id' not in session:
-#         return jsonify({'active': False, 'message': 'Not logged in'})
-#
-#     subscription_status = check_user_subscription(session['user_id'])
-#     return jsonify(subscription_status)
-
-
 @app.route('/initiate_payment', methods=['POST'])
 def initiate_payment():
     """Initiate M-Pesa STK Push"""
@@ -1441,112 +1332,99 @@ def initiate_payment():
         if not phone_number or len(phone_number) < 10:
             return jsonify({'success': False, 'message': 'Invalid phone number'})
 
-        # Get product details
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT product_id, product_name, price_per_unit, duration_days, is_active
-            FROM subscription_products 
-            WHERE product_id = %s AND is_active = true
-        """, (product_id,))
-
-        product = cur.fetchone()
-        cur.close()
-        conn.close()
-
-        if not product:
-            return jsonify({'success': False, 'message': 'Invalid product selected'})
-
-        product_id, product_name, price_per_unit, duration_days, is_active = product
-        amount = float(price_per_unit)
-
-        # Clean and format phone number to 254XXXXXXXXX
-        phone_number = phone_number.replace(" ", "").strip()  # Remove spaces and trim
-
-        if phone_number.startswith('07'):
-            # If number starts with 07, replace leading 0 with 254
-            phone_number = '254' + phone_number[1:]
-        elif phone_number.startswith('0'):
-            # Covers other cases like 01, etc.
-            phone_number = '254' + phone_number[1:]
-        elif phone_number.startswith('+254'):
-            phone_number = phone_number[1:]  # Strip the +
-        elif not phone_number.startswith('254'):
-            phone_number = '254' + phone_number
-
-        # Get access token
-        access_token = get_mpesa_access_token()
-        if not access_token:
-            return jsonify({'success': False, 'message': 'Failed to get access token'})
-
-        # Generate timestamp
-        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-
-        # Generate password
-        password_string = f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{timestamp}"
-        password = base64.b64encode(password_string.encode()).decode()
-
-        # STK Push request
-        # stk_url = "https://sandbox-api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
-        stk_url = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
-
-        headers = {
-            'Authorization': f'Bearer {access_token}',
-            'Content-Type': 'application/json'
-        }
-
-        payload = {
-            "BusinessShortCode": MPESA_SHORTCODE,
-            "Password": password,
-            "Timestamp": timestamp,
-            "TransactionType": "CustomerBuyGoodsOnline",
-            "Amount": amount,
-            "PartyA": phone_number,
-            "PartyB": MPESA_TILL,
-            "PhoneNumber": phone_number,
-            "CallBackURL": MPESA_CALLBACK_URL,
-            "AccountReference": f"SUB{session['user_id']}",
-            "TransactionDesc": f"{product_name} Subscription"
-        }
-
-        response = requests.post(stk_url, json=payload, headers=headers)
-        response_data = response.json()
-
-        if response_data.get('ResponseCode') == '0':
-            # Store transaction in database
-            conn = get_db_connection()
+        with get_db_connection2() as conn:
             cur = conn.cursor()
 
             cur.execute("""
-                INSERT INTO mpesa_transactions 
-                (user_id, product_id, merchant_request_id, checkout_request_id, phone_number, amount, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (
-                session['user_id'],
-                product_id,
-                response_data.get('MerchantRequestID'),
-                response_data.get('CheckoutRequestID'),
-                phone_number,
-                amount,
-                'pending'
-            ))
+                SELECT product_id, product_name, price_per_unit, duration_days, is_active
+                FROM subscription_products 
+                WHERE product_id = %s AND is_active = true
+            """, (product_id,))
 
-            conn.commit()
-            cur.close()
-            conn.close()
+            product = cur.fetchone()
 
-            return jsonify({
-                'success': True,
-                'message': 'STK Push sent successfully',
-                'checkout_request_id': response_data.get('CheckoutRequestID')
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'message': response_data.get('errorMessage', 'Payment initiation failed')
-            })
+            if not product:
+                return jsonify({'success': False, 'message': 'Invalid product selected'})
 
+            product_id, product_name, price_per_unit, duration_days, is_active = product
+            amount = float(price_per_unit)
+
+            # Clean and format phone number to 254XXXXXXXXX
+            phone_number = phone_number.replace(" ", "").strip()  # Remove spaces and trim
+
+            if phone_number.startswith('07'):
+                # If number starts with 07, replace leading 0 with 254
+                phone_number = '254' + phone_number[1:]
+            elif phone_number.startswith('0'):
+                # Covers other cases like 01, etc.
+                phone_number = '254' + phone_number[1:]
+            elif phone_number.startswith('+254'):
+                phone_number = phone_number[1:]  # Strip the +
+            elif not phone_number.startswith('254'):
+                phone_number = '254' + phone_number
+
+            # Get access token
+            access_token = get_mpesa_access_token()
+            if not access_token:
+                return jsonify({'success': False, 'message': 'Failed to get access token'})
+
+            # Generate timestamp
+            timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+
+            # Generate password
+            password_string = f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{timestamp}"
+            password = base64.b64encode(password_string.encode()).decode()
+
+            # STK Push request
+            stk_url = "https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+
+            payload = {
+                "BusinessShortCode": MPESA_SHORTCODE,
+                "Password": password,
+                "Timestamp": timestamp,
+                "TransactionType": "CustomerBuyGoodsOnline",
+                "Amount": amount,
+                "PartyA": phone_number,
+                "PartyB": MPESA_TILL,
+                "PhoneNumber": phone_number,
+                "CallBackURL": MPESA_CALLBACK_URL,
+                "AccountReference": f"SUB{session['user_id']}",
+                "TransactionDesc": f"{product_name} Subscription"
+            }
+
+            response = requests.post(stk_url, json=payload, headers=headers)
+            response_data = response.json()
+
+            if response_data.get('ResponseCode') == '0':
+
+                cur.execute("""
+                    INSERT INTO mpesa_transactions 
+                    (user_id, product_id, merchant_request_id, checkout_request_id, phone_number, amount, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    session['user_id'],
+                    product_id,
+                    response_data.get('MerchantRequestID'),
+                    response_data.get('CheckoutRequestID'),
+                    phone_number,
+                    amount,
+                    'pending'
+                ))
+                return jsonify({
+                    'success': True,
+                    'message': 'STK Push sent successfully',
+                    'checkout_request_id': response_data.get('CheckoutRequestID')
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': response_data.get('errorMessage', 'Payment initiation failed')
+                })
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
@@ -1564,9 +1442,6 @@ def mpesa_callback():
         checkout_request_id = stk_callback.get('CheckoutRequestID')
 
         print(f"ResultCode: {result_code}, CheckoutRequestID: {checkout_request_id}")  # Debug logging
-
-        conn = get_db_connection()
-        cur = conn.cursor()
 
         if result_code == 0:  # Success
             # Extract callback metadata
@@ -1599,96 +1474,91 @@ def mpesa_callback():
 
             print(
                 f"Extracted - Amount: {amount}, Receipt: {mpesa_receipt_number}, Phone: {phone_number}, Date: {transaction_date}")  # Debug logging
-
-            # Update transaction status
-            cur.execute("""
-                UPDATE mpesa_transactions 
-                SET status = 'completed', mpesa_receipt_number = %s, transaction_date = %s
-                WHERE checkout_request_id = %s
-                RETURNING user_id, product_id, amount
-            """, (mpesa_receipt_number, transaction_date, checkout_request_id))
-
-            # Get the transaction details including the original amount
-            transaction_result = cur.fetchone()
-            if transaction_result:
-                user_id, product_id, original_amount = transaction_result
-
-                # Use the original amount from the transaction if amount from callback is None
-                if amount is None:
-                    amount = original_amount
-                    print(f"Using original amount from transaction: {amount}")
-
-                # Get product duration
+            with get_db_connection2() as conn:
+                cur = conn.cursor()
+                # Update transaction status
                 cur.execute("""
-                    SELECT duration_days FROM subscription_products 
-                    WHERE product_id = %s
-                """, (product_id,))
+                    UPDATE mpesa_transactions 
+                    SET status = 'completed', mpesa_receipt_number = %s, transaction_date = %s
+                    WHERE checkout_request_id = %s
+                    RETURNING user_id, product_id, amount
+                """, (mpesa_receipt_number, transaction_date, checkout_request_id))
 
-                product_result = cur.fetchone()
-                if product_result:
-                    duration_days = product_result[0]
+                # Get the transaction details including the original amount
+                transaction_result = cur.fetchone()
+                if transaction_result:
+                    user_id, product_id, original_amount = transaction_result
 
-                    # Create or extend subscription
-                    start_date = datetime.now().date()
-                    end_date = start_date + timedelta(days=duration_days)
+                    # Use the original amount from the transaction if amount from callback is None
+                    if amount is None:
+                        amount = original_amount
+                        print(f"Using original amount from transaction: {amount}")
 
-                    # Check if user already has a subscription
+                    # Get product duration
                     cur.execute("""
-                        SELECT subscription_id FROM subscriptions 
-                        WHERE user_id = %s ORDER BY end_date DESC LIMIT 1
-                    """, (user_id,))
-                    existing_subscription = cur.fetchone()
+                        SELECT duration_days FROM subscription_products 
+                        WHERE product_id = %s
+                    """, (product_id,))
 
-                    if existing_subscription:
-                        # Update existing subscription
+                    product_result = cur.fetchone()
+                    if product_result:
+                        duration_days = product_result[0]
+
+                        # Create or extend subscription
+                        start_date = datetime.now().date()
+                        end_date = start_date + timedelta(days=duration_days)
+
+                        # Check if user already has a subscription
                         cur.execute("""
-                            UPDATE subscriptions 
-                            SET end_date = %s, status = 'active', amount = %s
-                            WHERE user_id = %s AND subscription_id = %s
-                        """, (end_date, amount, user_id, existing_subscription[0]))
-                    else:
-                        # Create new subscription
+                            SELECT subscription_id FROM subscriptions 
+                            WHERE user_id = %s ORDER BY end_date DESC LIMIT 1
+                        """, (user_id,))
+                        existing_subscription = cur.fetchone()
+
+                        if existing_subscription:
+                            # Update existing subscription
+                            cur.execute("""
+                                UPDATE subscriptions 
+                                SET end_date = %s, status = 'active', amount = %s
+                                WHERE user_id = %s AND subscription_id = %s
+                            """, (end_date, amount, user_id, existing_subscription[0]))
+                        else:
+                            # Create new subscription
+                            cur.execute("""
+                                INSERT INTO subscriptions (user_id, product_id, start_date, end_date, amount, status)
+                                VALUES (%s, %s, %s, %s, %s, 'active')
+                            """, (user_id, product_id, start_date, end_date, amount))
+
                         cur.execute("""
-                            INSERT INTO subscriptions (user_id, product_id, start_date, end_date, amount, status)
-                            VALUES (%s, %s, %s, %s, %s, 'active')
-                        """, (user_id, product_id, start_date, end_date, amount))
+                                           SELECT org_id FROM org_users WHERE user_id = %s
+                                       """, (user_id,))
+                        org_row = cur.fetchone()
 
-                    # ✅ Fetch org_id of this user
-                    cur.execute("""
-                                       SELECT org_id FROM org_users WHERE user_id = %s
-                                   """, (user_id,))
-                    org_row = cur.fetchone()
+                        if org_row:
+                            org_id = org_row[0]
+                            print(f"Creating tenant tables for org_id: {org_id}")
+                            create_tenant_tables(org_id)  # ✅ Create tenant-specific tables
+                        else:
+                            print(f"No org_id found for user_id {user_id}")
 
-                    if org_row:
-                        org_id = org_row[0]
-                        print(f"Creating tenant tables for org_id: {org_id}")
-                        create_tenant_tables(org_id)  # ✅ Create tenant-specific tables
+                        print(f"Subscription updated for user {user_id}, product {product_id}")
                     else:
-                        print(f"No org_id found for user_id {user_id}")
-
-                    print(f"Subscription updated for user {user_id}, product {product_id}")
+                        print(f"Product {product_id} not found")
                 else:
-                    print(f"Product {product_id} not found")
-            else:
-                print(f"Transaction with checkout_request_id {checkout_request_id} not found")
+                    print(f"Transaction with checkout_request_id {checkout_request_id} not found")
 
         else:  # Failed
             error_message = stk_callback.get('ResultDesc', 'Unknown error')
             print(f"Payment failed: {error_message}")
-
-            # Update transaction as failed
-            cur.execute("""
-                UPDATE mpesa_transactions 
-                SET status = 'failed'
-                WHERE checkout_request_id = %s
-            """, (checkout_request_id,))
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        return jsonify({'ResultCode': 0, 'ResultDesc': 'Success'})
-
+            with get_db_connection2() as conn:
+                cur = conn.cursor()
+                # Update transaction as failed
+                cur.execute("""
+                    UPDATE mpesa_transactions 
+                    SET status = 'failed'
+                    WHERE checkout_request_id = %s
+                """, (checkout_request_id,))
+                return jsonify({'ResultCode': 0, 'ResultDesc': 'Success'})
     except Exception as e:
         print(f"Callback error: {str(e)}")
         import traceback
@@ -1702,28 +1572,25 @@ def check_payment_status(checkout_request_id):
     if 'user_id' not in session:
         return jsonify({'success': False, 'message': 'Not logged in'})
 
-    conn = get_db_connection()
-    cur = conn.cursor()
+    with get_db_connection2() as conn:
+        cur = conn.cursor()
 
-    cur.execute("""
-        SELECT status, mpesa_receipt_number 
-        FROM mpesa_transactions 
-        WHERE checkout_request_id = %s AND user_id = %s
-    """, (checkout_request_id, session['user_id']))
+        cur.execute("""
+            SELECT status, mpesa_receipt_number 
+            FROM mpesa_transactions 
+            WHERE checkout_request_id = %s AND user_id = %s
+        """, (checkout_request_id, session['user_id']))
 
-    result = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if result:
-        status, receipt_number = result
-        return jsonify({
-            'success': True,
-            'status': status,
-            'receipt_number': receipt_number
-        })
-    else:
-        return jsonify({'success': False, 'message': 'Transaction not found'})
+        result = cur.fetchone()
+        if result:
+            status, receipt_number = result
+            return jsonify({
+                'success': True,
+                'status': status,
+                'receipt_number': receipt_number
+            })
+        else:
+            return jsonify({'success': False, 'message': 'Transaction not found'})
 
 
 # Sales Menu route
@@ -1900,7 +1767,6 @@ def sales_entry():
                             VALUES (%s, %s)
                             ON CONFLICT (invoice_number) DO NOTHING
                         """, (sales_acc_invoice_no, current_datetime))
-                        conn.commit()
 
                         today = datetime.today().date()
 
@@ -1977,7 +1843,6 @@ def sales_entry():
                                     'date': next_due_date.strftime('%d/%m/%Y'),
                                     'url': url_for('download_invoice', filename=filename)
                                 })
-                                conn.commit()
                                 next_due_date += delta
 
                             return jsonify({
@@ -1986,8 +1851,6 @@ def sales_entry():
                                 'pdf_urls': pdf_urls,
                                 'invoice_number': invoice_number,
                             })
-
-                    conn.commit()
 
                     cursor.execute(f"""
                         SELECT product as description, quantity, price as unit_price, total
@@ -2319,12 +2182,9 @@ def edit_sale(sales_id):
 
     org_id = session['org_id']
 
-    with get_db_connection2() as conn:
-        cur = conn.cursor()
-
-        if session.get('role') not in [1, 2]:
-            flash('You do not have access to edit sales', 'danger')
-            return redirect(url_for('search_invoices'))
+    if session.get('role') not in [1, 2]:
+        flash('You do not have access to edit sales', 'danger')
+        return redirect(url_for('search_invoices'))
 
     if request.method == 'POST':
         data = request.get_json()
@@ -2341,57 +2201,57 @@ def edit_sale(sales_id):
         # status = data.get('status')
 
         try:
-            cur.execute(f"""
-                UPDATE {org_id}_sales SET
-                    invoice_date = %s,
-                    invoice_no = %s,
-                    customer_name = %s,
-                    product = %s,
-                    quantity = %s,
-                    price = %s,
-                    total = %s,
-                    category = %s,
-                    account_owner = %s,
-                    bank_account = %s
-                WHERE sales_id = %s
-            """, (
-                invoice_date, invoice_no, customer_name, product,
-                quantity, price, total, category, account_owner, bank_account,
-                sales_id
-            ))
+            with get_db_connection2() as conn:
+                cur = conn.cursor()
+                cur.execute(f"""
+                    UPDATE {org_id}_sales SET
+                        invoice_date = %s,
+                        invoice_no = %s,
+                        customer_name = %s,
+                        product = %s,
+                        quantity = %s,
+                        price = %s,
+                        total = %s,
+                        category = %s,
+                        account_owner = %s,
+                        bank_account = %s
+                    WHERE sales_id = %s
+                """, (
+                    invoice_date, invoice_no, customer_name, product,
+                    quantity, price, total, category, account_owner, bank_account,
+                    sales_id
+                ))
 
-            # Update sales_list total and balance
-            cur.execute(f"SELECT SUM(total) FROM {org_id}_sales WHERE invoice_no = %s", (invoice_no,))
-            invoice_total = cur.fetchone()[0] or 0
+                # Update sales_list total and balance
+                cur.execute(f"SELECT SUM(total) FROM {org_id}_sales WHERE invoice_no = %s", (invoice_no,))
+                invoice_total = cur.fetchone()[0] or 0
 
-            cur.execute(f"SELECT paid_amount FROM {org_id}_sales_list WHERE invoice_no = %s", (invoice_no,))
-            paid_amount_result = cur.fetchone()
-            paid_amount = paid_amount_result[0] if paid_amount_result else 0
-            new_balance = invoice_total - paid_amount
+                cur.execute(f"SELECT paid_amount FROM {org_id}_sales_list WHERE invoice_no = %s", (invoice_no,))
+                paid_amount_result = cur.fetchone()
+                paid_amount = paid_amount_result[0] if paid_amount_result else 0
+                new_balance = invoice_total - paid_amount
 
-            cur.execute(f"""
-                UPDATE {org_id}_sales_list
-                SET invoice_amount = %s, balance = %s
-                WHERE invoice_no = %s
-            """, (invoice_total, new_balance, invoice_no))
+                cur.execute(f"""
+                    UPDATE {org_id}_sales_list
+                    SET invoice_amount = %s, balance = %s
+                    WHERE invoice_no = %s
+                """, (invoice_total, new_balance, invoice_no))
 
-            conn.commit()
-
-            return jsonify({
-                "status": "success",
-                "invoice": {
-                    "invoice_date": invoice_date,
-                    "invoice_no": invoice_no,
-                    "customer_name": customer_name,
-                    "product": product,
-                    "quantity": quantity,
-                    "price": price,
-                    "total": total,
-                    "category": category,
-                    "account_owner": account_owner,
-                    "bank_account": bank_account
-                }
-            })
+                return jsonify({
+                    "status": "success",
+                    "invoice": {
+                        "invoice_date": invoice_date,
+                        "invoice_no": invoice_no,
+                        "customer_name": customer_name,
+                        "product": product,
+                        "quantity": quantity,
+                        "price": price,
+                        "total": total,
+                        "category": category,
+                        "account_owner": account_owner,
+                        "bank_account": bank_account
+                    }
+                })
 
         except Exception as e:
             conn.rollback()
@@ -2399,11 +2259,16 @@ def edit_sale(sales_id):
         # finally:
         #     cur.close()
         #     conn.close()
+    try:
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+        # Fallback for GET (not used in modal AJAX)
+        cur.execute(f"SELECT * FROM {org_id}_sales WHERE sales_id = %s", (sales_id,))
+        invoice = cur.fetchone()
+        return jsonify({"invoice": invoice})
 
-    # Fallback for GET (not used in modal AJAX)
-    cur.execute(f"SELECT * FROM {org_id}_sales WHERE sales_id = %s", (sales_id,))
-    invoice = cur.fetchone()
-    return jsonify({"invoice": invoice})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # Search sales account route
@@ -2482,150 +2347,6 @@ def search_sales_account():
                            default_start_date=default_start_date,
                            default_end_date=default_end_date)
 
-
-# Edit sales account
-# @app.route('/edit_sales_account/<int:sales_acc_id>', methods=['POST'])
-# def edit_sales_account(sales_acc_id):
-#     if 'org_id' not in session:
-#         flash('Session expired. Please login again.', 'warning')
-#         return redirect(url_for('org_login'))
-#
-#     if 'user_id' not in session:
-#         return redirect(url_for('search_sales_account'))
-#
-#     org_id = session['org_id']
-#
-#     conn = get_db_connection()
-#     cur = conn.cursor()
-#
-#     # Only superuser and admin can edit
-#     if session.get('role') not in [1, 2]:
-#         cur.close()
-#         conn.close()
-#         flash("You don't have permission to edit sales accounts", "danger")
-#         return redirect(url_for('search_sales_account'))
-#
-#     try:
-#         data = request.get_json()
-#         invoice_date = datetime.strptime(data.get('invoice_date'), '%Y-%m-%d').date()
-#         customer_name = data.get('customer_name')
-#         product = data.get('product')
-#         quantity = int(data.get('quantity'))
-#         price = float(data.get('price'))
-#         total = quantity * price
-#         category = data.get('category')
-#         account_owner = data.get('account_owner')
-#         frequency = data.get('frequency')
-#         bank_account = data.get('bank_account', '')
-#
-#         # Deactivate old sales account and related records
-#         cur.execute("UPDATE sales_account SET status = 'Not Active' WHERE sales_acc_id = %s RETURNING invoice_number",
-#                     (sales_acc_id,))
-#         original_invoice_no = cur.fetchone()[0]
-#
-#         cur.execute("UPDATE sales SET status = 'Not Active' WHERE sales_acc_invoice_no = %s", (original_invoice_no,))
-#         cur.execute("UPDATE sales_list SET notes = 'Not Active' WHERE reference_no = %s", (original_invoice_no,))
-#
-#         # Generate new invoice number
-#         new_invoice_no = generate_next_invoice_number()
-#
-#         # Create new sales_account
-#         cur.execute("SELECT MAX(sales_acc_id) FROM sales_account")
-#         max_id = cur.fetchone()[0] or 0
-#         new_sales_acc_id = max_id + 1
-#
-#         cur.execute("""
-#             INSERT INTO sales_account (
-#                 sales_acc_id, invoice_date, invoice_number, customer_name, product,
-#                 quantity, price, total, created_at, category, account_owner,
-#                 frequency, status, bank_account
-#             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Active', %s)
-#         """, (
-#             new_sales_acc_id, invoice_date, new_invoice_no, customer_name, product,
-#             quantity, price, total, datetime.now(), category, account_owner,
-#             frequency, bank_account
-#         ))
-#
-#         # Insert invoice
-#         cur.execute("""
-#             INSERT INTO invoices (invoice_number, created_at)
-#             VALUES (%s, %s)
-#             ON CONFLICT (invoice_number) DO NOTHING
-#         """, (new_invoice_no, datetime.now()))
-#
-#         conn.commit()
-#         # Frequency handling
-#         today = datetime.today().date()
-#
-#         if frequency == 'Monthly':
-#             delta = relativedelta(months=1)
-#         elif frequency == 'Quarterly':
-#             delta = relativedelta(months=3)
-#         elif frequency == 'Annual':
-#             delta = relativedelta(years=1)
-#         else:
-#             delta = None
-#
-#         if delta:
-#             next_due_date = invoice_date
-#             generated_invoices = []  # PDF links for backdated invoices
-#             while next_due_date <= today + delta:
-#                 new_invoice_number = generate_next_invoice_number()
-#
-#                 cur.execute("""
-#                     INSERT INTO sales (
-#                         invoice_date, invoice_no, customer_name, product, quantity,
-#                         price, total, date_created, category, account_owner,
-#                         sales_acc_invoice_no, bank_account
-#                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-#                 """, (
-#                     next_due_date, new_invoice_number, customer_name, product, quantity,
-#                     price, total, datetime.now(), category, account_owner,
-#                     new_invoice_no, bank_account
-#                 ))
-#
-#                 cur.execute("""
-#                     INSERT INTO invoices (invoice_number, created_at)
-#                     VALUES (%s, %s)
-#                     ON CONFLICT (invoice_number) DO NOTHING
-#                 """, (new_invoice_number, datetime.now()))
-#
-#                 generated_invoices.append({
-#                     'date': next_due_date.strftime('%Y-%m-%d'),
-#                     'invoice_no': new_invoice_number
-#                 })
-#
-#                 # Calculate the total for this invoice (sum of all items)
-#                 cur.execute("""
-#                     SELECT SUM(total) FROM sales WHERE invoice_no = %s
-#                 """, (new_invoice_number,))
-#                 invoice_total = cur.fetchone()[0] or 0
-#
-#                 cur.execute("""
-#                     INSERT INTO sales_list (
-#                         customer_name, invoice_no, invoice_date, invoice_amount,
-#                         paid_amount, balance, category, account_owner, reference_no
-#                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-#                                     """, (
-#                     customer_name, new_invoice_number, next_due_date, invoice_total,
-#                     0, invoice_total, category, account_owner, new_invoice_no
-#                 ))
-#
-#                 conn.commit()
-#                 next_due_date += delta
-#
-#             return jsonify({
-#                 'status': 'success',
-#                 'message': 'Sales account updated successfully',
-#                 'generated_invoices': generated_invoices
-#             })
-#
-#     except Exception as e:
-#         conn.rollback()
-#         return jsonify({'status': 'error', 'message': str(e)}), 500
-#     finally:
-#         cur.close()
-#         conn.close()
 
 @app.route('/edit_sales_account/<int:sales_acc_id>', methods=['POST'])
 def edit_sales_account(sales_acc_id):
@@ -2707,8 +2428,6 @@ def edit_sales_account(sales_acc_id):
                 ON CONFLICT (invoice_number) DO NOTHING
             """, (new_invoice_no, datetime.now()))
 
-            conn.commit()
-
             # Frequency handling
             today = datetime.today().date()
 
@@ -2766,8 +2485,6 @@ def edit_sales_account(sales_acc_id):
                         customer_name, new_invoice_number, next_due_date, invoice_total,
                         0, invoice_total, category, account_owner, new_invoice_no
                     ))
-
-                    conn.commit()
                     next_due_date += delta
 
                 return jsonify({
@@ -2823,8 +2540,7 @@ def view_sales():
             category = request.form.get('category')
 
             # Start building query
-            query = f"""
-                           SELECT id, customer_name, invoice_no, invoice_date, invoice_amount,
+            query = f""" SELECT id, customer_name, invoice_no, invoice_date, invoice_amount,
                            paid_amount, balance, payment_status, category, account_owner, reference_no
                            FROM {org_id}_sales_list
                            WHERE 1=1
@@ -2912,8 +2628,7 @@ def record_payment(sales_list_id):
         account_owner = data.get('account_owner')
 
         # Get current totals from sales_list
-        cur.execute(f"""
-            SELECT paid_amount, invoice_amount
+        cur.execute(f""" SELECT paid_amount, invoice_amount
             FROM {org_id}_sales_list
             WHERE id = %s
         """, (sales_list_id,))
@@ -3034,9 +2749,6 @@ def record_payment(sales_list_id):
         filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
 
         generate_receipt(receipt_data, filepath)
-
-        conn.commit()
-
         # Check if this is a sales account payment and create next due sale
         if sales_acc_invoice_no and frequency and payment_status == 'Paid':
             # Get the most recent invoice date for this sales account
@@ -3115,8 +2827,6 @@ def record_payment(sales_list_id):
                                 category, account_owner, sales_acc_invoice_no
                             ))
 
-        conn.commit()
-
         return jsonify({
             'success': True,
             'message': message,
@@ -3127,14 +2837,10 @@ def record_payment(sales_list_id):
         })
 
     except Exception as e:
-        conn.rollback()
         return jsonify({
             'success': False,
             'message': f'Error recording payment: {str(e)}'
         }), 500
-    # finally:
-    #     cur.close()
-    #     conn.close()
 
 
 # Search receipts
@@ -3228,12 +2934,9 @@ def edit_receipt(receipt_id):
 
     org_id = session['org_id']
 
-    with get_db_connection2() as conn:
-        cur = conn.cursor()
-
-        if session.get('role') not in [1, 2]:
-            flash('You do not have access to edit receipts', 'danger')
-            return redirect(url_for('search_receipts'))
+    if session.get('role') not in [1, 2]:
+        flash('You do not have access to edit receipts', 'danger')
+        return redirect(url_for('search_receipts'))
 
     if request.method == 'POST':
         data = request.get_json()
@@ -3249,247 +2952,249 @@ def edit_receipt(receipt_id):
             category = data.get('category')
             account_owner = data.get('account_owner')
 
-            cur.execute(f"""
-                        SELECT s.product,
-                               s.quantity,
-                               s.price as unit_price,
-                               s.total,
-                               s.sales_acc_invoice_no,
-                               p.frequency,
-                               s.bank_account
-                        FROM {org_id}_sales s
-                                 JOIN {org_id}_products p ON s.product = p.product
-                        WHERE s.invoice_no = %s
-                        """, (invoice_number,))
-            items_raw = cur.fetchall()
-            items = []
-
-            for item in items_raw:
-                items.append({
-                    'product': item[0],
-                    'quantity': item[1],
-                    'unit_price': float(item[2]),
-                    'total': float(item[3])
-                })
-
-            # Get the original total and reference_no from sales_list
-            cur.execute(f"""
-                        SELECT invoice_amount, reference_no
-                        FROM {org_id}_sales_list
-                        WHERE invoice_no = %s
-                        """, (invoice_number,))
-            sales_list_result = cur.fetchone()
-
-            original_total = 0
-            sales_acc_invoice_no = None
-            frequency = None
-
-            if sales_list_result:
-                original_total = float(sales_list_result[0]) if sales_list_result[0] else 0
-                sales_acc_invoice_no = sales_list_result[1] if sales_list_result[1] else None
-
-                # Get frequency from products table via sales table
+            with get_db_connection2() as conn:
+                cur = conn.cursor()
                 cur.execute(f"""
-                            SELECT p.frequency
+                            SELECT s.product,
+                                   s.quantity,
+                                   s.price as unit_price,
+                                   s.total,
+                                   s.sales_acc_invoice_no,
+                                   p.frequency,
+                                   s.bank_account
                             FROM {org_id}_sales s
                                      JOIN {org_id}_products p ON s.product = p.product
-                            WHERE s.invoice_no = %s LIMIT 1
+                            WHERE s.invoice_no = %s
                             """, (invoice_number,))
-                freq_result = cur.fetchone()
-                frequency = freq_result[0] if freq_result and freq_result[0] else None
-            else:
-                # If not found in sales_list, get from receipts table
+                items_raw = cur.fetchall()
+                items = []
+
+                for item in items_raw:
+                    items.append({
+                        'product': item[0],
+                        'quantity': item[1],
+                        'unit_price': float(item[2]),
+                        'total': float(item[3])
+                    })
+
+                # Get the original total and reference_no from sales_list
                 cur.execute(f"""
-                            SELECT paid_amount + balance
-                            FROM {org_id}_receipts
-                            WHERE receipt_id = %s
-                            """, (receipt_id,))
-                result = cur.fetchone()
-                original_total = float(result[0]) if result and result[0] else 0
-
-            new_balance = max(0, original_total - paid_amount)
-            payment_status = 'Paid' if new_balance == 0 else 'Not Paid'
-
-            # Update receipts table
-            cur.execute(f"""
-                        UPDATE {org_id}_receipts
-                        SET paid_date              = %s,
-                            invoice_number         = %s,
-                            invoice_date           = %s,
-                            customer_name          = %s,
-                            paid_amount            = %s,
-                            balance                = %s,
-                            receipt_invoice_number = %s,
-                            category               = %s,
-                            account_owner          = %s
-                        WHERE receipt_id = %s
-                        """, (
-                paid_date, invoice_number, invoice_date, customer_name,
-                paid_amount, new_balance, receipt_invoice_number,
-                category, account_owner, receipt_id
-            ))
-
-            # Update sales_list table
-            cur.execute(f"""
-                        UPDATE {org_id}_sales_list
-                        SET balance        = %s,
-                            paid_amount    = %s,
-                            payment_status = %s
-                        WHERE invoice_no = %s
-                        """, (new_balance, paid_amount, payment_status, invoice_number))
-
-            # Update sales table
-            cur.execute(f"""
-                UPDATE {org_id}_sales
-                SET payment_status = %s
-                WHERE invoice_no = %s
-            """, (payment_status, invoice_number))
-
-            message = f'Receipt updated! Receipt #{receipt_invoice_number}'
-            # Generate receipt PDF
-            receipt_data = {
-                'receipt_id': receipt_id,
-                'invoice_no': invoice_number,
-                'customer_name': customer_name,
-                'invoice_date': invoice_date,
-                'amount_paid': float(paid_amount),
-                'new_bal': float(new_balance),
-                'payment_date': paid_date,
-                'receipt_invoice_number': receipt_invoice_number,
-                'category': category,
-                'account_owner': account_owner,
-                'items': items
-            }
-
-            sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', receipt_invoice_number)
-            filename = f"receipt_{sanitized_invoice_no}.pdf"
-            filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
-
-            generate_receipt(receipt_data, filepath)
-
-            # Check if we should create a next due sale
-            next_invoice_generated = False
-            if sales_acc_invoice_no and frequency and payment_status == 'Paid':
-                # Get the most recent invoice date for this sales account
-                cur.execute(f"""
-                            SELECT invoice_date, payment_status
+                            SELECT invoice_amount, reference_no
                             FROM {org_id}_sales_list
-                            WHERE reference_no = %s
-                            ORDER BY invoice_date DESC LIMIT 1
-                            """, (sales_acc_invoice_no,))
-                most_recent_invoice = cur.fetchone()
+                            WHERE invoice_no = %s
+                            """, (invoice_number,))
+                sales_list_result = cur.fetchone()
 
-                if most_recent_invoice and most_recent_invoice[0]:
-                    most_recent_date = most_recent_invoice[0]
-                    current_invoice_date = datetime.strptime(invoice_date, '%Y-%m-%d').date()
+                original_total = 0
+                sales_acc_invoice_no = None
+                frequency = None
 
-                    if most_recent_date == current_invoice_date:
-                        # Calculate delta based on frequency
-                        delta = None
-                        if frequency == 'Monthly':
-                            delta = relativedelta(months=1)
-                        elif frequency == 'Quarterly':
-                            delta = relativedelta(months=3)
-                        elif frequency == 'Annual':
-                            delta = relativedelta(years=1)
+                if sales_list_result:
+                    original_total = float(sales_list_result[0]) if sales_list_result[0] else 0
+                    sales_acc_invoice_no = sales_list_result[1] if sales_list_result[1] else None
 
-                        if delta:
-                            next_due_date = most_recent_date + delta
+                    # Get frequency from products table via sales table
+                    cur.execute(f"""
+                                SELECT p.frequency
+                                FROM {org_id}_sales s
+                                         JOIN {org_id}_products p ON s.product = p.product
+                                WHERE s.invoice_no = %s LIMIT 1
+                                """, (invoice_number,))
+                    freq_result = cur.fetchone()
+                    frequency = freq_result[0] if freq_result and freq_result[0] else None
+                else:
+                    # If not found in sales_list, get from receipts table
+                    cur.execute(f"""
+                                SELECT paid_amount + balance
+                                FROM {org_id}_receipts
+                                WHERE receipt_id = %s
+                                """, (receipt_id,))
+                    result = cur.fetchone()
+                    original_total = float(result[0]) if result and result[0] else 0
 
-                            # Check if this next invoice already exists
-                            cur.execute(f"""
-                                        SELECT COUNT(*)
-                                        FROM {org_id}_sales_list
-                                        WHERE reference_no = %s
-                                          AND invoice_date = %s
-                                        """, (sales_acc_invoice_no, next_due_date))
-                            invoice_exists = cur.fetchone()[0] > 0
+                new_balance = max(0, original_total - paid_amount)
+                payment_status = 'Paid' if new_balance == 0 else 'Not Paid'
 
-                            if not invoice_exists:
-                                # Get product details from the original sale
+                # Update receipts table
+                cur.execute(f"""
+                            UPDATE {org_id}_receipts
+                            SET paid_date              = %s,
+                                invoice_number         = %s,
+                                invoice_date           = %s,
+                                customer_name          = %s,
+                                paid_amount            = %s,
+                                balance                = %s,
+                                receipt_invoice_number = %s,
+                                category               = %s,
+                                account_owner          = %s
+                            WHERE receipt_id = %s
+                            """, (
+                    paid_date, invoice_number, invoice_date, customer_name,
+                    paid_amount, new_balance, receipt_invoice_number,
+                    category, account_owner, receipt_id
+                ))
+
+                # Update sales_list table
+                cur.execute(f"""
+                            UPDATE {org_id}_sales_list
+                            SET balance        = %s,
+                                paid_amount    = %s,
+                                payment_status = %s
+                            WHERE invoice_no = %s
+                            """, (new_balance, paid_amount, payment_status, invoice_number))
+
+                # Update sales table
+                cur.execute(f"""
+                    UPDATE {org_id}_sales
+                    SET payment_status = %s
+                    WHERE invoice_no = %s
+                """, (payment_status, invoice_number))
+
+                message = f'Receipt updated! Receipt #{receipt_invoice_number}'
+                # Generate receipt PDF
+                receipt_data = {
+                    'receipt_id': receipt_id,
+                    'invoice_no': invoice_number,
+                    'customer_name': customer_name,
+                    'invoice_date': invoice_date,
+                    'amount_paid': float(paid_amount),
+                    'new_bal': float(new_balance),
+                    'payment_date': paid_date,
+                    'receipt_invoice_number': receipt_invoice_number,
+                    'category': category,
+                    'account_owner': account_owner,
+                    'items': items
+                }
+
+                sanitized_invoice_no = re.sub(r'[^a-zA-Z0-9]', '_', receipt_invoice_number)
+                filename = f"receipt_{sanitized_invoice_no}.pdf"
+                filepath = os.path.join(app.config['RECEIPT_FOLDER'], filename)
+
+                generate_receipt(receipt_data, filepath)
+
+                # Check if we should create a next due sale
+                next_invoice_generated = False
+                if sales_acc_invoice_no and frequency and payment_status == 'Paid':
+                    # Get the most recent invoice date for this sales account
+                    cur.execute(f"""
+                                SELECT invoice_date, payment_status
+                                FROM {org_id}_sales_list
+                                WHERE reference_no = %s
+                                ORDER BY invoice_date DESC LIMIT 1
+                                """, (sales_acc_invoice_no,))
+                    most_recent_invoice = cur.fetchone()
+
+                    if most_recent_invoice and most_recent_invoice[0]:
+                        most_recent_date = most_recent_invoice[0]
+                        current_invoice_date = datetime.strptime(invoice_date, '%Y-%m-%d').date()
+
+                        if most_recent_date == current_invoice_date:
+                            # Calculate delta based on frequency
+                            delta = None
+                            if frequency == 'Monthly':
+                                delta = relativedelta(months=1)
+                            elif frequency == 'Quarterly':
+                                delta = relativedelta(months=3)
+                            elif frequency == 'Annual':
+                                delta = relativedelta(years=1)
+
+                            if delta:
+                                next_due_date = most_recent_date + delta
+
+                                # Check if this next invoice already exists
                                 cur.execute(f"""
-                                            SELECT s.product, s.quantity, s.price, s.total, s.bank_account
-                                            FROM {org_id}_sales s
-                                                     JOIN {org_id}_products p ON s.product = p.product
-                                            WHERE s.invoice_no = %s
-                                            """, (invoice_number,))
-                                items = []
-                                bank_account = None
-                                for row in cur.fetchall():
-                                    items.append({
-                                        'product': row[0],
-                                        'quantity': row[1],
-                                        'unit_price': row[2],
-                                        'total': row[3]
-                                    })
-                                    bank_account = row[4] if row[4] else None
+                                            SELECT COUNT(*)
+                                            FROM {org_id}_sales_list
+                                            WHERE reference_no = %s
+                                              AND invoice_date = %s
+                                            """, (sales_acc_invoice_no, next_due_date))
+                                invoice_exists = cur.fetchone()[0] > 0
 
-                                if items:
-                                    new_invoice_number = generate_next_invoice_number()
-                                    current_datetime = datetime.now()
+                                if not invoice_exists:
+                                    # Get product details from the original sale
+                                    cur.execute(f"""
+                                                SELECT s.product, s.quantity, s.price, s.total, s.bank_account
+                                                FROM {org_id}_sales s
+                                                         JOIN {org_id}_products p ON s.product = p.product
+                                                WHERE s.invoice_no = %s
+                                                """, (invoice_number,))
+                                    items = []
+                                    bank_account = None
+                                    for row in cur.fetchall():
+                                        items.append({
+                                            'product': row[0],
+                                            'quantity': row[1],
+                                            'unit_price': row[2],
+                                            'total': row[3]
+                                        })
+                                        bank_account = row[4] if row[4] else None
 
-                                    # Create new sales records for each product
-                                    for item in items:
+                                    if items:
+                                        new_invoice_number = generate_next_invoice_number()
+                                        current_datetime = datetime.now()
+
+                                        # Create new sales records for each product
+                                        for item in items:
+                                            cur.execute(f"""
+                                                        INSERT INTO {org_id}_sales (invoice_date, invoice_no, customer_name, product,
+                                                                           quantity,
+                                                                           price, total, date_created, category,
+                                                                           account_owner,
+                                                                           sales_acc_invoice_no, bank_account)
+                                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                        """, (
+                                                next_due_date, new_invoice_number, customer_name,
+                                                item['product'], item['quantity'], item['unit_price'],
+                                                item['total'], current_datetime, category, account_owner,
+                                                sales_acc_invoice_no, bank_account
+                                            ))
+
+                                        # Create invoice record
                                         cur.execute(f"""
-                                                    INSERT INTO {org_id}_sales (invoice_date, invoice_no, customer_name, product,
-                                                                       quantity,
-                                                                       price, total, date_created, category,
-                                                                       account_owner,
-                                                                       sales_acc_invoice_no, bank_account)
-                                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                    INSERT INTO {org_id})_invoices (invoice_number, created_at)
+                                                    VALUES (%s, %s) ON CONFLICT (invoice_number) DO NOTHING
+                                                    """, (new_invoice_number, current_datetime))
+
+                                        # Create sales_list entry
+                                        invoice_amount = sum(item['total'] for item in items)
+                                        cur.execute(f"""
+                                                    INSERT INTO {org_id}_sales_list (customer_name, invoice_no, invoice_date,
+                                                                            invoice_amount, paid_amount, balance, category,
+                                                                            account_owner, reference_no)
+                                                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                                                     """, (
-                                            next_due_date, new_invoice_number, customer_name,
-                                            item['product'], item['quantity'], item['unit_price'],
-                                            item['total'], current_datetime, category, account_owner,
-                                            sales_acc_invoice_no, bank_account
+                                            customer_name, new_invoice_number, next_due_date,
+                                            invoice_amount, 0, invoice_amount,
+                                            category, account_owner, sales_acc_invoice_no,
                                         ))
+                                        next_invoice_generated = True
+                return jsonify({
+                    "status": "success",
+                    "message": message,
+                    "receipt": {
+                        "invoice_date": invoice_date,
+                        "invoice_number": invoice_number,
+                        "customer_name": customer_name,
+                        "paid_amount": paid_amount,
+                        "balance": new_balance,
+                        "category": category,
+                        "account_owner": account_owner,
+                    },
+                    'download_url': url_for('download_receipt', filename=filename)
 
-                                    # Create invoice record
-                                    cur.execute(f"""
-                                                INSERT INTO {org_id})_invoices (invoice_number, created_at)
-                                                VALUES (%s, %s) ON CONFLICT (invoice_number) DO NOTHING
-                                                """, (new_invoice_number, current_datetime))
-
-                                    # Create sales_list entry
-                                    invoice_amount = sum(item['total'] for item in items)
-                                    cur.execute(f"""
-                                                INSERT INTO {org_id}_sales_list (customer_name, invoice_no, invoice_date,
-                                                                        invoice_amount, paid_amount, balance, category,
-                                                                        account_owner, reference_no)
-                                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                                """, (
-                                        customer_name, new_invoice_number, next_due_date,
-                                        invoice_amount, 0, invoice_amount,
-                                        category, account_owner, sales_acc_invoice_no,
-                                    ))
-                                    next_invoice_generated = True
-
-            conn.commit()
-
-            return jsonify({
-                "status": "success",
-                "message": message,
-                "receipt": {
-                    "invoice_date": invoice_date,
-                    "invoice_number": invoice_number,
-                    "customer_name": customer_name,
-                    "paid_amount": paid_amount,
-                    "balance": new_balance,
-                    "category": category,
-                    "account_owner": account_owner,
-                },
-                'download_url': url_for('download_receipt', filename=filename)
-
-            })
+                })
 
         except Exception as e:
-            conn.rollback()
             return jsonify({"status": "error", "message": str(e)}), 500
-
-    # GET request handling remains the same
-    cur.execute(f"SELECT * FROM {org_id}_receipts WHERE receipt_id = %s", (receipt_id,))
-    receipt = cur.fetchone()
-    return jsonify({"receipt": receipt})
+    try:
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+            # GET request handling remains the same
+            cur.execute(f"SELECT * FROM {org_id}_receipts WHERE receipt_id = %s", (receipt_id,))
+            receipt = cur.fetchone()
+            return jsonify({"receipt": receipt})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # Search and receive route
@@ -3562,303 +3267,28 @@ def get_unpaid_invoices(customer_name):
                         ORDER BY invoice_date DESC
                         """, (customer_name,))
 
-        columns = [desc[0] for desc in cur.description]
-        unpaid_invoices = [dict(zip(columns, row)) for row in cur.fetchall()]
+            columns = [desc[0] for desc in cur.description]
+            unpaid_invoices = [dict(zip(columns, row)) for row in cur.fetchall()]
 
-        # Now each invoice dict will have 'id' which can be used as sales_list_id
-        for invoice in unpaid_invoices:
-            invoice['sales_list_id'] = invoice['id']  # Make it explicit
+            # Now each invoice dict will have 'id' which can be used as sales_list_id
+            for invoice in unpaid_invoices:
+                invoice['sales_list_id'] = invoice['id']  # Make it explicit
 
-        if not unpaid_invoices:
+            if not unpaid_invoices:
+                return jsonify({
+                    "status": "empty",
+                    "message": f"No unpaid invoices found for {customer_name}"
+                })
+
             return jsonify({
-                "status": "empty",
-                "message": f"No unpaid invoices found for {customer_name}"
+                "status": "success",
+                "invoices": unpaid_invoices,
+                "customer": customer_name
             })
-
-        return jsonify({
-            "status": "success",
-            "invoices": unpaid_invoices,
-            "customer": customer_name
-        })
     except Exception as e:
         app.logger.error(f"Error getting unpaid invoices: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-
-# View sales route
-"""@app.route('/invoice/<int:sales_id>')
-def view_sales(sales_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM sales WHERE sales_id = %s", (sales_id,))
-    invoice = cur.fetchone()
-    cur.close()
-    conn.close()
-
-    if not invoice:
-        flash("Invoice not found", "danger")
-        return redirect(url_for('search_invoices'))
-
-    return render_template('view_sales.html', invoice=invoice)
-
-"""
-
-
-# # Manage users route
-# @app.route('/manage_users')
-# def manage_users():
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-#
-#     conn = get_db_connection()
-#     cur = conn.cursor()
-#
-#     # If user has role 3, only fetch their own information
-#     if session.get('role') == 3:
-#         cur.execute("""
-#             SELECT u.user_id, u.username, r.role_name, u.status
-#             FROM users u
-#                 JOIN roles r ON u.role = r.role_id
-#             WHERE u.user_id = %s
-#         """, (session['user_id'],))
-#     # For roles 1 and 2, fetch all users as before
-#     elif session.get('role') in [1, 2]:
-#         cur.execute("""
-#             SELECT u.user_id, u.username, r.role_name, u.status
-#             FROM users u
-#                 JOIN roles r ON u.role = r.role_id
-#             ORDER BY u.user_id ASC
-#         """)
-#     # If role is not 1, 2, or 3, redirect (or handle as you prefer)
-#     else:
-#         cur.close()
-#         conn.close()
-#         return redirect(url_for('login'))  # or some other page
-#
-#     users = cur.fetchall()
-#     cur.close()
-#     conn.close()
-#
-#     return render_template('manage_users.html', users=users)
-#
-#
-# # Add users route
-# @app.route('/add_user', methods=['GET', 'POST'])
-# def add_user():
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-#
-#     if session.get('role') not in [1, 2]:
-#         flash('Access denied', 'danger')
-#         return redirect(url_for('manage_users'))
-#
-#     conn = get_db_connection()
-#     cur = conn.cursor()
-#
-#     cur.execute("SELECT role_id, role_name FROM roles")
-#     roles = cur.fetchall()
-#
-#     if request.method == 'POST':
-#         username = request.form['username']
-#         role_id = request.form['role']
-#         password = request.form['password']
-#         confirm_password = request.form['confirm_password']
-#
-#         error = validate_password(password)
-#         if error:
-#             flash(error, "danger")
-#             selected_role = int(role_id)
-#             return render_template('add_users.html', roles=roles, username=username, selected_role=selected_role)
-#
-#         if password != confirm_password:
-#             flash("Passwords do not match!", "danger")
-#             selected_role = int(role_id)
-#             return render_template('add_users.html', roles=roles, username=username, selected_role=selected_role)
-#
-#         hashed_password = generate_password_hash(password)
-#
-#         try:
-#             cur.execute("""
-#                 INSERT INTO users (username, role, password)
-#                 VALUES (%s, %s, %s)
-#             """, (username, role_id, hashed_password))
-#             conn.commit()
-#             flash('User added successfully!', 'success')
-#
-#             # Redirect to manage users page
-#             return redirect(url_for('manage_users'))
-#
-#         except Exception as e:
-#             conn.rollback()
-#             flash(f'Error: {str(e)}', 'danger')
-#             return render_template('add_users.html', roles=roles, username=username, selected_role=role_id)
-#
-#         finally:
-#             cur.close()
-#             conn.close()
-#     else:
-#         # GET: fetch roles for dropdown
-#         cur.execute("SELECT role_id, role_name FROM roles")
-#         roles = cur.fetchall()
-#         cur.close()
-#         conn.close()
-#         return render_template('add_users.html', roles=roles)
-#
-#
-# # Change Password Route
-# @app.route('/change_password/<int:user_id>', methods=['GET', 'POST'])
-# def change_password(user_id):
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-#
-#     if session['user_id'] != user_id:
-#         flash("You can only change your own password.", "danger")
-#         return redirect(url_for('manage_users'))
-#
-#     if request.method == 'POST':
-#         user_id = session['user_id']
-#         old_password = request.form['old_password']
-#         new_password = request.form['new_password']
-#         confirm_password = request.form['confirm_password']
-#
-#         error = validate_password(new_password)
-#         if error:
-#             flash(error, "danger")
-#             return redirect(url_for('change_password'))
-#         if new_password != confirm_password:
-#             flash("Passwords do not match!", "danger")
-#             return redirect(url_for('change_password', user_id=user_id))
-#
-#         conn = get_db_connection()
-#         cur = conn.cursor()
-#
-#         cur.execute("SELECT password FROM users WHERE user_id = %s", (user_id,))
-#         user = cur.fetchone()
-#
-#         if user and check_password_hash(user[0], old_password):
-#             hashed_password = generate_password_hash(new_password)
-#             cur.execute("UPDATE users SET password = %s WHERE user_id = %s", (hashed_password, user_id))
-#             conn.commit()
-#             flash('Password changed successfully!', 'success')
-#         else:
-#             flash('Old password is incorrect!', 'danger')
-#
-#         cur.close()
-#         conn.close()
-#
-#         return redirect(url_for('change_password', user_id=user_id))
-#
-#     return render_template('change_password.html')
-#
-#
-# # User details route
-# @app.route('/user_details/<int:user_id>')
-# def user_details(user_id):
-#     if 'user_id' not in session:
-#         flash("Please log in first.", "warning")
-#         return redirect(url_for('org_login'))
-#
-#     conn = get_db_connection()
-#     cur = conn.cursor()
-#
-#     try:
-#         if session.get('role') == 1 or session.get('role') == 2:
-#             cur.execute("""
-#             SELECT u.user_id, u.username, r.role_name FROM users u
-#             JOIN roles r
-#             ON u.role = r.role_id
-#             WHERE u.user_id = %s
-#             """, (user_id,))
-#         else:
-#             cur.execute("""
-#             SELECT u.user_id, u.username, r.role_name FROM users u
-#             JOIN roles r
-#             ON u.role = r.role_id
-#             WHERE u.user_id = %s
-#             AND u.user_id = %s
-#             """, (user_id, session['user_id']))
-#
-#         user = cur.fetchone()
-#
-#         if not user:
-#             flash("User not found or access denied.", "danger")
-#             return redirect(url_for('manage_users'))
-#
-#         return render_template('user_details.html', user=user)
-#
-#     except Exception as e:
-#         flash(f"Error: {str(e)}", "danger")
-#         return redirect(url_for('manage_users'))
-#     finally:
-#         cur.close()
-#         conn.close()
-#
-#
-# # Edit User information route
-# @app.route('/edit_users/<int:user_id>', methods=['GET', 'POST'])
-# def edit_users(user_id):
-#     if 'user_id' not in session:
-#         return redirect(url_for('login'))
-#
-#     conn = get_db_connection()
-#     cur = conn.cursor()
-#
-#     if session.get('role') not in [1, 2]:
-#         flash('Access denied', 'danger')
-#         return redirect(url_for('manage_users'))
-#
-#     if request.method == 'POST':
-#         # Get data from form
-#         username = request.form.get('username')
-#         role_id = request.form.get('role')
-#         status = request.form.get('status')
-#
-#         try:
-#             # Update user in the database
-#             cur.execute("""
-#                 UPDATE users
-#                 SET username = %s, role = %s, status = %s
-#                 WHERE user_id = %s
-#             """, (username, role_id, status, user_id))
-#             conn.commit()
-#             flash("User updated successfully", "success")
-#             return redirect(url_for('manage_users'))
-#         except Exception as e:
-#             conn.rollback()
-#             flash(f"Failed to update user: {e}", "danger")
-#         finally:
-#             cur.close()
-#             conn.close()
-#     else:
-#         try:
-#             # Fetch user details
-#             cur.execute("""
-#                 SELECT u.user_id, u.username, r.role_id, r.role_name, u.status
-#                 FROM users u
-#                 JOIN roles r ON u.role = r.role_id
-#                 WHERE u.user_id = %s
-#             """, (user_id,))
-#             user = cur.fetchone()
-#
-#             # Fetch all roles for the dropdown
-#             cur.execute("SELECT role_id, role_name FROM roles")
-#             roles = cur.fetchall()
-#
-#             if not user:
-#                 flash("User not found or access denied", "danger")
-#                 return redirect(url_for('manage_users'))
-#
-#             return render_template('edit_users.html', user=user, roles=roles)
-#
-#         except Exception as e:
-#             flash(f"Error fetching user: {e}", "danger")
-#             return redirect(url_for('manage_users'))
-#         finally:
-#             cur.close()
-#             conn.close()
 # Manage users route
 @app.route('/manage_users')
 def manage_users():
@@ -3947,7 +3377,7 @@ def add_user():
         hashed_password = generate_password_hash(password)
 
         try:
-            with get_db_connection() as conn:
+            with get_db_connection2() as conn:
                 cur = conn.cursor()
                 cur.execute(f"""
                     INSERT INTO {org_id}_users (username, role, password, full_name, email,  org_id) 
@@ -4195,13 +3625,11 @@ def add_client():
                     INSERT INTO {org_id}_clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
-                conn.commit()
                 flash('Client added successfully!', 'success')
 
             return redirect(url_for('manage_clients'))
 
         except Exception as e:
-            conn.rollback()
             flash(f'Error: {str(e)}', 'danger')
     else:
         return render_template('add_clients.html')
@@ -4243,8 +3671,6 @@ def add_client_ajax():
                     INSERT INTO {org_id}_clients (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created) 
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, date_created))
-                conn.commit()
-
                 return jsonify({'success': True, 'customer_name': customer_name})
 
     except Exception as e:
@@ -4288,7 +3714,6 @@ def edit_clients(customer_id):
                     email = %s, position = %s, id_no = %s
                     WHERE customer_id = %s
                 """, (customer_name, institution, phone_no, phone_no_2, email, position, id_no, customer_id))
-                conn.commit()
                 flash("Client updated successfully", "success")
                 return redirect(url_for('manage_clients'))
         except Exception as e:
@@ -4553,7 +3978,6 @@ def products():
                     cur.execute(f"""
                                 UPDATE {org_id}_products SET status = 'Inactive' WHERE product_number = %s
                             """, (product_number,))
-                    conn.commit()
                     return jsonify({'success': True, 'message': 'Product deleted successfully'})
             except Exception as e:
                 print(f"Error deleting product: {e}")
@@ -4604,7 +4028,6 @@ def products():
 
                     # Get the updated record
                     updated_record = cur.fetchone()
-                    conn.commit()
                 # Format the updated record for response
 
                 date_created = ''
@@ -4682,7 +4105,6 @@ def products():
                         raise Exception("No data returned after insert")
 
                     product, date_created = result
-                    conn.commit()
 
                 # Format the date safely
                 formatted_date = ''
@@ -4818,14 +4240,10 @@ def suppliers():
                     cur.execute(f"""
                         UPDATE {org_id}_suppliers SET status = 'Not Active' WHERE supplier_id = %s
                     """, (supplier_id,))
-                    conn.commit()
                     return jsonify({'success': True, 'message': 'Supplier deleted successfully'})
             except Exception as e:
                 print(f"Error deleting supplier: {e}")
                 return jsonify({'success': False, 'message': 'Failed to delete supplier'}), 400
-            finally:
-                cur.close()
-                conn.close()
 
         elif form_type == 'edit':
             try:
@@ -4861,7 +4279,6 @@ def suppliers():
 
                     # Get the updated record
                     updated_record = cur.fetchone()
-                    conn.commit()
 
                 # Format dates for response
                 created_at = ''
@@ -4937,7 +4354,6 @@ def suppliers():
                         raise Exception("No data returned after insert")
 
                     supplier_id, sup_name, cont_name, tel, em, created_at = result
-                    conn.commit()
 
                 # Format the date safely
                 formatted_date = ''
@@ -5145,8 +4561,6 @@ def edit_billing_account(billing_acc_id):
                         VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
                         """, (new_invoice_no,))
 
-            conn.commit()
-
         # Initialize generated_bills list to store generated bills
         generated_bills = []
 
@@ -5194,7 +4608,6 @@ def edit_billing_account(billing_acc_id):
                     'invoice_no': bill_invoice_number
                 })
 
-                conn.commit()
                 next_due_date += delta
 
         return jsonify({
@@ -5266,8 +4679,6 @@ def add_billing_account():
                 VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
             """, (invoice_number,))
 
-            conn.commit()
-
         # Calculate time delta based on frequency
         if frequency == 'Monthly':
             delta = relativedelta(months=1)
@@ -5307,8 +4718,6 @@ def add_billing_account():
                 'due_date': next_due_date.strftime('%d-%m-%Y'),
                 'invoice_no': bill_invoice_number
             })
-
-            conn.commit()
             next_due_date += delta
 
         return jsonify({
@@ -5362,7 +4771,6 @@ def delete_billing_account():
 
             cur.execute(update_query, (invoice_number,))
             result = cur.fetchone()
-            conn.commit()
 
         if result:
             return jsonify({
@@ -5597,8 +5005,6 @@ def edit_bill(bill_id):
                     account_owner, bill_invoice_number, bank_account, bill_id
                 ))
 
-                conn.commit()
-
                 return jsonify({
                     "status": "success",
                     "invoice": {
@@ -5660,7 +5066,6 @@ def delete_bill():
 
             cur.execute(update_query, (bill_invoice_number,))
             result = cur.fetchone()
-            conn.commit()
 
             if result:
                 return jsonify({
@@ -5739,8 +5144,6 @@ def add_bill():
                 INSERT INTO {org_id}_invoices (invoice_number)
                 VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
             """, (bill_invoice_number,))
-
-            conn.commit()
 
             return jsonify({
                 'success': True,
@@ -6029,8 +5432,6 @@ def pay_bill(bill_id):
                         VALUES (%s) ON CONFLICT (invoice_number) DO NOTHING
                         """, (payment_reference_no,))
 
-            conn.commit()
-
             # Update bill status if fully paid
             billing_account = None
             next_due_date = None
@@ -6108,8 +5509,6 @@ def pay_bill(bill_id):
 
             else:
                 cur.execute(f"UPDATE {org_id}_bills SET pay_status = 'Not Paid' WHERE bill_id = %s", (bill_id,))
-
-            conn.commit()
 
             # Get the complete payment details for PDF generation
             cur.execute(f"""
@@ -6402,8 +5801,6 @@ def update_payment(payment_id):
                             print(f"Found {existing_bill_count} bill(s) for date: {next_due_date.strftime('%Y-%m-%d')}")
                             print(f"Skipping bill generation")
                             print("================================")
-
-            conn.commit()
 
             payment_data = {
                 'payment_date': datetime.strptime(payment_date, '%Y-%m-%d').strftime('%d-%m-%Y'),
