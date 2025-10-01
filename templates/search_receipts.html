@@ -138,15 +138,14 @@
                         </tr>
                     </thead>
                     <tbody>
+                      {% if receipts and receipts|length > 0 %}
                         {% for receipt in receipts %}
                         <tr>
-                            <td>
-                                {{ receipt[1].strftime('%d-%m-%Y') }}
-                            </td>
+                            <td>{{ receipt[1].strftime('%d-%m-%Y') if receipt[1] else '' }}</td>
                             <td>{{ receipt[2] }}</td>
                             <td>{{ receipt[4] }}</td>
-                            <td>{{ "Ksh {:,.2f}".format(receipt[5])}}</td>
-                            <td>{{ "Ksh {:,.2f}".format(receipt[6])}}</td>
+                            <td>{{ "Ksh {:,.2f}".format(receipt[5]) if receipt[5] else "Ksh 0.00" }}</td>
+                            <td>{{ "Ksh {:,.2f}".format(receipt[6])if receipt[6] else "Ksh 0.00" }}</td>
                             <td>
                                 <button type="button" class="btn btn-sm btn-warning edit-btn" data-bs-toggle="modal" data-bs-target="#editModal"
                                     data-receipt-id="{{ receipt[0] }}"
@@ -159,13 +158,19 @@
                                     data-receipt-invoice-number="{{ receipt[7] }}"
                                     data-category="{{ receipt[8] }}"
                                     data-account-owner="{{ receipt[9] }}"
-                                    data-original-total="{{ receipt[5] + receipt[6] }}"
+                                    data-original-total="{{ (receipt[5] or 0) + (receipt[6] or 0) }}"
+
                                     >
                                     Edit
                                 </button>
                             </td>
                         </tr>
                         {% endfor %}
+                    {% else %}
+                        <tr>
+                          <td colspan="5" class="text-center">No receipts found</td>
+                        </tr>
+                      {% endif %}
                     </tbody>
                 </table>
             </div>
