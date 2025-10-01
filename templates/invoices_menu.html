@@ -39,9 +39,10 @@
         }
 
         .page-header h1 {
-            color: #2c3e50;
+            color: orange;
             font-weight: 600;
             margin-bottom: 10px;
+            font-size: 36px;
         }
 
         /* Back button positioning */
@@ -72,6 +73,9 @@
             box-shadow: 0 2px 12px rgba(0,0,0,0.08);
             margin-bottom: 0;
             margin-top: 0;
+        }
+        #create-section {
+            padding: 10px 30px 30px 30px; /* No top padding */
         }
         #edit-section {
             padding: 10px 30px 30px 30px; /* No top padding */
@@ -140,6 +144,11 @@
             color: #dc3545;
             border: none;
             font-size: 0.875rem;
+        }
+        .small-form {
+            max-width: 600px;   /* adjust as needed (400px, 500px, etc.) */
+            width: 100%;        /* makes it responsive */
+            padding: 15px;      /* optional, adds breathing room */
         }
         /* Active nav button styling */
         .nav-buttons .btn.active {
@@ -626,37 +635,100 @@
             </div>
 
             <!-- Sales Form Section -->
-            <div id="salesFormSection" class="form-section">
+            <div id="salesFormSection" class="form-section small-form mx-auto">
                 <div class="alert alert-info mb-4">
                     <div class="row">
                         <div class="col-md-6">
                             <span id="selectedClientFormDisplay">No client selected</span>
+                            <br>
+                            <span>Inv No: </span><span id="invoiceNumberDisplay"></span>
                         </div>
+                        <!--
                         <div class="col-md-6">
                             <span>Inv No: </span><span id="invoiceNumberDisplay"></span>
                         </div>
+                        -->
                     </div>
                 </div>
 
-                <div class="row g-4">
-                    <div class="col-md-4">
-                        <!--<label for="invoiceDate" class="form-label">Invoice Date</label>-->
-                        <label for="invoiceDate" class="form-label"></label>
-                        <input type="date" class="form-control" id="invoiceDate">
-                    </div>
-
+                <div class="row g-3">
                     <input type="hidden" id="customerNameDisplay">
                     <input type="hidden" id="invoiceNumber">
+                    <div class="col-6 col-md-6">
+                        <!--<label for="invoiceDate" class="form-label">Invoice Date</label>-->
+                        <!--<label for="invoiceDate" class="form-label"></label>-->
+                        <!--<input type="date" class="form-control" id="invoiceDate">-->
+                        <input type="text" class="form-control" id="invDate" placeholder="Select Date">
+                    </div>
 
-                    <div class="col-md-4">
+                    <div class="col-6 col-md-6">
+                        <!--<label for="account" class="form-label">Account Owner</label>-->
+                            <!--<label for="account" class="form-label"></label>-->
+                            <select class="form-select" id="account">
+                                <option value="" class="text-muted">Account Owner</option>
+                                {% for account in account_owners %}
+                                    <option value="{{ account }}">{{ account }}</option>
+                                {% endfor %}
+                            </select>
+                    </div>
+
+                    <div class="col-6 col-md-6">
                         <!--<label for="product" class="form-label">Product</label>-->
-                            <label for="product" class="form-label"></label>
+                            <!--<label for="product" class="form-label"></label>-->
                             <select class="form-select" id="product">
-                                <option value="">Select a product</option>
+                                <option value="">Select Product</option>
                                 {% for product in product_names %}
                                     <option value="{{ product }}">{{ product }}</option>
                                 {% endfor %}
                             </select>
+                    </div>
+                    <div class="col-6 col-md-6">
+                        <!--<label for="category" class="form-label">Category</label>-->
+                            <!--<label for="category" class="form-label"></label>-->
+                            <select class="form-select" id="category">
+                                <option value=""> Select Category</option>
+                                {% for category in categories %}
+                                    <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                    </div>
+                    <div class="col-12">
+                       <textarea class="form-control" id="description" rows="2" placeholder="Optional Detailed Description..."></textarea>
+                    </div>
+                    <div class="col-6 col-md-6">
+                        <label for="quantity" class="form-label">Quantity *</label>
+                        <input type="number" class="form-control" id="quantity" min="1" value="1">
+                    </div>
+                    <div class="col-6 col-md-6">
+                        <label for="price" class="form-label">Price (KSh) *</label>
+                        <input type="number" class="form-control" id="price" step="0.01" min="0">
+                    </div>
+                    <div class="col-12">
+                        <!--<label for="bank_account" class="form-label">Bank Account</label>-->
+                            <!--<label for="bank_account" class="form-label"></label>-->
+                            <select class="form-select" id="bank_account">
+                                <option value="">Enter Payment Account</option>
+                                {% for bank_account in bank_accounts %}
+                                    <option value="{{ bank_account }}">{{ bank_account }}</option>
+                                {% endfor %}
+                            </select>
+                    </div>
+                    <div class="col-12">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" rows="2" placeholder="Optional notes..."></textarea>
+                    </div>
+                    <div class="col-12 mt-3 d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-success" id="saveSaleBtn">
+                                <i class="bi bi-save me-2"></i>Save
+                            </button>
+                            <div class="d-flex align-items-center gap-2">
+                                <div id="saveLoader" class="spinner-border text-primary d-none align-self-center" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary" id="backToTransactionTypeBtn">
+                                    Cancel
+                                </button>
+                            </div>
                     </div>
                     <!--
                     <div class="col-md-4">
@@ -675,74 +747,9 @@
                     -->
 
                     <div class="col-md-4">
-                        <label for="quantity" class="form-label">Quantity *</label>
-                        <input type="number" class="form-control" id="quantity" min="1" value="1">
-                    </div>
-
-                    <div class="col-md-4">
-                        <label for="price" class="form-label">Price (KSh) *</label>
-                        <input type="number" class="form-control" id="price" step="0.01" min="0">
-                    </div>
-
-                    <div class="col-md-4">
-                        <!--<label for="category" class="form-label">Category</label>-->
-                            <label for="category" class="form-label"></label>
-                            <select class="form-select" id="category">
-                                <option value=""> Select a Category</option>
-                                {% for category in categories %}
-                                    <option value="{{ category }}">{{ category }}</option>
-                                {% endfor %}
-                            </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <!--<label for="account" class="form-label">Account Owner</label>-->
-                            <label for="account" class="form-label"></label>
-                            <select class="form-select" id="account">
-                                <option value=""> Select an Account Owner</option>
-                                {% for account in account_owners %}
-                                    <option value="{{ account }}">{{ account }}</option>
-                                {% endfor %}
-                            </select>
-                    </div>
-
-                    <div class="col-md-4">
-                        <!--<label for="bank_account" class="form-label">Bank Account</label>-->
-                            <label for="bank_account" class="form-label"></label>
-                            <select class="form-select" id="bank_account">
-                                <option value=""> Select a Bank Account</option>
-                                {% for bank_account in bank_accounts %}
-                                    <option value="{{ bank_account }}">{{ bank_account }}</option>
-                                {% endfor %}
-                            </select>
-                    </div>
-
-                    <div class="col-md-4">
                         <!--<label class="form-label">Transaction Type</label>-->
                         <label class="form-label"></label>
                         <input type="text" class="form-control" id="transactionTypeDisplay" hidden>
-                    </div>
-
-
-                    <div class="col-12">
-                        <label for="notes" class="form-label">Notes</label>
-                        <textarea class="form-control" id="notes" rows="2" placeholder="Optional notes..."></textarea>
-                    </div>
-
-                    <div class="col-12 mt-4">
-                        <div class="d-flex flex-column flex-md-row gap-2 align-items-md-start">
-                            <button type="button" class="btn btn-success" id="saveSaleBtn">
-                                <i class="bi bi-save me-2"></i>Save Transaction
-                            </button>
-                            <div class="d-flex align-items-center gap-2">
-                                <div id="saveLoader" class="spinner-border text-primary d-none align-self-center" role="status">
-                                    <span class="visually-hidden">Loading...</span>
-                                </div>
-                                <button type="button" class="btn btn-outline-secondary" id="backToTransactionTypeBtn">
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -1388,13 +1395,25 @@
             disableMobile: true
         });
         flatpickr("#receive_start_date",{
-            dateFormat: "d-m-Y",
+            dateFormat: "Y-m-d",
+            altFormat: "d-m-Y",
+            altInput: true,
             //defaultDate: "{{ default_start_date }}",
             allowInput: true,
             disableMobile: true
         });
         flatpickr("#receive_end_date",{
-            dateFormat: "d-m-Y",
+            dateFormat: "Y-m-d",
+            altFormat: "d-m-Y",
+            altInput: true,
+            //defaultDate: "{{ default_end_date }}",
+            allowInput: true,
+            disableMobile: true
+        });
+        flatpickr("#invDate",{
+            dateFormat: "Y-m-d",
+            altFormat: "d-m-Y",
+            altInput: true,
             //defaultDate: "{{ default_end_date }}",
             allowInput: true,
             disableMobile: true
@@ -1503,7 +1522,7 @@
             const salesFormSection = document.getElementById('salesFormSection');
             const customerNameDisplay = document.getElementById('customerNameDisplay');
             const invoiceNumber = document.getElementById('invoiceNumber');
-            const invoiceDate = document.getElementById('invoiceDate');
+            //const invoiceDate = document.getElementById('invoiceDate');
             const addAnotherSection = document.getElementById('addAnotherSection');
             const addAnotherYesBtn = document.getElementById('addAnotherYesBtn');
             const addAnotherNoBtn = document.getElementById('addAnotherNoBtn');
@@ -1832,7 +1851,7 @@
             .then(data => {
                 if (data.status === 'success') {
                     invoiceNumber.value = data.invoice_number;
-                    invoiceDate.value = data.current_date;
+                    //invoiceDate.value = data.current_date;
                     selectedClientDisplay.innerHTML = `
                         <strong>${data.client_name}</strong>
                         ${data.institution ? `<br><small class="text-muted">${data.institution}</small>` : ''}
@@ -1901,7 +1920,8 @@
                 startLoading();
 
                 const formData = {
-                    invoice_date: invoiceDate.value,
+                    //invoice_date: invoiceDate.value,
+                    invoice_date: invDate.value,
                     invoice_number: invoiceNumber.value,
                     client_name: customerNameDisplay.value,
                     product: document.getElementById('product').value,
@@ -1989,7 +2009,8 @@
                 // Now show the invoice preview
                 updateInvoicePreview(
                     invoiceNumber.value,
-                    invoiceDate.value,
+                    //invoiceDate.value,
+                    invDate.value,
                     customerNameDisplay.value,
                     currentTransactionType,
                     currentItems
@@ -2000,7 +2021,8 @@
 
             function updateInvoicePreview() {
                 document.getElementById('previewInvoiceNumber').textContent = invoiceNumber.value;
-                document.getElementById('previewDate').textContent = formatDate(invoiceDate.value);
+                //document.getElementById('previewDate').textContent = formatDate(invoiceDate.value);
+                document.getElementById('previewDate').textContent = formatDate(invDate.value);
                 document.getElementById('previewCustomer').textContent = customerNameDisplay.value;
                 document.getElementById('previewTransactionType').textContent =
                     currentTransactionType === 'sell' ? 'Sale' : 'Take Back';
