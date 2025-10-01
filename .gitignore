@@ -195,3 +195,6 @@ cython_debug/
 /kis-kenglex-replace-db-excel.py
 /progress.txt
 /clients.txt
+/sales_list.txt
+/receipts.txt
+/ex.py
