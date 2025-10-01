@@ -146,13 +146,16 @@
             font-size: 0.875rem;
         }
         .small-form {
-            max-width: 800px;
+            max-width: 500px;
             width: 100%;
             padding: 15px;
         }
         #salesFormSection .form-control {
             font-size: 13.5px;
             color: #6c757d;
+        }
+        #salesFormSection .form-label {
+            font-size: 13.5px;
         }
         #salesFormSection input::placeholder,
         #salesFormSection textarea::placeholder {
@@ -179,10 +182,11 @@
             margin-bottom: 0;
             margin-top: 0;
             flex-wrap: wrap;
+            justify-content: center;
         }
 
         .filter-item {
-            background-color: #8dec5e;
+            border: 1px solid #376e41;
             padding: 8px 12px;
             border-radius: 6px;
             color: white;
@@ -197,14 +201,18 @@
             font-size: 0.85rem;
             line-height: 1.2;
         }
+        .filter-item .form-control::placeholder {
+            color: #376e41 !important;
+        }
 
         .filter-item .form-control, .filter-item .form-select {
             background-color: white;
-            color: #333;
+            color: #376e41;
             font-size: 0.85rem;
             padding: 4px 8px;
             height: 32px;
             line-height: 1.2;
+            border: none;
         }
 
         /* Results styling */
@@ -224,8 +232,10 @@
             z-index: 10;
             font-weight: 500;
             font-size: 14px;
-            text-align: center;
-            vertical-align: middle;
+            text-align: left;
+            vertical-align: top;
+            white-space: nowrap;
+            padding: 8px 6px;
         }
 
         .invoice-table {
@@ -233,11 +243,29 @@
         }
 
         .table td {
-            padding: 2px 4px;
+            padding: 8px 6px;
             font-size: 13px;
-            vertical-align: middle;
-            text-align:center;
+            vertical-align: top;
+            text-align:left;
+            white-space: normal;
+            word-break: break-word;    /* break long words */
+            overflow-wrap: break-word;
         }
+        .table td:nth-child(2) {
+            max-width: 17ch;        /* adjust as you like */
+            white-space: normal;
+            width: min-content;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+        .table td:nth-child(3) {
+            max-width: 10ch;        /* adjust as you like */
+            width: min-content;
+            white-space: normal;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
         .table {
             border-collapse: collapse;
             table-layout: auto;
@@ -246,9 +274,10 @@
         .invoice-details {
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: left;
             justify-content: flex-start;
             height: 100%;
+            white-space: nowrap;
         }
 
         .results-count {
@@ -703,12 +732,12 @@
                     <div class="col-12">
                        <textarea class="form-control" id="description" rows="2" placeholder="Optional Detailed Description..."></textarea>
                     </div>
-                    <div class="col-6 col-md-6">
-                        <label for="quantity" class="form-label">Quantity *</label>
+                    <div class="col-6 col-md-6 text-center">
+                        <label for="quantity" class="form-label">Quantity*</label>
                         <input type="number" class="form-control" id="quantity" min="1" value="1">
                     </div>
-                    <div class="col-6 col-md-6">
-                        <label for="price" class="form-label">Price (KSh) *</label>
+                    <div class="col-6 col-md-6 text-center">
+                        <label for="price" class="form-label">Price (Kes)*</label>
                         <input type="number" class="form-control" id="price" step="0.01" min="0">
                     </div>
                     <div class="col-12">
