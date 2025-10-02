@@ -594,22 +594,22 @@ def create_tenant_tables(org_id):
         """,
 
         "mpesa_requests": f"""
-            CREATE TABLE {org_id}_mpesa_requests (
-            id SERIAL PRIMARY KEY,
-            checkout_request_id VARCHAR(255) UNIQUE NOT NULL,
-            merchant_request_id VARCHAR(255) NOT NULL,
-            invoice_no VARCHAR(100) NOT NULL,
-            phone_number VARCHAR(20) NOT NULL,
-            amount DECIMAL(15,2) NOT NULL,
-            customer_name VARCHAR(255),
-            sales_list_id INTEGER,
-            status VARCHAR(50) DEFAULT 'Pending',
-            result_code VARCHAR(10),
-            result_desc VARCHAR(255),
-            mpesa_receipt_number VARCHAR(255),
-            transaction_date TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            CREATE TABLE IF NOT EXISTS {org_id}_payments (
+                id SERIAL PRIMARY KEY,
+                checkout_request_id VARCHAR(255) UNIQUE NOT NULL,
+                merchant_request_id VARCHAR(255) NOT NULL,
+                invoice_no VARCHAR(100) NOT NULL,
+                phone_number VARCHAR(20) NOT NULL,
+                amount DECIMAL(15,2) NOT NULL,
+                customer_name VARCHAR(255),
+                sales_list_id INTEGER,
+                status VARCHAR(50) DEFAULT 'Pending',
+                result_code VARCHAR(10),
+                result_desc VARCHAR(255),
+                mpesa_receipt_number VARCHAR(255),
+                transaction_date TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
     }
@@ -844,8 +844,8 @@ def initiate_mpesa_payment():
         }), 500
 
 
-@app.route('/mpesa_callback', methods=['POST'])
-def mpesa_callback():
+@app.route('/sales_mpesa_callback', methods=['POST'])
+def sales_mpesa_callback():
     try:
         data = request.get_json()
 
@@ -934,6 +934,7 @@ def mpesa_callback():
     except Exception as e:
         print(f"Error processing MPESA callback: {str(e)}")
         return jsonify({'ResultCode': 1, 'ResultDesc': 'Error processing callback'})
+
 
 def create_subscription_tables():
     """Create subscription tables if they don't exist"""
