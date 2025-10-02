@@ -881,8 +881,8 @@ def initiate_mpesa_payment():
         }), 500
 
 
-@app.route('/mpesa_callback', methods=['POST'])
-def mpesa_callback():
+@app.route('/sales_mpesa_callback', methods=['POST'])
+def sales_mpesa_callback():
     try:
         data = request.get_json()
         log_error_to_file(f"MPESA Callback Received: {json.dumps(data, indent=2)}")
