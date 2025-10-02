@@ -3,7 +3,7 @@ import base64
 import secrets
 import requests
 from flask import Flask, flash, session, render_template, request, redirect, url_for, send_from_directory, jsonify, \
-    make_response, Blueprint
+    make_response, Blueprint, json
 import secrets, datetime
 import os
 import io
@@ -470,6 +470,7 @@ def create_tenant_tables(org_id):
                 receipt_invoice_number VARCHAR(255) NOT NULL,
                 category VARCHAR(255) NOT NULL,
                 account_owner VARCHAR(255) NOT NULL
+                mpesa_receipt_number VARCHAR(255) 
             )
         """,
 
@@ -849,16 +850,18 @@ def initiate_mpesa_payment():
 def sales_mpesa_callback():
     try:
         data = request.get_json()
+        print("MPESA Callback Received:", json.dumps(data, indent=2))
 
-        # Extract callback metadata
-        callback_metadata = data['Body']['stkCallback'].get('CallbackMetadata', {})
+        # Extract callback data
+        stk_callback = data['Body']['stkCallback']
+        result_code = stk_callback['ResultCode']
+        result_desc = stk_callback['ResultDesc']
+        checkout_request_id = stk_callback['CheckoutRequestID']
+        merchant_request_id = stk_callback['MerchantRequestID']
+
+        # Extract callback metadata if available
+        callback_metadata = stk_callback.get('CallbackMetadata', {})
         items = callback_metadata.get('Item', [])
-
-        # Extract values from callback
-        result_code = data['Body']['stkCallback']['ResultCode']
-        result_desc = data['Body']['stkCallback']['ResultDesc']
-        checkout_request_id = data['Body']['stkCallback']['CheckoutRequestID']
-        merchant_request_id = data['Body']['stkCallback']['MerchantRequestID']
 
         # Extract payment details from callback metadata
         amount = None
@@ -884,56 +887,71 @@ def sales_mpesa_callback():
             cur.execute("""
                 SELECT table_name FROM information_schema.tables 
                 WHERE table_name LIKE '%_mpesa_requests' 
-                AND checkout_request_id = %s
-            """, (checkout_request_id,))
+                AND table_name IN (
+                    SELECT table_name FROM information_schema.tables 
+                    WHERE table_name LIKE %s
+                )
+            """, (f"%_mpesa_requests",))
 
-            result = cur.fetchone()
-            if not result:
+            tables = cur.fetchall()
+            org_id = None
+            table_name = None
+
+            for table in tables:
+                cur.execute(f"SELECT COUNT(*) FROM {table[0]} WHERE checkout_request_id = %s", (checkout_request_id,))
+                if cur.fetchone()[0] > 0:
+                    table_name = table[0]
+                    org_id = table_name.split('_')[0]
+                    break
+
+            if not table_name:
+                print(f"MPESA Callback: Request not found for checkout_request_id: {checkout_request_id}")
                 return jsonify({'ResultCode': 1, 'ResultDesc': 'Request not found'})
 
-            table_name = result[0]
-            org_id = table_name.split('_')[0]
-
             # Update MPESA request
-            cur.execute(f"""
-                UPDATE {table_name} 
-                SET status = %s, result_code = %s, result_desc = %s,
-                    mpesa_receipt_number = %s, transaction_date = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE checkout_request_id = %s
-            """, (
-                'Completed' if result_code == 0 else 'Failed',
-                result_code,
-                result_desc,
-                mpesa_receipt_number,
-                datetime.strptime(str(transaction_date), '%Y%m%d%H%M%S') if transaction_date else None,
-                checkout_request_id
-            ))
-
-            # If payment was successful, update the invoice
             if result_code == 0:
-                # Get the sales_list_id from the MPESA request
+                # Payment successful
+                status = 'Completed'
                 cur.execute(f"""
-                    SELECT sales_list_id, amount, invoice_no, customer_name
-                    FROM {table_name} 
+                    UPDATE {table_name} 
+                    SET status = %s, result_code = %s, result_desc = %s,
+                        mpesa_receipt_number = %s, transaction_date = TO_TIMESTAMP(%s, 'YYYYMMDDHH24MISS'),
+                        updated_at = CURRENT_TIMESTAMP
                     WHERE checkout_request_id = %s
-                """, (checkout_request_id,))
+                    RETURNING sales_list_id, amount, invoice_no, customer_name
+                """, (
+                    status,
+                    result_code,
+                    result_desc,
+                    mpesa_receipt_number,
+                    transaction_date,
+                    checkout_request_id
+                ))
 
-                mpesa_request = cur.fetchone()
-                if mpesa_request:
-                    sales_list_id, amount, invoice_no, customer_name = mpesa_request
+                result = cur.fetchone()
+                if result:
+                    sales_list_id, amount, invoice_no, customer_name = result
 
-                    # Record the payment (similar to your existing record_payment function)
-                    # You can call your existing record_payment logic here
-                    # This would update the sales_list and create receipt records
+                    # Record the payment in your system
+                    record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_name, mpesa_receipt_number)
 
-                    # For now, we'll just mark it as a TODO
-                    print(f"Payment successful for invoice {invoice_no}, amount: {amount}")
+            else:
+                # Payment failed or cancelled
+                status = 'Failed'
+                cur.execute(f"""
+                    UPDATE {table_name} 
+                    SET status = %s, result_code = %s, result_desc = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE checkout_request_id = %s
+                """, (status, result_code, result_desc, checkout_request_id))
 
+        print(f"MPESA Callback Processed: {checkout_request_id} - Result: {result_code} - {result_desc}")
         return jsonify({'ResultCode': 0, 'ResultDesc': 'Success'})
 
     except Exception as e:
         print(f"Error processing MPESA callback: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'ResultCode': 1, 'ResultDesc': 'Error processing callback'})
 
 
@@ -952,7 +970,7 @@ def check_mpesa_status():
         with get_db_connection2() as conn:
             cur = conn.cursor()
             cur.execute(f"""
-                SELECT status, result_code, result_desc, mpesa_receipt_number
+                SELECT status, result_code, result_desc, mpesa_receipt_number, invoice_no, amount
                 FROM {org_id}_mpesa_requests 
                 WHERE checkout_request_id = %s
             """, (checkout_request_id,))
@@ -962,18 +980,115 @@ def check_mpesa_status():
             if not result:
                 return jsonify({'status': 'NotFound'})
 
-            status, result_code, result_desc, mpesa_receipt = result
+            status, result_code, result_desc, mpesa_receipt, invoice_no, amount = result
 
-            return jsonify({
+            response_data = {
                 'status': status,
                 'result_code': result_code,
                 'result_desc': result_desc,
-                'mpesa_receipt': mpesa_receipt
-            })
+                'mpesa_receipt': mpesa_receipt,
+                'invoice_no': invoice_no,
+                'amount': amount
+            }
+
+            # If payment is completed, also check if it was recorded in sales_list
+            if status == 'Completed':
+                cur.execute(f"""
+                    SELECT payment_status, balance FROM {org_id}_sales_list 
+                    WHERE invoice_no = %s
+                """, (invoice_no,))
+                sales_result = cur.fetchone()
+                if sales_result:
+                    response_data['payment_status'] = sales_result[0]
+                    response_data['current_balance'] = float(sales_result[1])
+
+            return jsonify(response_data)
 
     except Exception as e:
         print(f"Error checking MPESA status: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+def record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_name, mpesa_receipt_number):
+    """Record MPESA payment in the system"""
+    try:
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+
+            # Get current invoice details
+            cur.execute(f"""
+                SELECT paid_amount, invoice_amount, balance, category, account_owner
+                FROM {org_id}_sales_list 
+                WHERE id = %s
+            """, (sales_list_id,))
+
+            result = cur.fetchone()
+            if not result:
+                print(f"Invoice not found for sales_list_id: {sales_list_id}")
+                return False
+
+            current_paid, invoice_amount, current_balance, category, account_owner = result
+            current_paid = float(current_paid or 0)
+            invoice_amount = float(invoice_amount)
+            current_balance = float(current_balance)
+
+            # Calculate new totals
+            total_paid = current_paid + float(amount)
+            balance = invoice_amount - total_paid
+            payment_status = 'Paid' if balance == 0 else 'Not Paid'
+
+            # Generate receipt number
+            receipt_invoice_number = generate_next_invoice_number()
+
+            # Insert receipt record
+            cur.execute(f"""
+                INSERT INTO {org_id}_receipts (
+                    paid_date, invoice_number, invoice_date, customer_name,
+                    paid_amount, balance, receipt_invoice_number,
+                    category, account_owner, mpesa_receipt_number
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING receipt_id
+            """, (
+                datetime.now().date(), invoice_no, datetime.now().date(), customer_name,
+                amount, balance, receipt_invoice_number,
+                category, account_owner, mpesa_receipt_number
+            ))
+            receipt_id = cur.fetchone()[0]
+
+            # Create invoice record
+            cur.execute(f"""
+                INSERT INTO {org_id}_invoices (invoice_number, created_at)
+                VALUES (%s, %s)
+                ON CONFLICT (invoice_number) DO NOTHING
+            """, (receipt_invoice_number, datetime.now()))
+
+            # Update sales_list table
+            cur.execute(f"""
+                UPDATE {org_id}_sales_list
+                SET 
+                    paid_amount = %s,
+                    balance = %s,
+                    payment_status = %s
+                WHERE id = %s
+            """, (total_paid, balance, payment_status, sales_list_id))
+
+            # Update sales records
+            cur.execute(f"""
+                UPDATE {org_id}_sales
+                SET 
+                    payment_status = %s
+                WHERE invoice_no = %s
+            """, (payment_status, invoice_no))
+
+            print(f"MPESA Payment recorded: {mpesa_receipt_number} for invoice {invoice_no}, amount: {amount}")
+            return True
+
+    except Exception as e:
+        print(f"Error recording MPESA payment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 
 def create_subscription_tables():
     """Create subscription tables if they don't exist"""

@@ -2596,7 +2596,8 @@ function initiateStkPushPayment() {
     .then(data => {
         if (data.success) {
             showMpesaResponse(
-                'MPESA STK Push initiated successfully. Please check your phone to complete the payment. ' ,
+                'MPESA STK Push initiated successfully. Please check your phone to complete the payment. ' +
+                'This modal will close automatically when payment is confirmed.',
                 'success'
             );
 
@@ -2621,7 +2622,7 @@ function initiateStkPushPayment() {
 
 function pollForPaymentStatus(checkoutRequestId) {
     let attempts = 0;
-    const maxAttempts = 30; // 2.5 minutes (5 seconds * 30)
+    const maxAttempts = 60; // 5 minutes (5 seconds * 60)
 
     const checkStatus = setInterval(() => {
         attempts++;
@@ -2629,11 +2630,16 @@ function pollForPaymentStatus(checkoutRequestId) {
         fetch('/check_mpesa_status?checkout_request_id=' + checkoutRequestId)
             .then(response => response.json())
             .then(data => {
+                console.log('Payment status check:', data);
+
                 if (data.status === 'Completed') {
                     // Payment successful
                     clearInterval(checkStatus);
                     showMpesaResponse(
-                        'Payment confirmed successfully! Closing...',
+                        `Payment confirmed successfully!<br>
+                         Receipt: ${data.mpesa_receipt || 'N/A'}<br>
+                         Amount: Ksh ${parseFloat(data.amount).toLocaleString()}<br>
+                         Closing in 3 seconds...`,
                         'success'
                     );
 
@@ -2643,21 +2649,36 @@ function pollForPaymentStatus(checkoutRequestId) {
                             currentMpesaModal.hide();
                         }
                         location.reload();
-                    }, 2000);
+                    }, 3000);
 
-                } else if (data.status === 'Failed' || attempts >= maxAttempts) {
-                    // Payment failed or timeout
+                } else if (data.status === 'Failed' || data.status === 'Cancelled') {
+                    // Payment failed or cancelled
                     clearInterval(checkStatus);
                     showMpesaResponse(
-                        attempts >= maxAttempts ?
-                        'Payment timeout. Please check your phone and try again.' :
-                        'Payment failed. Please try again.',
+                        `Payment failed: ${data.result_desc || 'Unknown error'}`,
                         'error'
                     );
                     enableMpesaForm();
                     resetMpesaButton();
+
+                } else if (attempts >= maxAttempts) {
+                    // Timeout
+                    clearInterval(checkStatus);
+                    showMpesaResponse(
+                        'Payment status check timeout. The payment may still be processing.<br>Please check your MPESA messages and refresh the page later.',
+                        'warning'
+                    );
+                    enableMpesaForm();
+                    resetMpesaButton();
+                } else {
+                    // Still pending, update status message
+                    showMpesaResponse(
+                        `Waiting for payment confirmation... (${attempts}/${maxAttempts})<br>
+                         Please check your phone and enter your MPESA PIN.<br>
+                         Status: ${data.result_desc || 'Pending'}`,
+                        'info'
+                    );
                 }
-                // If still pending, continue polling
             })
             .catch(error => {
                 console.error('Error checking payment status:', error);
