@@ -190,7 +190,7 @@ cython_debug/
 /.idea
 
 /payments/
-/error_log.txt
+
 /aaab-data.xlsx
 /progress.txt
 /clients.txt

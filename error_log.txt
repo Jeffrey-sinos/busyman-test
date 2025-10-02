@@ -1,0 +1,29 @@
+[2025-09-30T15:07:46.771817] Database Error
+[2025-10-01T09:16:39.304259] Database OperationalError
+[2025-10-01T09:49:21.469176] Database OperationalError
+[2025-10-01T09:49:21.484692] check_org_subscription error (org_id=aaac): server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+Traceback (most recent call last):
+  File "D:\PycharmProjects\DataEntry\Data_Entry\busyman-pro-demo-test\busyman-test\Sales.py", line 1230, in check_org_subscription
+    with get_db_connection2() as conn:
+  File "C:\Users\Administrator\AppData\Local\Programs\Python\Python312\Lib\contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "D:\PycharmProjects\DataEntry\Data_Entry\busyman-pro-demo-test\busyman-test\Sales.py", line 110, in get_db_connection2
+    cur.execute("SELECT 1")
+psycopg2.OperationalError: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+
+[2025-10-01T10:32:26.901887] Database Error
+[2025-10-01T10:42:54.861345] Database Error
+[2025-10-02T16:12:28.887526] Database OperationalError

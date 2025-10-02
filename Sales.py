@@ -734,6 +734,8 @@ def check_user_subscription(user_id):
 @app.route('/initiate_mpesa_payment', methods=['POST'])
 def initiate_mpesa_payment():
     if 'org_id' not in session:
+        error_msg = "MPESA Initiation Failed: Session expired - org_id not in session"
+        log_error_to_file(error_msg)
         return jsonify({'success': False, 'message': 'Session expired'}), 401
 
     org_id = session['org_id']
@@ -743,11 +745,15 @@ def initiate_mpesa_payment():
     required_fields = ['sales_list_id', 'invoice_no', 'phone_number', 'amount']
     for field in required_fields:
         if not data.get(field):
+            error_msg = f"MPESA Initiation Failed: Missing required field: {field} - Data: {data}"
+            log_error_to_file(error_msg)
             return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
 
     try:
         amount = float(data['amount'])
         if amount <= 0:
+            error_msg = f"MPESA Initiation Failed: Amount must be greater than 0 - Amount: {amount}"
+            log_error_to_file(error_msg)
             return jsonify({'success': False, 'message': 'Amount must be greater than 0'}), 400
 
         # Optional: Check if amount exceeds balance (server-side only)
@@ -762,6 +768,8 @@ def initiate_mpesa_payment():
             if result:
                 balance = float(result[0])
                 if amount > balance:
+                    error_msg = f"MPESA Initiation Failed: Amount exceeds invoice balance - Amount: {amount}, Balance: {balance}"
+                    log_error_to_file(error_msg)
                     return jsonify({
                         'success': False,
                         'message': f'Amount exceeds invoice balance. Maximum allowed: Ksh {balance:,.2f}'
@@ -770,6 +778,8 @@ def initiate_mpesa_payment():
         # Get access token
         access_token = get_mpesa_access_token()
         if not access_token:
+            error_msg = "MPESA Initiation Failed: Failed to get MPESA access token"
+            log_error_to_file(error_msg)
             return jsonify({'success': False, 'message': 'Failed to get MPESA access token'}), 500
 
         # Generate timestamp and password
@@ -791,6 +801,9 @@ def initiate_mpesa_payment():
             "TransactionDesc": data.get('description', f"Payment for invoice {data['invoice_no']}")
         }
 
+        log_error_to_file(
+            f"MPESA STK Push Initiation: Invoice: {data['invoice_no']}, Amount: {amount}, Phone: {data['phone_number']}, Payload: {payload}")
+
         # Make STK Push request
         headers = {
             'Authorization': f'Bearer {access_token}',
@@ -800,10 +813,12 @@ def initiate_mpesa_payment():
         response = requests.post(
             'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
             json=payload,
-            headers=headers
+            headers=headers,
+            timeout=30
         )
 
         response_data = response.json()
+        log_error_to_file(f"MPESA API Response: Status: {response.status_code}, Data: {response_data}")
 
         if response.status_code == 200 and response_data.get('ResponseCode') == '0':
             # STK Push initiated successfully
@@ -825,6 +840,9 @@ def initiate_mpesa_payment():
                     data['sales_list_id']
                 ))
 
+            log_error_to_file(
+                f"MPESA STK Push Initiated Successfully: CheckoutRequestID: {response_data['CheckoutRequestID']}, MerchantRequestID: {response_data['MerchantRequestID']}")
+
             return jsonify({
                 'success': True,
                 'message': 'MPESA STK Push initiated successfully.',
@@ -833,24 +851,41 @@ def initiate_mpesa_payment():
 
         else:
             error_message = response_data.get('errorMessage', 'MPESA API request failed')
+            error_msg = f"MPESA Initiation Failed: API Error - {error_message}, Response: {response_data}"
+            log_error_to_file(error_msg)
             return jsonify({
                 'success': False,
                 'message': f'Payment initiation failed: {error_message}'
             }), 400
 
+    except requests.exceptions.Timeout:
+        error_msg = "MPESA Initiation Failed: Request timeout to MPESA API"
+        log_error_to_file(error_msg)
+        return jsonify({
+            'success': False,
+            'message': 'MPESA service timeout. Please try again.'
+        }), 408
+    except requests.exceptions.ConnectionError:
+        error_msg = "MPESA Initiation Failed: Connection error to MPESA API"
+        log_error_to_file(error_msg)
+        return jsonify({
+            'success': False,
+            'message': 'Cannot connect to MPESA service. Please check your internet connection.'
+        }), 503
     except Exception as e:
-        print(f"Error initiating MPESA payment: {str(e)}")
+        error_msg = f"MPESA Initiation Failed: Unexpected error - {str(e)}\nTraceback: {traceback.format_exc()}"
+        log_error_to_file(error_msg)
         return jsonify({
             'success': False,
             'message': f'Error initiating payment: {str(e)}'
         }), 500
 
 
-@app.route('/sales_mpesa_callback', methods=['POST'])
-def sales_mpesa_callback():
+@app.route('/mpesa_callback', methods=['POST'])
+def mpesa_callback():
     try:
         data = request.get_json()
-        print("MPESA Callback Received:", json.dumps(data, indent=2))
+        log_error_to_file(f"MPESA Callback Received: {json.dumps(data, indent=2)}")
 
         # Extract callback data
         stk_callback = data['Body']['stkCallback']
@@ -905,7 +940,8 @@ def sales_mpesa_callback():
                     break
 
             if not table_name:
-                print(f"MPESA Callback: Request not found for checkout_request_id: {checkout_request_id}")
+                error_msg = f"MPESA Callback: Request not found for checkout_request_id: {checkout_request_id}"
+                log_error_to_file(error_msg)
                 return jsonify({'ResultCode': 1, 'ResultDesc': 'Request not found'})
 
             # Update MPESA request
@@ -933,7 +969,13 @@ def sales_mpesa_callback():
                     sales_list_id, amount, invoice_no, customer_name = result
 
                     # Record the payment in your system
-                    record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_name, mpesa_receipt_number)
+                    if record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_name,
+                                            mpesa_receipt_number):
+                        log_error_to_file(
+                            f"MPESA Payment recorded successfully: {mpesa_receipt_number} for invoice {invoice_no}, amount: {amount}")
+                    else:
+                        log_error_to_file(
+                            f"Failed to record MPESA payment: {mpesa_receipt_number} for invoice {invoice_no}")
 
             else:
                 # Payment failed or cancelled
@@ -944,26 +986,31 @@ def sales_mpesa_callback():
                         updated_at = CURRENT_TIMESTAMP
                     WHERE checkout_request_id = %s
                 """, (status, result_code, result_desc, checkout_request_id))
+                log_error_to_file(
+                    f"MPESA Payment failed: {checkout_request_id} - Result: {result_code} - {result_desc}")
 
-        print(f"MPESA Callback Processed: {checkout_request_id} - Result: {result_code} - {result_desc}")
+        log_error_to_file(f"MPESA Callback Processed: {checkout_request_id} - Result: {result_code} - {result_desc}")
         return jsonify({'ResultCode': 0, 'ResultDesc': 'Success'})
 
     except Exception as e:
-        print(f"Error processing MPESA callback: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        error_msg = f"Error processing MPESA callback: {str(e)}\nTraceback: {traceback.format_exc()}"
+        log_error_to_file(error_msg)
         return jsonify({'ResultCode': 1, 'ResultDesc': 'Error processing callback'})
 
 
 @app.route('/check_mpesa_status')
 def check_mpesa_status():
     if 'org_id' not in session:
+        error_msg = "MPESA Status Check Failed: Session expired"
+        log_error_to_file(error_msg)
         return jsonify({'status': 'error', 'message': 'Session expired'}), 401
 
     org_id = session['org_id']
     checkout_request_id = request.args.get('checkout_request_id')
 
     if not checkout_request_id:
+        error_msg = "MPESA Status Check Failed: Missing checkout_request_id"
+        log_error_to_file(error_msg)
         return jsonify({'status': 'error', 'message': 'Missing checkout request ID'}), 400
 
     try:
@@ -978,6 +1025,8 @@ def check_mpesa_status():
             result = cur.fetchone()
 
             if not result:
+                error_msg = f"MPESA Status Check: Request not found - CheckoutRequestID: {checkout_request_id}"
+                log_error_to_file(error_msg)
                 return jsonify({'status': 'NotFound'})
 
             status, result_code, result_desc, mpesa_receipt, invoice_no, amount = result
@@ -1001,11 +1050,19 @@ def check_mpesa_status():
                 if sales_result:
                     response_data['payment_status'] = sales_result[0]
                     response_data['current_balance'] = float(sales_result[1])
+                    log_error_to_file(
+                        f"MPESA Status Check - Completed: Invoice {invoice_no}, Receipt: {mpesa_receipt}, Sales Status: {sales_result[0]}, Balance: {sales_result[1]}")
+                else:
+                    log_error_to_file(
+                        f"MPESA Status Check - Completed but sales record not found: Invoice {invoice_no}")
 
+            log_error_to_file(
+                f"MPESA Status Check: CheckoutRequestID: {checkout_request_id}, Status: {status}, Result: {result_code}")
             return jsonify(response_data)
 
     except Exception as e:
-        print(f"Error checking MPESA status: {str(e)}")
+        error_msg = f"MPESA Status Check Error: {str(e)}\nTraceback: {traceback.format_exc()}"
+        log_error_to_file(error_msg)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
@@ -1024,7 +1081,8 @@ def record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_nam
 
             result = cur.fetchone()
             if not result:
-                print(f"Invoice not found for sales_list_id: {sales_list_id}")
+                error_msg = f"Invoice not found for sales_list_id: {sales_list_id}"
+                log_error_to_file(error_msg)
                 return False
 
             current_paid, invoice_amount, current_balance, category, account_owner = result
@@ -1080,13 +1138,13 @@ def record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_nam
                 WHERE invoice_no = %s
             """, (payment_status, invoice_no))
 
-            print(f"MPESA Payment recorded: {mpesa_receipt_number} for invoice {invoice_no}, amount: {amount}")
+            log_error_to_file(
+                f"MPESA Payment recorded successfully in database: {mpesa_receipt_number} for invoice {invoice_no}, amount: {amount}")
             return True
 
     except Exception as e:
-        print(f"Error recording MPESA payment: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        error_msg = f"Error recording MPESA payment: {str(e)}\nTraceback: {traceback.format_exc()}"
+        log_error_to_file(error_msg)
         return False
 
 
