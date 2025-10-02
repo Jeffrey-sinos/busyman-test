@@ -591,6 +591,26 @@ def create_tenant_tables(org_id):
                 paid_date DATE NOT NULL,
                 bank_account VARCHAR(255)
             )
+        """,
+
+        "mpesa_requests": f"""
+            CREATE TABLE {org_id}_mpesa_requests (
+            id SERIAL PRIMARY KEY,
+            checkout_request_id VARCHAR(255) UNIQUE NOT NULL,
+            merchant_request_id VARCHAR(255) NOT NULL,
+            invoice_no VARCHAR(100) NOT NULL,
+            phone_number VARCHAR(20) NOT NULL,
+            amount DECIMAL(15,2) NOT NULL,
+            customer_name VARCHAR(255),
+            sales_list_id INTEGER,
+            status VARCHAR(50) DEFAULT 'Pending',
+            result_code VARCHAR(10),
+            result_desc VARCHAR(255),
+            mpesa_receipt_number VARCHAR(255),
+            transaction_date TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
         """
     }
 
@@ -709,6 +729,211 @@ def check_user_subscription(user_id):
     except Exception as e:
         return {'active': False, 'message': f'Error checking subscription: {str(e)}'}
 
+
+@app.route('/initiate_mpesa_payment', methods=['POST'])
+def initiate_mpesa_payment():
+    if 'org_id' not in session:
+        return jsonify({'success': False, 'message': 'Session expired'}), 401
+
+    org_id = session['org_id']
+    data = request.get_json()
+
+    # Validate required fields
+    required_fields = ['sales_list_id', 'invoice_no', 'phone_number', 'amount']
+    for field in required_fields:
+        if not data.get(field):
+            return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
+
+    try:
+        amount = float(data['amount'])
+        if amount <= 0:
+            return jsonify({'success': False, 'message': 'Amount must be greater than 0'}), 400
+
+        # Optional: Check if amount exceeds balance (server-side only)
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+            cur.execute(f"""
+                SELECT balance FROM {org_id}_sales_list 
+                WHERE id = %s
+            """, (data['sales_list_id'],))
+            result = cur.fetchone()
+
+            if result:
+                balance = float(result[0])
+                if amount > balance:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Amount exceeds invoice balance. Maximum allowed: Ksh {balance:,.2f}'
+                    }), 400
+
+        # Rest of your MPESA implementation remains the same...
+        access_token = get_mpesa_access_token()
+        if not access_token:
+            return jsonify({'success': False, 'message': 'Failed to get MPESA access token'}), 500
+
+        # Generate timestamp and password
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        password = base64.b64encode(f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{timestamp}".encode()).decode()
+
+        # Prepare STK Push payload
+        payload = {
+            "BusinessShortCode": MPESA_SHORTCODE,
+            "Password": password,
+            "Timestamp": timestamp,
+            "TransactionType": "CustomerPayBillOnline",
+            "Amount": int(amount),
+            "PartyA": data['phone_number'],
+            "PartyB": MPESA_SHORTCODE,
+            "PhoneNumber": data['phone_number'],
+            "CallBackURL": MPESA_CALLBACK_URL,
+            "AccountReference": data['invoice_no'],
+            "TransactionDesc": data.get('description', f"Payment for invoice {data['invoice_no']}")
+        }
+
+        # Make STK Push request
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+
+        response = requests.post(
+            'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+            json=payload,
+            headers=headers
+        )
+
+        response_data = response.json()
+
+        if response.status_code == 200 and response_data.get('ResponseCode') == '0':
+            # STK Push initiated successfully
+            with get_db_connection2() as conn:
+                cur = conn.cursor()
+
+                cur.execute(f"""
+                    INSERT INTO {org_id}_mpesa_requests 
+                    (checkout_request_id, merchant_request_id, invoice_no, phone_number, 
+                     amount, customer_name, sales_list_id, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'Pending')
+                """, (
+                    response_data['CheckoutRequestID'],
+                    response_data['MerchantRequestID'],
+                    data['invoice_no'],
+                    data['phone_number'],
+                    amount,
+                    data.get('customer_name', ''),
+                    data['sales_list_id']
+                ))
+
+            return jsonify({
+                'success': True,
+                'message': 'MPESA STK Push initiated successfully. Please check your phone to complete payment.'
+            })
+
+        else:
+            error_message = response_data.get('errorMessage', 'MPESA API request failed')
+            return jsonify({
+                'success': False,
+                'message': f'Payment initiation failed: {error_message}'
+            }), 400
+
+    except Exception as e:
+        print(f"Error initiating MPESA payment: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error initiating payment: {str(e)}'
+        }), 500
+
+
+@app.route('/mpesa_callback', methods=['POST'])
+def mpesa_callback():
+    try:
+        data = request.get_json()
+
+        # Extract callback metadata
+        callback_metadata = data['Body']['stkCallback'].get('CallbackMetadata', {})
+        items = callback_metadata.get('Item', [])
+
+        # Extract values from callback
+        result_code = data['Body']['stkCallback']['ResultCode']
+        result_desc = data['Body']['stkCallback']['ResultDesc']
+        checkout_request_id = data['Body']['stkCallback']['CheckoutRequestID']
+        merchant_request_id = data['Body']['stkCallback']['MerchantRequestID']
+
+        # Extract payment details from callback metadata
+        amount = None
+        mpesa_receipt_number = None
+        transaction_date = None
+        phone_number = None
+
+        for item in items:
+            if item['Name'] == 'Amount':
+                amount = item.get('Value')
+            elif item['Name'] == 'MpesaReceiptNumber':
+                mpesa_receipt_number = item.get('Value')
+            elif item['Name'] == 'TransactionDate':
+                transaction_date = item.get('Value')
+            elif item['Name'] == 'PhoneNumber':
+                phone_number = item.get('Value')
+
+        # Update MPESA request record
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+
+            # Find the organization that this payment belongs to
+            cur.execute("""
+                SELECT table_name FROM information_schema.tables 
+                WHERE table_name LIKE '%_mpesa_requests' 
+                AND checkout_request_id = %s
+            """, (checkout_request_id,))
+
+            result = cur.fetchone()
+            if not result:
+                return jsonify({'ResultCode': 1, 'ResultDesc': 'Request not found'})
+
+            table_name = result[0]
+            org_id = table_name.split('_')[0]
+
+            # Update MPESA request
+            cur.execute(f"""
+                UPDATE {table_name} 
+                SET status = %s, result_code = %s, result_desc = %s,
+                    mpesa_receipt_number = %s, transaction_date = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE checkout_request_id = %s
+            """, (
+                'Completed' if result_code == 0 else 'Failed',
+                result_code,
+                result_desc,
+                mpesa_receipt_number,
+                datetime.strptime(str(transaction_date), '%Y%m%d%H%M%S') if transaction_date else None,
+                checkout_request_id
+            ))
+
+            # If payment was successful, update the invoice
+            if result_code == 0:
+                # Get the sales_list_id from the MPESA request
+                cur.execute(f"""
+                    SELECT sales_list_id, amount, invoice_no, customer_name
+                    FROM {table_name} 
+                    WHERE checkout_request_id = %s
+                """, (checkout_request_id,))
+
+                mpesa_request = cur.fetchone()
+                if mpesa_request:
+                    sales_list_id, amount, invoice_no, customer_name = mpesa_request
+
+                    # Record the payment (similar to your existing record_payment function)
+                    # You can call your existing record_payment logic here
+                    # This would update the sales_list and create receipt records
+
+                    # For now, we'll just mark it as a TODO
+                    print(f"Payment successful for invoice {invoice_no}, amount: {amount}")
+
+        return jsonify({'ResultCode': 0, 'ResultDesc': 'Success'})
+
+    except Exception as e:
+        print(f"Error processing MPESA callback: {str(e)}")
+        return jsonify({'ResultCode': 1, 'ResultDesc': 'Error processing callback'})
 
 def create_subscription_tables():
     """Create subscription tables if they don't exist"""
