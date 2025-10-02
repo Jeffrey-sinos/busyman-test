@@ -30,9 +30,12 @@
             gap: 8px;
         }
         .superuser-text {
-            font-size: 1rem;
+            font-size: 0.5rem;
             color: #6c757d;
-            margin-bottom: 1.5rem;
+            margin-top: 1.5rem;
+            position: absolute;
+            bottom: 10px;
+            right: 15px;
         }
         h1 {
             color: #1dc91d;
@@ -49,6 +52,8 @@
             right: 15px;
             width: auto !important;
             margin: 0 !important;
+            font-size: 0.7rem;
+            padding: 2px 6px;
         }
         .heading-container {
             margin-bottom: 1.5rem;
@@ -67,8 +72,6 @@
             <p class="lead">Biashara Yangu Mkononi</p>
         </div>
 
-        <div class="superuser-text">Logged in as Superuser</div>
-
         <!-- Menu Buttons with Icons -->
         <a href="{{ url_for('sales_menu') }}" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-receipt"></i> Sales
@@ -82,6 +85,7 @@
         <a href="{{ url_for('admin_menu') }}" class="btn btn-sm btn-outline-success">
             <i class="bi bi-person"></i> Admin
         </a>
+        <div class="superuser-text">Logged in as Superuser</div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
