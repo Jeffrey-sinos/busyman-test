@@ -2596,8 +2596,7 @@ function initiateStkPushPayment() {
     .then(data => {
         if (data.success) {
             showMpesaResponse(
-                'MPESA STK Push initiated successfully. Please check your phone to complete the payment. ' +
-                'This modal will close automatically when payment is confirmed.',
+                'MPESA STK Push initiated successfully. Please check your phone to complete the payment. ',
                 'success'
             );
 
@@ -2673,9 +2672,7 @@ function pollForPaymentStatus(checkoutRequestId) {
                 } else {
                     // Still pending, update status message
                     showMpesaResponse(
-                        `Waiting for payment confirmation... (${attempts}/${maxAttempts})<br>
-                         Please check your phone and enter your MPESA PIN.<br>
-                         Status: ${data.result_desc || 'Pending'}`,
+                        `Waiting for payment confirmation... (${attempts}/${maxAttempts})<br>,
                         'info'
                     );
                 }
