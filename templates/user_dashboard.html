@@ -3,53 +3,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Main Menu - Busyman Pro</title>
+    <title>Main Menu - Shughuli Pap</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
         body {
             background-color: #f8f9fa;
         }
+        .text-center h1 {
+            font-size: 2rem;
+        }
         .menu-container {
             max-width: 400px;
             margin: 50px auto;
-            padding: 2rem;
+            padding: 1rem;
             background-color: #fff;
             border: 1px solid #dee2e6;
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
             text-align: center;
+            position: relative;
         }
         .menu-container .btn {
-            margin: 10px 0;
-            width: 100%;
+            margin: 10px auto;
+            width: 50%;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
         .user-text {
-            font-size: 1rem;
+            font-size: 0.5rem;
             color: #6c757d;
-            margin-bottom: 1.5rem;
+            margin-top: 2rem;
         }
         h1 {
             color: #1dc91d;
-            font-weight: bold;
+            font-weight: bold !important;
+            margin-top: 2rem;
         }
         .lead {
             font-size: 12px;
+            margin-bottom: 0.5rem;
+        }
+        .logout-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: auto !important;
+            margin: 0 !important;
+            font-size: 0.5rem;
+            padding: 2px 6px;
+        }
+        .heading-container {
+            margin-bottom: 1.5rem;
         }
     </style>
 </head>
 <body>
     <div class="menu-container">
-        <div class="text-center mb-5">
-            <h1 class="display-5">Shughuli Pap</h1>
+        <!-- Logout Button at Top Right -->
+        <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger logout-btn">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+
+        <div class="text-center heading-container">
+            <h1 class="display-6">Shughuli Pap</h1>
             <p class="lead">Biashara Yangu Mkononi</p>
         </div>
-        <div class="user-text">Logged in as user</div>
-        <a href="{{ url_for('sales_menu') }}" class="btn btn-outline-primary">Sales</a>
-        <a href="{{ url_for('payments_menu') }}" class="btn btn-outline-secondary">Payments</a>
-        <a href="{{ url_for('stores_menu') }}" class="btn btn-outline-info">Stores</a>
-        <a href="{{ url_for('admin_menu') }}" class="btn btn-outline-success">Admin</a>
-        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">Logout</a>
+
+        <!-- Menu Buttons with Icons -->
+        <a href="{{ url_for('sales_menu') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-receipt"></i> Sales
+        </a>
+        <a href="{{ url_for('payments_menu') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-credit-card"></i> Payments
+        </a>
+        <a href="{{ url_for('stores_menu') }}" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-shop"></i> Stores
+        </a>
+        <a href="{{ url_for('admin_menu') }}" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-person"></i> Admin
+        </a>
+        <div class="user-text">Logged in as User</div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
