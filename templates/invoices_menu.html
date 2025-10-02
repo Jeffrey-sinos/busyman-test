@@ -1328,6 +1328,47 @@
         </div>
     </div>
 
+    <!-- MPESA Payment Modal -->
+<div class="modal fade" id="mpesaModal" tabindex="-1" aria-labelledby="mpesaModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mpesaModalLabel">MPESA Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="mpesaPaymentForm">
+                <div class="modal-body">
+                    <input type="hidden" id="mpesaSalesListId">
+                    <input type="hidden" id="mpesaInvoiceNo">
+                    <input type="hidden" id="mpesaCustomerName">
+                    <input type="hidden" id="mpesaBalance">
+
+                    <div class="mb-3">
+                        <label for="phoneNumber" class="form-label">Phone Number *</label>
+                        <input type="text" class="form-control" id="phoneNumber"
+                               placeholder="2547XXXXXXXX" required pattern="2547\d{8}">
+                        <div class="form-text">Format: 2547XXXXXXXX (e.g., 254712345678)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Amount (Ksh) *</label>
+                        <input type="number" class="form-control" id="amount"
+                               min="1" step="1" required>
+                    </div>
+                    <div id="mpesaResponse" class="alert d-none" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success" id="initiateStkPush">
+                        <span id="stkPushText">Initiate Payment</span>
+                        <span id="stkPushSpinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
     <!-- Invoice Edit Modal -->
     <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1459,7 +1500,7 @@
         });
     </script>
 
-    <script>
+        <script>
         // Navigation functionality
         document.addEventListener('DOMContentLoaded', function() {
             // Navigation buttons
@@ -2461,6 +2502,127 @@
                     window.open(receiptUrl, '_blank');
                 });
             });
+			// MPESA Payment Functionality
+const mpesaInvoiceBtn = document.getElementById('mpesaInvoiceBtn');
+const mpesaModal = new bootstrap.Modal(document.getElementById('mpesaModal'));
+const mpesaPaymentForm = document.getElementById('mpesaPaymentForm');
+const initiateStkPush = document.getElementById('initiateStkPush');
+
+// Open MPESA modal
+mpesaInvoiceBtn.addEventListener('click', function() {
+    // Close details modal
+    const receiveDetailsModalInstance = bootstrap.Modal.getInstance(receiveDetailsModal);
+    receiveDetailsModalInstance.hide();
+
+    // Find the row that was clicked
+    const clickableRow = document.querySelector(`.clickable-row[data-sales-list-id="${currentInvoiceId}"]`);
+
+    // Populate MPESA modal
+    const balance = parseFloat(clickableRow.getAttribute('data-balance'));
+    const invoiceNo = clickableRow.getAttribute('data-invoice-no');
+    const customerName = clickableRow.getAttribute('data-customer-name');
+
+    document.getElementById('mpesaSalesListId').value = currentInvoiceId;
+    document.getElementById('mpesaInvoiceNo').value = invoiceNo;
+    document.getElementById('mpesaCustomerName').value = customerName;
+    document.getElementById('mpesaBalance').value = balance;
+    document.getElementById('description').value = `Payment for invoice ${invoiceNo}`;
+
+    // Reset form and messages
+    mpesaPaymentForm.reset();
+    document.getElementById('amount').value = ''; // Clear amount field
+    hideMpesaResponse();
+
+    mpesaModal.show();
+});
+
+// Real-time amount validation (removed balance check)
+document.getElementById('amount').addEventListener('input', function() {
+    const amount = parseFloat(this.value) || 0;
+
+    if (amount <= 0) {
+        this.classList.add('is-invalid');
+    } else {
+        this.classList.remove('is-invalid');
+    }
+});
+
+// MPESA form submission
+mpesaPaymentForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const amount = parseFloat(document.getElementById('amount').value);
+
+    if (amount <= 0) {
+        showMpesaResponse('Amount must be greater than 0', 'error');
+        return;
+    }
+
+    initiateStkPushPayment();
+});
+
+function initiateStkPushPayment() {
+    const btn = document.getElementById('initiateStkPush');
+    const text = document.getElementById('stkPushText');
+    const spinner = document.getElementById('stkPushSpinner');
+
+    // Show loading state
+    btn.disabled = true;
+    text.textContent = 'Processing...';
+    spinner.classList.remove('d-none');
+    hideMpesaResponse();
+
+    const formData = {
+        sales_list_id: document.getElementById('mpesaSalesListId').value,
+        invoice_no: document.getElementById('mpesaInvoiceNo').value,
+        customer_name: document.getElementById('mpesaCustomerName').value,
+        phone_number: document.getElementById('phoneNumber').value,
+        amount: document.getElementById('amount').value,
+        description: document.getElementById('description').value
+    };
+
+    fetch('/initiate_mpesa_payment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showMpesaResponse(data.message, 'success');
+            // Close modal after success
+            setTimeout(() => {
+                mpesaModal.hide();
+                location.reload(); // Refresh to update balances
+            }, 3000);
+        } else {
+            showMpesaResponse(data.message || 'Payment initiation failed', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error initiating MPESA payment:', error);
+        showMpesaResponse('Network error. Please try again.', 'error');
+    })
+    .finally(() => {
+        // Reset button state
+        btn.disabled = false;
+        text.textContent = 'Initiate Payment';
+        spinner.classList.add('d-none');
+    });
+}
+
+function showMpesaResponse(message, type) {
+    const responseDiv = document.getElementById('mpesaResponse');
+    responseDiv.textContent = message;
+    responseDiv.className = `alert alert-${type} d-block`;
+}
+
+function hideMpesaResponse() {
+    const responseDiv = document.getElementById('mpesaResponse');
+    responseDiv.className = 'alert d-none';
+}
         }
 
         function downloadAndRefresh(downloadUrl) {
@@ -2488,5 +2650,6 @@
         }
 
     </script>
+
 </body>
 </html>

@@ -637,7 +637,6 @@ def subscription_required():
 #         port=os.getenv('DB_PORT')
 #     )
 
-
 def get_mpesa_access_token():
     """Get M-Pesa access token"""
     api_url = "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
@@ -3289,6 +3288,7 @@ def get_unpaid_invoices(customer_name):
         app.logger.error(f"Error getting unpaid invoices: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+
 # Manage users route
 @app.route('/manage_users')
 def manage_users():
@@ -4790,31 +4790,6 @@ def delete_billing_account():
             'success': False,
             'message': f'Failed to delete account: {str(e)}'
         }), 500
-
-# def generate_next_invoice_number():
-#     conn = get_db_connection()
-#     cur = conn.cursor()
-#
-#     now = datetime.now()
-#     month = f"{now.month:02d}"
-#     year_short = f"{now.year % 100:02d}"
-#
-#     cur.execute(
-#         sql.SQL("SELECT invoice_number FROM invoices WHERE invoice_number LIKE %s ORDER BY id DESC LIMIT 1"),
-#         [f"TKB/{month}%/{year_short}"]
-#     )
-#     last_invoice = cur.fetchone()
-#
-#     if last_invoice:
-#         last_seq = int(last_invoice[0].split("/")[1][2:])
-#         next_seq = last_seq + 1
-#     else:
-#         next_seq = 1
-#
-#     invoice_number = f"TKB/{month}{next_seq:03d}/{year_short}"
-#     cur.close()
-#     conn.close()
-#     return invoice_number
 
 
 def generate_next_invoice_number():
