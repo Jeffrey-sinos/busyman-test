@@ -27,22 +27,23 @@
         display: flex;
         align-items: center;
         margin-bottom: 1.5rem;
+        justify-content: center;
     }
     .form-group label {
-        width: 120px;
+        width: auto;
         margin-bottom: 0;
-        text-align: right;
-        padding-right: 1rem;
+        text-align: left;
         flex-shrink: 0;
+        margin-right: 15px;
     }
     .form-group .input-container {
         flex: 1;
-        max-width: 250px; /* Limit the maximum width of input fields */
+        max-width: 200px; /* Limit the maximum width of input fields */
     }
 
     /* Input field styling - shorter lengths */
     .form-control {
-        max-width: 250px; /* Maximum width for all form controls */
+        max-width: 200px; /* Maximum width for all form controls */
         width: 100%;
     }
 
@@ -50,7 +51,7 @@
     .password-container {
         display: flex;
         width: 100%;
-        max-width: 250px; /* Match the input container width */
+        max-width: 200px; /* Match the input container width */
     }
     .password-container input {
         flex: 1;
@@ -94,29 +95,25 @@
         margin-bottom: 1.8rem !important;
     }
 
-    /* Responsive adjustments */
+    /* Responsive adjustments - Smaller inputs on mobile */
     @media (max-width: 576px) {
-        .form-group {
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        .form-group label {
-            width: 100%;
-            text-align: left;
-            padding-right: 0;
-            margin-bottom: 0.5rem;
-        }
         .form-group .input-container {
-            width: 100%;
-            max-width: none; /* Allow full width on mobile */
+            max-width: 200px; /* Reduced from 250px on mobile */
         }
+
         .form-control {
-            max-width: none; /* Allow full width on mobile */
+            max-width: 200px; /* Reduced from 250px on mobile */
         }
+
         .password-container {
-            max-width: none; /* Allow full width on mobile */
+            max-width: 200px; /* Reduced from 250px on mobile */
+        }
+
+        .form-group label {
+            width: auto; /* Slightly smaller label width on mobile */
         }
     }
+
 </style>
 </head>
 <body>
@@ -132,11 +129,11 @@
 </div>
 
 <div class="container mt-5">
-    <div class="text-center mb-5">
+    <div class="text-center mb-4">
         <h1 class="display-4">Shughuli Pap</h1>
         <p class="lead">Biashara Yangu Mkononi</p>
     </div>
-    <h2 class="text-center mt-5 login-heading">Login</h2>
+    <h2 class="text-center login-heading">Login</h2>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
