@@ -1500,7 +1500,7 @@
         });
     </script>
 
-        <script>
+    <script>
         // Navigation functionality
         document.addEventListener('DOMContentLoaded', function() {
             // Navigation buttons
@@ -2502,11 +2502,13 @@
                     window.open(receiptUrl, '_blank');
                 });
             });
-			// MPESA Payment Functionality
+// MPESA Payment Functionality
 const mpesaInvoiceBtn = document.getElementById('mpesaInvoiceBtn');
 const mpesaModal = new bootstrap.Modal(document.getElementById('mpesaModal'));
 const mpesaPaymentForm = document.getElementById('mpesaPaymentForm');
 const initiateStkPush = document.getElementById('initiateStkPush');
+
+let currentMpesaModal = null;
 
 // Open MPESA modal
 mpesaInvoiceBtn.addEventListener('click', function() {
@@ -2533,10 +2535,12 @@ mpesaInvoiceBtn.addEventListener('click', function() {
     document.getElementById('amount').value = ''; // Clear amount field
     hideMpesaResponse();
 
-    mpesaModal.show();
+    // Store the modal instance
+    currentMpesaModal = new bootstrap.Modal(document.getElementById('mpesaModal'));
+    currentMpesaModal.show();
 });
 
-// Real-time amount validation (removed balance check)
+// Real-time amount validation
 document.getElementById('amount').addEventListener('input', function() {
     const amount = parseFloat(this.value) || 0;
 
@@ -2591,31 +2595,108 @@ function initiateStkPushPayment() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            showMpesaResponse(data.message, 'success');
-            // Close modal after success
-            setTimeout(() => {
-                mpesaModal.hide();
-                location.reload(); // Refresh to update balances
-            }, 3000);
+            showMpesaResponse(
+                'MPESA STK Push initiated successfully. Please check your phone to complete the payment. ' +
+                'This modal will close automatically when payment is confirmed.',
+                'success'
+            );
+
+            // Disable form inputs
+            disableMpesaForm();
+
+            // Start polling for payment status
+            pollForPaymentStatus(data.checkout_request_id);
+
         } else {
             showMpesaResponse(data.message || 'Payment initiation failed', 'error');
+            // Re-enable button on error
+            resetMpesaButton();
         }
     })
     .catch(error => {
         console.error('Error initiating MPESA payment:', error);
         showMpesaResponse('Network error. Please try again.', 'error');
-    })
-    .finally(() => {
-        // Reset button state
-        btn.disabled = false;
-        text.textContent = 'Initiate Payment';
-        spinner.classList.add('d-none');
+        resetMpesaButton();
     });
+}
+
+function pollForPaymentStatus(checkoutRequestId) {
+    let attempts = 0;
+    const maxAttempts = 30; // 2.5 minutes (5 seconds * 30)
+
+    const checkStatus = setInterval(() => {
+        attempts++;
+
+        fetch('/check_mpesa_status?checkout_request_id=' + checkoutRequestId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'Completed') {
+                    // Payment successful
+                    clearInterval(checkStatus);
+                    showMpesaResponse(
+                        'Payment confirmed successfully! Closing...',
+                        'success'
+                    );
+
+                    // Close modal and refresh after delay
+                    setTimeout(() => {
+                        if (currentMpesaModal) {
+                            currentMpesaModal.hide();
+                        }
+                        location.reload();
+                    }, 2000);
+
+                } else if (data.status === 'Failed' || attempts >= maxAttempts) {
+                    // Payment failed or timeout
+                    clearInterval(checkStatus);
+                    showMpesaResponse(
+                        attempts >= maxAttempts ?
+                        'Payment timeout. Please check your phone and try again.' :
+                        'Payment failed. Please try again.',
+                        'error'
+                    );
+                    enableMpesaForm();
+                    resetMpesaButton();
+                }
+                // If still pending, continue polling
+            })
+            .catch(error => {
+                console.error('Error checking payment status:', error);
+                if (attempts >= maxAttempts) {
+                    clearInterval(checkStatus);
+                    showMpesaResponse('Status check timeout. Please refresh the page to check payment status.', 'warning');
+                    enableMpesaForm();
+                    resetMpesaButton();
+                }
+            });
+    }, 5000); // Check every 5 seconds
+}
+
+function disableMpesaForm() {
+    document.getElementById('phoneNumber').disabled = true;
+    document.getElementById('amount').disabled = true;
+    document.getElementById('initiateStkPush').disabled = true;
+}
+
+function enableMpesaForm() {
+    document.getElementById('phoneNumber').disabled = false;
+    document.getElementById('amount').disabled = false;
+    document.getElementById('initiateStkPush').disabled = false;
+}
+
+function resetMpesaButton() {
+    const btn = document.getElementById('initiateStkPush');
+    const text = document.getElementById('stkPushText');
+    const spinner = document.getElementById('stkPushSpinner');
+
+    btn.disabled = false;
+    text.textContent = 'Initiate Payment';
+    spinner.classList.add('d-none');
 }
 
 function showMpesaResponse(message, type) {
     const responseDiv = document.getElementById('mpesaResponse');
-    responseDiv.textContent = message;
+    responseDiv.innerHTML = message;
     responseDiv.className = `alert alert-${type} d-block`;
 }
 
@@ -2623,6 +2704,13 @@ function hideMpesaResponse() {
     const responseDiv = document.getElementById('mpesaResponse');
     responseDiv.className = 'alert d-none';
 }
+
+// Close modal handler to reset form if user manually closes
+document.getElementById('mpesaModal').addEventListener('hidden.bs.modal', function () {
+    enableMpesaForm();
+    resetMpesaButton();
+    hideMpesaResponse();
+});
         }
 
         function downloadAndRefresh(downloadUrl) {

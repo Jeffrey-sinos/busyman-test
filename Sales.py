@@ -766,7 +766,7 @@ def initiate_mpesa_payment():
                         'message': f'Amount exceeds invoice balance. Maximum allowed: Ksh {balance:,.2f}'
                     }), 400
 
-        # Rest of your MPESA implementation remains the same...
+        # Get access token
         access_token = get_mpesa_access_token()
         if not access_token:
             return jsonify({'success': False, 'message': 'Failed to get MPESA access token'}), 500
@@ -826,7 +826,8 @@ def initiate_mpesa_payment():
 
             return jsonify({
                 'success': True,
-                'message': 'MPESA STK Push initiated successfully. Please check your phone to complete payment.'
+                'message': 'MPESA STK Push initiated successfully.',
+                'checkout_request_id': response_data['CheckoutRequestID']
             })
 
         else:
@@ -935,6 +936,44 @@ def sales_mpesa_callback():
         print(f"Error processing MPESA callback: {str(e)}")
         return jsonify({'ResultCode': 1, 'ResultDesc': 'Error processing callback'})
 
+
+@app.route('/check_mpesa_status')
+def check_mpesa_status():
+    if 'org_id' not in session:
+        return jsonify({'status': 'error', 'message': 'Session expired'}), 401
+
+    org_id = session['org_id']
+    checkout_request_id = request.args.get('checkout_request_id')
+
+    if not checkout_request_id:
+        return jsonify({'status': 'error', 'message': 'Missing checkout request ID'}), 400
+
+    try:
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+            cur.execute(f"""
+                SELECT status, result_code, result_desc, mpesa_receipt_number
+                FROM {org_id}_mpesa_requests 
+                WHERE checkout_request_id = %s
+            """, (checkout_request_id,))
+
+            result = cur.fetchone()
+
+            if not result:
+                return jsonify({'status': 'NotFound'})
+
+            status, result_code, result_desc, mpesa_receipt = result
+
+            return jsonify({
+                'status': status,
+                'result_code': result_code,
+                'result_desc': result_desc,
+                'mpesa_receipt': mpesa_receipt
+            })
+
+    except Exception as e:
+        print(f"Error checking MPESA status: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 def create_subscription_tables():
     """Create subscription tables if they don't exist"""
