@@ -2046,7 +2046,7 @@ def invoices_menu():
                     SELECT id, customer_name, invoice_no, invoice_date, invoice_amount,
                         paid_amount, balance, payment_status, category, account_owner, reference_no
                     FROM {org_id}_sales_list
-                    WHERE 1=1  
+                    WHERE balance > 0 AND 1=1  
                 """
                 sales_params = []
 
