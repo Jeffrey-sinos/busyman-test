@@ -1096,14 +1096,22 @@ def record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_nam
             current_paid = float(current_paid or 0)
             invoice_amount = float(invoice_amount)
             current_balance = float(current_balance)
+            amount = float(amount)
 
             # Calculate new totals
-            total_paid = current_paid + float(amount)
+            total_paid = current_paid + amount
             balance = invoice_amount - total_paid
             payment_status = 'Paid' if balance == 0 else 'Not Paid'
 
-            # Generate receipt number
-            receipt_invoice_number = generate_next_invoice_number()
+            # Generate receipt number - NOW WITH org_id parameter
+            receipt_invoice_number = generate_next_invoice_number_for_org(org_id)
+
+            if not receipt_invoice_number:
+                error_msg = f"Failed to generate receipt number for org {org_id}"
+                log_error_to_file(error_msg)
+                return False
+
+            log_error_to_file(f"Generated receipt number: {receipt_invoice_number} for org {org_id}")
 
             # Insert receipt record
             cur.execute(f"""
@@ -1114,11 +1122,20 @@ def record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_nam
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING receipt_id
             """, (
-                datetime.now().date(), invoice_no, datetime.now().date(), customer_name,
-                amount, balance, receipt_invoice_number,
-                category, account_owner, mpesa_receipt_number
+                datetime.now().date(),
+                invoice_no,
+                datetime.now().date(),
+                customer_name,
+                amount,
+                balance,
+                receipt_invoice_number,
+                category,
+                account_owner,
+                mpesa_receipt_number
             ))
             receipt_id = cur.fetchone()[0]
+
+            log_error_to_file(f"Receipt created with ID: {receipt_id}, receipt number: {receipt_invoice_number}")
 
             # Create invoice record
             cur.execute(f"""
@@ -1126,6 +1143,8 @@ def record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_nam
                 VALUES (%s, %s)
                 ON CONFLICT (invoice_number) DO NOTHING
             """, (receipt_invoice_number, datetime.now()))
+
+            log_error_to_file(f"Invoice record created/confirmed for: {receipt_invoice_number}")
 
             # Update sales_list table
             cur.execute(f"""
@@ -1137,6 +1156,9 @@ def record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_nam
                 WHERE id = %s
             """, (total_paid, balance, payment_status, sales_list_id))
 
+            log_error_to_file(
+                f"Updated sales_list ID {sales_list_id}: paid={total_paid}, balance={balance}, status={payment_status}")
+
             # Update sales records
             cur.execute(f"""
                 UPDATE {org_id}_sales
@@ -1145,8 +1167,16 @@ def record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_nam
                 WHERE invoice_no = %s
             """, (payment_status, invoice_no))
 
+            log_error_to_file(f"Updated sales records for invoice {invoice_no} to status: {payment_status}")
+
+            # Explicitly commit the transaction
+            conn.commit()
+
             log_error_to_file(
-                f"MPESA Payment recorded successfully in database: {mpesa_receipt_number} for invoice {invoice_no}, amount: {amount}")
+                f"SUCCESS: MPESA Payment fully recorded - Receipt: {mpesa_receipt_number}, "
+                f"Invoice: {invoice_no}, Amount: {amount}, New Balance: {balance}, "
+                f"Receipt Number: {receipt_invoice_number}")
+
             return True
 
     except Exception as e:
@@ -5165,38 +5195,47 @@ def delete_billing_account():
         }), 500
 
 
+def generate_next_invoice_number_for_org(org_id):
+    """Generate invoice number for a specific organization (no session required)"""
+    try:
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+
+            now = datetime.now()
+            month = f"{now.month:02d}"
+            year_short = f"{now.year % 100:02d}"
+
+            # Query the tenant-specific invoices table
+            cur.execute(f"""
+                SELECT invoice_number FROM {org_id}_invoices 
+                WHERE invoice_number LIKE %s 
+                ORDER BY id DESC LIMIT 1
+            """, (f"TKB/{month}%/{year_short}",))
+
+            last_invoice = cur.fetchone()
+
+            if last_invoice:
+                # Extract sequence number from format: TKB/MM###/YY
+                last_seq = int(last_invoice[0].split("/")[1][2:])  # Get digits after MM
+                next_seq = last_seq + 1
+            else:
+                next_seq = 1
+
+            invoice_number = f"TKB/{month}{next_seq:03d}/{year_short}"
+            return invoice_number
+    except Exception as e:
+        log_error_to_file(f"Error generating invoice number for org {org_id}: {str(e)}")
+        return None
+
+
 def generate_next_invoice_number():
+    """Generate invoice number using session org_id"""
     if 'org_id' not in session:
         flash('Session expired. Please login again.', 'warning')
         return redirect(url_for('org_login'))
 
     org_id = session['org_id']
-
-    with get_db_connection2() as conn:
-        cur = conn.cursor()
-
-        now = datetime.now()
-        month = f"{now.month:02d}"
-        year_short = f"{now.year % 100:02d}"
-
-        # Query the tenant-specific invoices table
-        cur.execute(f"""
-            SELECT invoice_number FROM {org_id}_invoices 
-            WHERE invoice_number LIKE %s 
-            ORDER BY id DESC LIMIT 1
-        """, (f"TKB/{month}%/{year_short}",))
-
-        last_invoice = cur.fetchone()
-
-        if last_invoice:
-            # Extract sequence number from format: TKB/MM###/YY
-            last_seq = int(last_invoice[0].split("/")[1][2:])  # Get digits after MM
-            next_seq = last_seq + 1
-        else:
-            next_seq = 1
-
-        invoice_number = f"TKB/{month}{next_seq:03d}/{year_short}"
-        return invoice_number
+    return generate_next_invoice_number_for_org(org_id)
 
 
 @app.route('/get_next_invoice_number')
