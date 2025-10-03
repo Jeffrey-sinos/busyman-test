@@ -732,6 +732,156 @@ def check_user_subscription(user_id):
         return {'active': False, 'message': f'Error checking subscription: {str(e)}'}
 
 
+# @app.route('/initiate_mpesa_payment', methods=['POST'])
+# def initiate_mpesa_payment():
+#     if 'org_id' not in session:
+#         error_msg = "MPESA Initiation Failed: Session expired - org_id not in session"
+#         log_error_to_file(error_msg)
+#         return redirect(url_for('org_login'))
+#
+#     org_id = session['org_id']
+#     data = request.get_json()
+#
+#     # Validate required fields
+#     required_fields = ['sales_list_id', 'invoice_no', 'phone_number', 'amount']
+#     for field in required_fields:
+#         if not data.get(field):
+#             error_msg = f"MPESA Initiation Failed: Missing required field: {field} - Data: {data}"
+#             log_error_to_file(error_msg)
+#             return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
+#
+#     try:
+#         amount = float(data['amount'])
+#         if amount <= 0:
+#             error_msg = f"MPESA Initiation Failed: Amount must be greater than 0 - Amount: {amount}"
+#             log_error_to_file(error_msg)
+#             return jsonify({'success': False, 'message': 'Amount must be greater than 0'}), 400
+#
+#         # Optional: Check if amount exceeds balance (server-side only)
+#         with get_db_connection2() as conn:
+#             cur = conn.cursor()
+#             cur.execute(f"""
+#                 SELECT balance FROM {org_id}_sales_list
+#                 WHERE id = %s
+#             """, (data['sales_list_id'],))
+#             result = cur.fetchone()
+#
+#             if result:
+#                 balance = float(result[0])
+#                 if amount > balance:
+#                     error_msg = f"MPESA Initiation Failed: Amount exceeds invoice balance - Amount: {amount}, Balance: {balance}"
+#                     log_error_to_file(error_msg)
+#                     return jsonify({
+#                         'success': False,
+#                         'message': f'Amount exceeds invoice balance. Maximum allowed: Ksh {balance:,.2f}'
+#                     }), 400
+#
+#         # Get access token
+#         access_token = get_mpesa_access_token()
+#         if not access_token:
+#             error_msg = "MPESA Initiation Failed: Failed to get MPESA access token"
+#             log_error_to_file(error_msg)
+#             return jsonify({'success': False, 'message': 'Failed to get MPESA access token'}), 500
+#
+#         # Generate timestamp and password
+#         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+#         password = base64.b64encode(f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{timestamp}".encode()).decode()
+#
+#         # Prepare STK Push payload
+#         payload = {
+#             "BusinessShortCode": MPESA_SHORTCODE,
+#             "Password": password,
+#             "Timestamp": timestamp,
+#             "TransactionType": "CustomerBuyGoodsOnline",
+#             "Amount": int(amount),
+#             "PartyA": data['phone_number'],
+#             "PartyB": MPESA_TILL,
+#             "PhoneNumber": data['phone_number'],
+#             "CallBackURL": SALES_MPESA_CALLBACK_URL,
+#             "AccountReference": data['invoice_no'],
+#             "TransactionDesc": data.get('description', f"Payment for invoice {data['invoice_no']}")
+#         }
+#
+#         log_error_to_file(
+#             f"MPESA STK Push Initiation: Invoice: {data['invoice_no']}, Amount: {amount}, Phone: {data['phone_number']}, Payload: {payload}")
+#
+#         # Make STK Push request
+#         headers = {
+#             'Authorization': f'Bearer {access_token}',
+#             'Content-Type': 'application/json'
+#         }
+#
+#         response = requests.post(
+#             'https://api.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+#             json=payload,
+#             headers=headers,
+#             timeout=30
+#         )
+#
+#         response_data = response.json()
+#         log_error_to_file(f"MPESA API Response: Status: {response.status_code}, Data: {response_data}")
+#
+#         if response.status_code == 200 and response_data.get('ResponseCode') == '0':
+#             # STK Push initiated successfully
+#             with get_db_connection2() as conn:
+#                 cur = conn.cursor()
+#
+#                 cur.execute(f"""
+#                     INSERT INTO {org_id}_mpesa_requests
+#                     (checkout_request_id, merchant_request_id, invoice_no, phone_number,
+#                      amount, customer_name, sales_list_id, status)
+#                     VALUES (%s, %s, %s, %s, %s, %s, %s, 'Pending')
+#                 """, (
+#                     response_data['CheckoutRequestID'],
+#                     response_data['MerchantRequestID'],
+#                     data['invoice_no'],
+#                     data['phone_number'],
+#                     amount,
+#                     data.get('customer_name', ''),
+#                     data['sales_list_id']
+#                 ))
+#
+#             log_error_to_file(
+#                 f"MPESA STK Push Initiated Successfully: CheckoutRequestID: {response_data['CheckoutRequestID']}, MerchantRequestID: {response_data['MerchantRequestID']}")
+#
+#             return jsonify({
+#                 'success': True,
+#                 'message': 'MPESA STK Push initiated successfully.',
+#                 'checkout_request_id': response_data['CheckoutRequestID']
+#             })
+#
+#         else:
+#             error_message = response_data.get('errorMessage', 'MPESA API request failed')
+#             error_msg = f"MPESA Initiation Failed: API Error - {error_message}, Response: {response_data}"
+#             log_error_to_file(error_msg)
+#             return jsonify({
+#                 'success': False,
+#                 'message': f'Payment initiation failed: {error_message}'
+#             }), 400
+#
+#     except requests.exceptions.Timeout:
+#         error_msg = "MPESA Initiation Failed: Request timeout to MPESA API"
+#         log_error_to_file(error_msg)
+#         return jsonify({
+#             'success': False,
+#             'message': 'MPESA service timeout. Please try again.'
+#         }), 408
+#     except requests.exceptions.ConnectionError:
+#         error_msg = "MPESA Initiation Failed: Connection error to MPESA API"
+#         log_error_to_file(error_msg)
+#         return jsonify({
+#             'success': False,
+#             'message': 'Cannot connect to MPESA service. Please check your internet connection.'
+#         }), 503
+#     except Exception as e:
+#         error_msg = f"MPESA Initiation Failed: Unexpected error - {str(e)}\nTraceback: {traceback.format_exc()}"
+#         log_error_to_file(error_msg)
+#         return jsonify({
+#             'success': False,
+#             'message': f'Error initiating payment: {str(e)}'
+#         }), 500
+
+
 @app.route('/initiate_mpesa_payment', methods=['POST'])
 def initiate_mpesa_payment():
     if 'org_id' not in session:
@@ -750,6 +900,17 @@ def initiate_mpesa_payment():
             log_error_to_file(error_msg)
             return jsonify({'success': False, 'message': f'Missing required field: {field}'}), 400
 
+    # Get M-PESA config for this organization
+    mpesa_config = get_mpesa_config_for_org(org_id)
+
+    if not mpesa_config:
+        error_msg = f"MPESA Initiation Failed: No M-PESA configuration found for org: {org_id}"
+        log_error_to_file(error_msg)
+        return jsonify({
+            'success': False,
+            'message': 'M-PESA not configured for your organization. Please contact support.'
+        }), 400
+
     try:
         amount = float(data['amount'])
         if amount <= 0:
@@ -757,7 +918,7 @@ def initiate_mpesa_payment():
             log_error_to_file(error_msg)
             return jsonify({'success': False, 'message': 'Amount must be greater than 0'}), 400
 
-        # Optional: Check if amount exceeds balance (server-side only)
+        # Check if amount exceeds balance
         with get_db_connection2() as conn:
             cur = conn.cursor()
             cur.execute(f"""
@@ -776,34 +937,37 @@ def initiate_mpesa_payment():
                         'message': f'Amount exceeds invoice balance. Maximum allowed: Ksh {balance:,.2f}'
                     }), 400
 
-        # Get access token
-        access_token = get_mpesa_access_token()
+        # Get access token for this org
+        access_token = get_mpesa_access_token_for_org(org_id)
         if not access_token:
-            error_msg = "MPESA Initiation Failed: Failed to get MPESA access token"
+            error_msg = f"MPESA Initiation Failed: Failed to get MPESA access token for org: {org_id}"
             log_error_to_file(error_msg)
-            return jsonify({'success': False, 'message': 'Failed to get MPESA access token'}), 500
+            return jsonify({'success': False, 'message': 'Failed to authenticate with M-PESA'}), 500
 
         # Generate timestamp and password
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        password = base64.b64encode(f"{MPESA_SHORTCODE}{MPESA_PASSKEY}{timestamp}".encode()).decode()
+        password = base64.b64encode(
+            f"{mpesa_config['shortcode']}{mpesa_config['passkey']}{timestamp}".encode()
+        ).decode()
 
         # Prepare STK Push payload
         payload = {
-            "BusinessShortCode": MPESA_SHORTCODE,
+            "BusinessShortCode": mpesa_config['shortcode'],
             "Password": password,
             "Timestamp": timestamp,
             "TransactionType": "CustomerBuyGoodsOnline",
             "Amount": int(amount),
             "PartyA": data['phone_number'],
-            "PartyB": MPESA_TILL,
+            "PartyB": mpesa_config['till_number'],
             "PhoneNumber": data['phone_number'],
-            "CallBackURL": SALES_MPESA_CALLBACK_URL,
+            "CallBackURL": mpesa_config['callback_url'],
             "AccountReference": data['invoice_no'],
             "TransactionDesc": data.get('description', f"Payment for invoice {data['invoice_no']}")
         }
 
         log_error_to_file(
-            f"MPESA STK Push Initiation: Invoice: {data['invoice_no']}, Amount: {amount}, Phone: {data['phone_number']}, Payload: {payload}")
+            f"MPESA STK Push Initiation for org {org_id}: Invoice: {data['invoice_no']}, "
+            f"Amount: {amount}, Phone: {data['phone_number']}")
 
         # Make STK Push request
         headers = {
@@ -819,7 +983,7 @@ def initiate_mpesa_payment():
         )
 
         response_data = response.json()
-        log_error_to_file(f"MPESA API Response: Status: {response.status_code}, Data: {response_data}")
+        log_error_to_file(f"MPESA API Response for {org_id}: Status: {response.status_code}, Data: {response_data}")
 
         if response.status_code == 200 and response_data.get('ResponseCode') == '0':
             # STK Push initiated successfully
@@ -842,17 +1006,18 @@ def initiate_mpesa_payment():
                 ))
 
             log_error_to_file(
-                f"MPESA STK Push Initiated Successfully: CheckoutRequestID: {response_data['CheckoutRequestID']}, MerchantRequestID: {response_data['MerchantRequestID']}")
+                f"MPESA STK Push Initiated Successfully for {org_id}: "
+                f"CheckoutRequestID: {response_data['CheckoutRequestID']}")
 
             return jsonify({
                 'success': True,
-                'message': 'MPESA STK Push initiated successfully.',
+                'message': 'M-PESA STK Push initiated successfully.',
                 'checkout_request_id': response_data['CheckoutRequestID']
             })
 
         else:
             error_message = response_data.get('errorMessage', 'MPESA API request failed')
-            error_msg = f"MPESA Initiation Failed: API Error - {error_message}, Response: {response_data}"
+            error_msg = f"MPESA Initiation Failed for {org_id}: API Error - {error_message}"
             log_error_to_file(error_msg)
             return jsonify({
                 'success': False,
@@ -860,26 +1025,78 @@ def initiate_mpesa_payment():
             }), 400
 
     except requests.exceptions.Timeout:
-        error_msg = "MPESA Initiation Failed: Request timeout to MPESA API"
+        error_msg = f"MPESA Initiation Failed for {org_id}: Request timeout"
         log_error_to_file(error_msg)
         return jsonify({
             'success': False,
-            'message': 'MPESA service timeout. Please try again.'
+            'message': 'M-PESA service timeout. Please try again.'
         }), 408
-    except requests.exceptions.ConnectionError:
-        error_msg = "MPESA Initiation Failed: Connection error to MPESA API"
-        log_error_to_file(error_msg)
-        return jsonify({
-            'success': False,
-            'message': 'Cannot connect to MPESA service. Please check your internet connection.'
-        }), 503
     except Exception as e:
-        error_msg = f"MPESA Initiation Failed: Unexpected error - {str(e)}\nTraceback: {traceback.format_exc()}"
+        error_msg = f"MPESA Initiation Failed for {org_id}: {str(e)}\n{traceback.format_exc()}"
         log_error_to_file(error_msg)
         return jsonify({
             'success': False,
             'message': f'Error initiating payment: {str(e)}'
         }), 500
+
+
+def get_mpesa_config_for_org(org_id):
+    """Retrieve M-PESA configuration for a specific organization"""
+    try:
+        with get_db_connection2() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT consumer_key, consumer_secret, shortcode, till_number, 
+                       passkey, callback_url
+                FROM org_mpesa_configs 
+                WHERE org_id = %s AND is_active = TRUE
+            """, (org_id,))
+
+            result = cur.fetchone()
+
+            if result:
+                return {
+                    'consumer_key': result[0],
+                    'consumer_secret': result[1],
+                    'shortcode': result[2],
+                    'till_number': result[3],
+                    'passkey': result[4],
+                    'callback_url': result[5]
+                }
+            else:
+                log_error_to_file(f"No M-PESA config found for org_id: {org_id}")
+                return None
+
+    except Exception as e:
+        log_error_to_file(f"Error fetching M-PESA config for {org_id}: {str(e)}")
+        return None
+
+
+def get_mpesa_access_token_for_org(org_id):
+    """Get M-PESA access token for specific organization"""
+    config = get_mpesa_config_for_org(org_id)
+
+    if not config:
+        return None
+
+    try:
+        api_url = "https://api.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+
+        response = requests.get(
+            api_url,
+            auth=(config['consumer_key'], config['consumer_secret']),
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            return response.json().get('access_token')
+        else:
+            log_error_to_file(f"Failed to get access token for {org_id}: {response.text}")
+            return None
+
+    except Exception as e:
+        log_error_to_file(f"Error getting access token for {org_id}: {str(e)}")
+        return None
 
 
 @app.route('/sales_mpesa_callback', methods=['POST'])
