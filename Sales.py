@@ -67,6 +67,7 @@ MPESA_SHORTCODE = os.getenv('MPESA_SHORTCODE')
 MPESA_TILL = os.getenv('MPESA_TILL')
 MPESA_PASSKEY = os.getenv('MPESA_PASSKEY')
 MPESA_CALLBACK_URL = os.getenv('MPESA_CALLBACK_URL')
+SALES_MPESA_CALLBACK_URL = os.getenv('SALES_MPESA_CALLBACK_URL')
 
 ERROR_LOG_FILE = "error_log.txt"
 
@@ -736,7 +737,7 @@ def initiate_mpesa_payment():
     if 'org_id' not in session:
         error_msg = "MPESA Initiation Failed: Session expired - org_id not in session"
         log_error_to_file(error_msg)
-        return jsonify({'success': False, 'message': 'Session expired'}), 401
+        return redirect(url_for('org_login'))
 
     org_id = session['org_id']
     data = request.get_json()
@@ -796,7 +797,7 @@ def initiate_mpesa_payment():
             "PartyA": data['phone_number'],
             "PartyB": MPESA_TILL,
             "PhoneNumber": data['phone_number'],
-            "CallBackURL": MPESA_CALLBACK_URL,
+            "CallBackURL": SALES_MPESA_CALLBACK_URL,
             "AccountReference": data['invoice_no'],
             "TransactionDesc": data.get('description', f"Payment for invoice {data['invoice_no']}")
         }
@@ -1326,79 +1327,7 @@ def read_bank_accounts():
         print(f"Error reading bank accounts: {e}")
         return []
 
-# Display products function
-# def read_product_names():
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-#     try:
-#         cursor.execute("SELECT DISTINCT product FROM products ORDER BY product;")
-#         return [row[0] for row in cursor.fetchall()]
-#     except Exception as e:
-#         print(f"Error reading product names: {e}")
-#         return []
-#     finally:
-#         cursor.close()
-#         conn.close()
-#
-#
-# # Display categories function
-# def read_categories():
-#     return [
-#         "Books",
-#         "Consultancy",
-#         "Rent",
-#     ]
-#
-#
-# # Display account owners function
-# def read_account_owners():
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-#
-#     try:
-#         cursor.execute("SELECT DISTINCT account_owner FROM account_owner ORDER BY account_owner;")
-#         return [row[0] for row in cursor.fetchall()]
-#     except Exception as e:
-#         print(f"Error reading client names: {e}")
-#         return []
-#     finally:
-#         cursor.close
-#         conn.close
-#
-#
-# Display clients function
-# def read_client_names():
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-#     try:
-#         cursor.execute("SELECT customer_name FROM clients ORDER BY customer_name;")
-#         return [row[0] for row in cursor.fetchall()]
-#     except Exception as e:
-#         print(f"Error reading client names: {e}")
-#         return []
-#     finally:
-#         cursor.close()
-#         conn.close()
-#
-#
-# # Bank Accounts function
-# def read_bank_accounts():
-#     conn = get_db_connection()
-#     cursor = conn.cursor()
-#
-#     try:
-#         cursor.execute(
-#             "SELECT account_name || '-' || bank_name FROM banks ORDER BY account_name;")  # Concatenation of the account name and bank name
-#         return [row[0] for row in cursor.fetchall()]
-#     except Exception as e:
-#         print(f"Error reading bank accounts: {e}")
-#         return []
-#     finally:
-#         cursor.close()
-#         conn.close()
 
-
-# Password validation page
 def validate_password(password):
     """
     Password validation:
