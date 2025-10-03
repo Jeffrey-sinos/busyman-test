@@ -173,6 +173,15 @@
             border-color: #000;
             color: white;
         }
+        #actionButtonsContainer {
+            animation: fadeIn 0.3s ease-in-out;
+            display: none;
+        }
+
+        #actionButtonsContainer .btn {
+            white-space: nowrap;
+            font-size: 0.8rem;
+        }
 
         /* Filter styling */
         .filter-bar {
@@ -422,10 +431,19 @@
         }
 
         /* Mobile responsiveness */
-        /* Mobile responsiveness */
         @media (max-width: 992px) {
             .main-container {
                 padding: 0 10px;
+            }
+            #actionButtonsContainer {
+                justify-content: flex-end;
+                flex-direction: row;
+                gap: 8px;
+            }
+
+            #actionButtonsContainer .btn {
+                flex: 0 0 auto;
+                font-size: 0.8rem;
             }
 
             .filter-bar {
@@ -805,9 +823,11 @@
                 <div id="invoicePreview" style="display: none;">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h5 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Invoice Preview</h5>
+                        <!--
                         <a href="#" class="btn btn-success" id="downloadInvoiceBtn" target="_blank">
                             <i class="bi bi-download me-2"></i>Download Invoice
                         </a>
+                        -->
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-6">
@@ -818,25 +838,27 @@
                         </div>
                     </div>
 
-                    <table class="items-table table table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Description</th>
-                                <th>Quantity</th>
-                                <th>Unit Price</th>
-                                <th>Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody id="invoiceItems">
-                            <!-- Items will be added here dynamically -->
-                        </tbody>
-                        <tfoot>
-                            <tr class="total-row">
-                                <td colspan="3"><strong>TOTAL</strong></td>
-                                <td><strong>Ksh <span id="previewTotal">0.00</span></strong></td>
-                            </tr>
-                        </tfoot>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="items-table table table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Description</th>
+                                    <th>Quantity</th>
+                                    <th>Unit Price</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoiceItems">
+                                <!-- Items will be added here dynamically -->
+                            </tbody>
+                            <tfoot>
+                                <tr class="total-row">
+                                    <td colspan="3"><strong>TOTAL</strong></td>
+                                    <td><strong>Ksh <span id="previewTotal">0.00</span></strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                 </div>
                 <div id="pdfLinksContainer" class="mt-3" style="display: none;">
                         <h5>Generated Invoices</h5>
@@ -1556,39 +1578,113 @@
             initializeSearchFunctionality();
         });
 
-		function resetToClientSearch() {
-                // Reset all sections
-                salesFormSection.classList.remove('active');
-                transactionTypeSection.classList.remove('active');
-                clientSearchSection.classList.add('active');
+        let currentItems = [];
+        let currentInvoiceUrl = '';
+        let currentTransactionType = 'sell';
 
-                //showBackToMenuButton();
-                // Reset form
-                resetFormForNewItem();
-                document.getElementById('account').value = '';
-                document.getElementById('bank_account').value = '';
-                clientNameInput.value = '';
-                selectedClientDisplay.textContent = 'No client selected';
+        function resetSalesForm() {
+            const requiredFields = {
+                'product': 'Product is required',
+                'quantity': 'Quantity is required',
+                'price': 'Price is required',
+                'category': 'Category is required',
+                'account': 'Account Owner is required',
+                'bank_account': 'Bank Account is required'
+            };
+            // Reset all form fields
+            document.getElementById('product').value = '';
+            document.getElementById('quantity').value = '1';
+            document.getElementById('price').value = '';
+            document.getElementById('category').value = '';
+            document.getElementById('account').value = '';
+            document.getElementById('bank_account').value = '';
+            document.getElementById('notes').value = '';
+            document.getElementById('description').value = '';
 
-                // Reset state
-                currentItems = [];
-                currentInvoiceUrl = '';
-
-                // Hide sections
-                addAnotherSection.style.display = 'none';
-                document.getElementById('invoicePreview').style.display = 'none';
-                document.getElementById('pdfLinksContainer').style.display = 'none';
-
-                // Hide add client button and alert
-                addClientBtnContainer.style.display = 'none';
-                clientNotFoundAlert.style.display = 'none';
-
-                // Show save button
-                saveSaleBtn.style.display = 'block';
-
-                // Stop any loading
-                stopLoading();
+            const dateInput = document.getElementById('invDate');
+            if (dateInput && dateInput._flatpickr) {
+                dateInput._flatpickr.clear(); // This is the proper way to clear Flatpickr
+            } else {
+                dateInput.value = ''; // Fallback
             }
+
+            // Reset validation states
+            Object.keys(requiredFields).forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                const fieldContainer = field.parentNode;
+                const errorElement = fieldContainer.querySelector('.field-error-message');
+
+                field.classList.remove('field-error', 'field-valid');
+                if (errorElement) {
+                    errorElement.classList.remove('show');
+                }
+            });
+
+            currentItems = [];
+            currentInvoiceUrl = '';
+
+            // Hide any preview sections
+            document.getElementById('invoicePreview').style.display = 'none';
+            document.getElementById('pdfLinksContainer').style.display = 'none';
+
+            // Hide action buttons if they exist
+            const actionButtonsContainer = document.getElementById('actionButtonsContainer');
+            if (actionButtonsContainer) {
+                actionButtonsContainer.remove();
+            }
+
+            // Ensure save button is visible
+            saveSaleBtn.style.display = 'block';
+            backToTransactionTypeBtn.style.display = 'block';
+        }
+
+        function stopLoading() {
+            saveSaleBtn.disabled = false;
+            saveLoader.style.display = 'none';
+        }
+
+        function resetCurrentItems() {
+            currentItems = [];
+            currentInvoiceUrl = '';
+        }
+		function resetToClientSearch() {
+		    resetSalesForm();
+		    resetCurrentItems();
+            // Reset all sections
+            salesFormSection.classList.remove('active');
+            transactionTypeSection.classList.remove('active');
+            clientSearchSection.classList.add('active');
+
+            //showBackToMenuButton();
+            document.getElementById('account').value = '';
+            document.getElementById('bank_account').value = '';
+            //clientNameInput.value = '';
+            //selectedClientDisplay.textContent = 'No client selected';
+
+            // Reset state
+            currentItems = [];
+            currentInvoiceUrl = '';
+
+            const actionButtonsContainer = document.getElementById('actionButtonsContainer');
+            if (actionButtonsContainer) {
+                actionButtonsContainer.style.display = 'none';
+            }
+
+            // Hide sections
+            addAnotherSection.style.display = 'none';
+            document.getElementById('invoicePreview').style.display = 'none';
+            document.getElementById('pdfLinksContainer').style.display = 'none';
+
+            // Hide add client button and alert
+            addClientBtnContainer.style.display = 'none';
+            clientNotFoundAlert.style.display = 'none';
+
+            // Show save button
+            saveSaleBtn.style.display = 'block';
+
+            // Stop any loading
+            stopLoading();
+        }
 
         // Create Invoice Functionality
         function initializeCreateInvoice() {
@@ -1606,7 +1702,7 @@
             const addAnotherSection = document.getElementById('addAnotherSection');
             const addAnotherYesBtn = document.getElementById('addAnotherYesBtn');
             const addAnotherNoBtn = document.getElementById('addAnotherNoBtn');
-            const downloadInvoiceBtn = document.getElementById('downloadInvoiceBtn');
+            //const downloadInvoiceBtn = document.getElementById('downloadInvoiceBtn');
             const saveSaleBtn = document.getElementById('saveSaleBtn');
             const sellBtn = document.getElementById('sellBtn');
             const takeBackBtn = document.getElementById('takeBackBtn');
@@ -1618,10 +1714,6 @@
             const addClientBtnContainer = document.getElementById('addClientBtnContainer');
             const clientNotFoundAlert = document.getElementById('clientNotFoundAlert');
             const proceedBtn = document.getElementById('proceedBtn');
-            // State variables
-            let currentItems = [];
-            let currentInvoiceUrl = '';
-            let currentTransactionType = 'sell';
 
 
             // Required fields configuration
@@ -1667,6 +1759,7 @@
                 }
                 return true;
             }
+
             document.getElementById('addClientForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 const form = e.target;
@@ -1970,11 +2063,13 @@
 
             // Navigation buttons
             backToClientSearchBtn.addEventListener('click', function() {
+                resetSalesForm();
                 transactionTypeSection.classList.remove('active');
                 clientSearchSection.classList.add('active');
             });
 
             backToTransactionTypeBtn.addEventListener('click', function() {
+                resetSalesForm();
                 salesFormSection.classList.remove('active');
                 transactionTypeSection.classList.add('active');
             });
@@ -2000,7 +2095,6 @@
                 startLoading();
 
                 const formData = {
-                    //invoice_date: invoiceDate.value,
                     invoice_date: invDate.value,
                     invoice_number: invoiceNumber.value,
                     client_name: customerNameDisplay.value,
@@ -2045,11 +2139,13 @@
                             currentInvoiceUrl = data.invoice_url;
                         }
 
-                        // Hide save button and show add another section
+                        // Hide save button and cancel button
                         saveSaleBtn.style.display = 'none';
-                        addAnotherSection.style.display = 'block';
+                        backToTransactionTypeBtn.style.display = 'none';
 
-                        // Don't show preview yet - wait for user decision
+                        // Show the action buttons section
+                        showActionButtons();
+
                     } else {
                         alert(data.message || 'An error occurred while saving the sale');
                     }
@@ -2060,6 +2156,89 @@
                     alert('An error occurred while saving the sale');
                 });
             });
+
+            function showActionButtons() {
+                // Create action buttons container if it doesn't exist
+                let actionButtonsContainer = document.getElementById('actionButtonsContainer');
+                if (!actionButtonsContainer) {
+                    actionButtonsContainer = document.createElement('div');
+                    actionButtonsContainer.id = 'actionButtonsContainer';
+                    actionButtonsContainer.className = 'mt-4 d-flex justify-content-end gap-2';
+
+                    // Add buttons (same markup as before)
+                    actionButtonsContainer.innerHTML = `
+                        <button type="button" class="btn btn-sm btn-primary" id="addItemsBtn">
+                            Add Items
+                        </button>
+                        <button type="button" class="btn btn-sm btn-info" id="viewInvoiceBtn">
+                            View
+                        </button>
+                        <button type="button" class="btn btn-sm btn-success" id="downloadInvoiceActionBtn">
+                            <i class="bi bi-download me-2"></i>Download Invoice
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="finishBtn">
+                            Finish
+                        </button>
+                    `;
+
+                    // Insert after the save button container
+                    const saveButtonContainer = document.querySelector('.col-12.mt-3.d-flex.justify-content-end.gap-2');
+                    if (saveButtonContainer && saveButtonContainer.parentNode) {
+                        saveButtonContainer.parentNode.insertBefore(actionButtonsContainer, saveButtonContainer.nextSibling);
+                    } else {
+                        // fallback: append to form area
+                        document.querySelector('.card-body')?.appendChild(actionButtonsContainer);
+                    }
+
+                    // *** Attach listeners ONCE when container is created ***
+                    const addItemsBtn = actionButtonsContainer.querySelector('#addItemsBtn');
+                    const viewInvoiceBtn = actionButtonsContainer.querySelector('#viewInvoiceBtn');
+                    const downloadInvoiceActionBtn = actionButtonsContainer.querySelector('#downloadInvoiceActionBtn');
+                    const finishBtn = actionButtonsContainer.querySelector('#finishBtn');
+
+                    addItemsBtn.addEventListener('click', function() {
+                        resetFormForNewItem();
+                        actionButtonsContainer.style.display = 'none';
+                        saveSaleBtn.style.display = 'block';
+                        document.getElementById('product').focus();
+                    });
+
+                    viewInvoiceBtn.addEventListener('click', function() {
+                        // Show the invoice preview
+                        updateInvoicePreview(
+                            invoiceNumber.value,
+                            invDate.value,
+                            customerNameDisplay.value,
+                            currentTransactionType,
+                            currentItems
+                        );
+                        document.getElementById('invoicePreview').style.display = 'block';
+                        actionButtonsContainer.style.display = 'none';
+                    });
+
+                    downloadInvoiceActionBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        if (currentInvoiceUrl) {
+                            const iframe = document.createElement('iframe');
+                            iframe.style.display = 'none';
+                            iframe.src = currentInvoiceUrl;
+                            document.body.appendChild(iframe);
+                            // show toast if you have it
+                            if (typeof downloadSuccessToast !== 'undefined') {
+                                downloadSuccessToast.show();
+                            }
+                        }
+                    });
+
+                    finishBtn.addEventListener('click', function() {
+                        resetToClientSearch();
+                    });
+                }
+
+                // Always make sure it's visible when called
+                actionButtonsContainer.style.display = 'flex';
+            }
+
 
             function showMultiplePdfLinks(pdfUrls){
                 const pdfLinksContainer = document.getElementById('pdfLinksContainer');
@@ -2125,21 +2304,22 @@
 
                 document.getElementById('previewTotal').textContent = totalAmount.toFixed(2);
             }
-            downloadInvoiceBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (currentInvoiceUrl) {
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    iframe.src = currentInvoiceUrl;
-                    document.body.appendChild(iframe);
-                    downloadSuccessToast.show();
+
+            //downloadInvoiceBtn.addEventListener('click', function(e) {
+              //  e.preventDefault();
+                //if (currentInvoiceUrl) {
+                  //  const iframe = document.createElement('iframe');
+                    //iframe.style.display = 'none';
+                    //iframe.src = currentInvoiceUrl;
+                    //document.body.appendChild(iframe);
+                    //downloadSuccessToast.show();
 
                     // Return to client search instead of exiting
-                    setTimeout(function() {
-                        resetToClientSearch();
-                    }, 2000);
-                }
-            });
+                    //setTimeout(function() {
+                      //  resetToClientSearch();
+                    //}, 2000);
+                //}
+            //});
 
             function formatDate(dateString) {
                 if (!dateString) return '';
@@ -2152,6 +2332,8 @@
                 document.getElementById('quantity').value = '1';
                 document.getElementById('price').value = '';
                 document.getElementById('category').value = '';
+                document.getElementById('account').value = '';
+                document.getElementById('bank_account').value = '';
                 document.getElementById('notes').value = '';
 
                 Object.keys(requiredFields).forEach(fieldId => {
