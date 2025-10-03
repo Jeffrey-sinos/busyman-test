@@ -915,88 +915,94 @@ def sales_mpesa_callback():
             elif item['Name'] == 'PhoneNumber':
                 phone_number = item.get('Value')
 
-        # Update MPESA request record
+        # Find the organization and update MPESA request record
         with get_db_connection2() as conn:
             cur = conn.cursor()
 
-            # Find the organization that this payment belongs to
+            # Find the organization using a safer query
             cur.execute("""
-                SELECT table_name FROM information_schema.tables 
-                WHERE table_name LIKE '%_mpesa_requests' 
-                AND table_name IN (
-                    SELECT table_name FROM information_schema.tables 
-                    WHERE table_name LIKE %s
-                )
-            """, (f"%_mpesa_requests",))
+                SELECT schemaname, tablename 
+                FROM pg_tables 
+                WHERE tablename LIKE '%_mpesa_requests' 
+                AND schemaname = 'public'
+            """)
 
             tables = cur.fetchall()
             org_id = None
             table_name = None
+            request_data = None
 
-            for table in tables:
-                cur.execute(f"SELECT COUNT(*) FROM {table[0]} WHERE checkout_request_id = %s", (checkout_request_id,))
-                if cur.fetchone()[0] > 0:
-                    table_name = table[0]
-                    org_id = table_name.split('_')[0]
-                    break
+            for schema, table in tables:
+                try:
+                    cur.execute(f"""
+                        SELECT sales_list_id, amount, invoice_no, customer_name 
+                        FROM {table} 
+                        WHERE checkout_request_id = %s
+                    """, (checkout_request_id,))
+                    result = cur.fetchone()
 
-            if not table_name:
+                    if result:
+                        table_name = table
+                        org_id = table.replace('_mpesa_requests', '')
+                        request_data = result
+                        break
+                except Exception as e:
+                    log_error_to_file(f"Error checking table {table}: {str(e)}")
+                    continue
+
+            if not table_name or not request_data:
                 error_msg = f"MPESA Callback: Request not found for checkout_request_id: {checkout_request_id}"
                 log_error_to_file(error_msg)
-                return jsonify({'ResultCode': 1, 'ResultDesc': 'Request not found'})
+                return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'})  # Still return success to Safaricom
 
-            # Update MPESA request
+            sales_list_id, original_amount, invoice_no, customer_name = request_data
+
+            # Update MPESA request status
             if result_code == 0:
                 # Payment successful
-                status = 'Completed'
                 cur.execute(f"""
                     UPDATE {table_name} 
-                    SET status = %s, result_code = %s, result_desc = %s,
-                        mpesa_receipt_number = %s, transaction_date = TO_TIMESTAMP(%s, 'YYYYMMDDHH24MISS'),
+                    SET status = 'Completed', 
+                        result_code = %s, 
+                        result_desc = %s,
+                        mpesa_receipt_number = %s, 
+                        transaction_date = TO_TIMESTAMP(%s, 'YYYYMMDDHH24MISS'),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE checkout_request_id = %s
-                    RETURNING sales_list_id, amount, invoice_no, customer_name
-                """, (
-                    status,
-                    result_code,
-                    result_desc,
-                    mpesa_receipt_number,
-                    transaction_date,
-                    checkout_request_id
-                ))
+                """, (result_code, result_desc, mpesa_receipt_number, str(transaction_date), checkout_request_id))
 
-                result = cur.fetchone()
-                if result:
-                    sales_list_id, amount, invoice_no, customer_name = result
-
-                    # Record the payment in your system
-                    if record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_name,
-                                            mpesa_receipt_number):
-                        log_error_to_file(
-                            f"MPESA Payment recorded successfully: {mpesa_receipt_number} for invoice {invoice_no}, amount: {amount}")
-                    else:
-                        log_error_to_file(
-                            f"Failed to record MPESA payment: {mpesa_receipt_number} for invoice {invoice_no}")
+                # Record the payment
+                if record_mpesa_payment(org_id, sales_list_id, amount, invoice_no, customer_name, mpesa_receipt_number):
+                    log_error_to_file(
+                        f"MPESA Payment recorded successfully: {mpesa_receipt_number} for invoice {invoice_no}")
+                else:
+                    log_error_to_file(
+                        f"Failed to record MPESA payment: {mpesa_receipt_number} for invoice {invoice_no}")
 
             else:
                 # Payment failed or cancelled
-                status = 'Failed'
                 cur.execute(f"""
                     UPDATE {table_name} 
-                    SET status = %s, result_code = %s, result_desc = %s,
+                    SET status = 'Failed', 
+                        result_code = %s, 
+                        result_desc = %s,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE checkout_request_id = %s
-                """, (status, result_code, result_desc, checkout_request_id))
+                """, (result_code, result_desc, checkout_request_id))
+
                 log_error_to_file(
                     f"MPESA Payment failed: {checkout_request_id} - Result: {result_code} - {result_desc}")
 
-        log_error_to_file(f"MPESA Callback Processed: {checkout_request_id} - Result: {result_code} - {result_desc}")
+            # Commit the transaction explicitly
+            conn.commit()
+
+        log_error_to_file(f"MPESA Callback Processed Successfully: {checkout_request_id} - Status: {result_code}")
         return jsonify({'ResultCode': 0, 'ResultDesc': 'Success'})
 
     except Exception as e:
         error_msg = f"Error processing MPESA callback: {str(e)}\nTraceback: {traceback.format_exc()}"
         log_error_to_file(error_msg)
-        return jsonify({'ResultCode': 1, 'ResultDesc': 'Error processing callback'})
+        return jsonify({'ResultCode': 0, 'ResultDesc': 'Accepted'})  # Still return success to avoid retries
 
 
 @app.route('/check_mpesa_status')
@@ -1017,8 +1023,13 @@ def check_mpesa_status():
     try:
         with get_db_connection2() as conn:
             cur = conn.cursor()
+
+            # Add debugging
+            log_error_to_file(f"Checking MPESA status for org_id: {org_id}, checkout_id: {checkout_request_id}")
+
             cur.execute(f"""
-                SELECT status, result_code, result_desc, mpesa_receipt_number, invoice_no, amount
+                SELECT status, result_code, result_desc, mpesa_receipt_number, 
+                       invoice_no, amount, updated_at
                 FROM {org_id}_mpesa_requests 
                 WHERE checkout_request_id = %s
             """, (checkout_request_id,))
@@ -1028,9 +1039,11 @@ def check_mpesa_status():
             if not result:
                 error_msg = f"MPESA Status Check: Request not found - CheckoutRequestID: {checkout_request_id}"
                 log_error_to_file(error_msg)
-                return jsonify({'status': 'NotFound'})
+                return jsonify({'status': 'Pending'})  # Return Pending instead of NotFound
 
-            status, result_code, result_desc, mpesa_receipt, invoice_no, amount = result
+            status, result_code, result_desc, mpesa_receipt, invoice_no, amount, updated_at = result
+
+            log_error_to_file(f"Found MPESA record: status={status}, result_code={result_code}, updated={updated_at}")
 
             response_data = {
                 'status': status,
@@ -1038,10 +1051,10 @@ def check_mpesa_status():
                 'result_desc': result_desc,
                 'mpesa_receipt': mpesa_receipt,
                 'invoice_no': invoice_no,
-                'amount': amount
+                'amount': float(amount) if amount else 0
             }
 
-            # If payment is completed, also check if it was recorded in sales_list
+            # If payment is completed, check sales_list
             if status == 'Completed':
                 cur.execute(f"""
                     SELECT payment_status, balance FROM {org_id}_sales_list 
@@ -1051,14 +1064,7 @@ def check_mpesa_status():
                 if sales_result:
                     response_data['payment_status'] = sales_result[0]
                     response_data['current_balance'] = float(sales_result[1])
-                    log_error_to_file(
-                        f"MPESA Status Check - Completed: Invoice {invoice_no}, Receipt: {mpesa_receipt}, Sales Status: {sales_result[0]}, Balance: {sales_result[1]}")
-                else:
-                    log_error_to_file(
-                        f"MPESA Status Check - Completed but sales record not found: Invoice {invoice_no}")
 
-            log_error_to_file(
-                f"MPESA Status Check: CheckoutRequestID: {checkout_request_id}, Status: {status}, Result: {result_code}")
             return jsonify(response_data)
 
     except Exception as e:
