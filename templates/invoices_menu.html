@@ -436,14 +436,14 @@
                 padding: 0 10px;
             }
             #actionButtonsContainer {
-                justify-content: flex-end;
-                flex-direction: row;
-                gap: 8px;
+                justify-content: flex-end !important;
+                display: flex;
+                flex-wrap: nowrap;     /* prevent wrapping */
+                gap: 4px;
             }
 
             #actionButtonsContainer .btn {
-                flex: 0 0 auto;
-                font-size: 0.8rem;
+                font-size: 0.65rem;
             }
 
             .filter-bar {
@@ -2165,6 +2165,8 @@
                     actionButtonsContainer.id = 'actionButtonsContainer';
                     actionButtonsContainer.className = 'mt-4 d-flex justify-content-end gap-2';
 
+
+
                     // Add buttons (same markup as before)
                     actionButtonsContainer.innerHTML = `
                         <button type="button" class="btn btn-sm btn-primary" id="addItemsBtn">
@@ -2174,7 +2176,7 @@
                             View
                         </button>
                         <button type="button" class="btn btn-sm btn-success" id="downloadInvoiceActionBtn">
-                            <i class="bi bi-download me-2"></i>Download Invoice
+                            <i class="bi bi-download me-2"></i>Download
                         </button>
                         <button type="button" class="btn btn-sm btn-secondary" id="finishBtn">
                             Finish
