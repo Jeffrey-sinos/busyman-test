@@ -197,3 +197,4 @@ cython_debug/
 /sales_list.txt
 /receipts.txt
 /ex.py
+/billing-accounts.xlsx
